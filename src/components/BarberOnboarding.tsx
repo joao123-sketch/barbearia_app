@@ -272,9 +272,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
       <div className="w-full max-w-lg mx-auto space-y-6">
         {/* Header com Logo e Título */}
         <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center mx-auto shadow-xl shadow-amber-500/20">
-            <Scissors className="w-7 h-7" />
-          </div>
+          <img src="/logo-js.png" alt="SuaAgenda" className="w-24 h-24 rounded-3xl mx-auto shadow-lg" />
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
             Cadastre seu negócio
           </h1>

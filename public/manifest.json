@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "BarberApp - Agendamento",
-  "short_name": "BarberApp",
+  "name": "SuaAgenda",
+  "short_name": "SuaAgenda",
   "description": "Agende seu corte e barba em segundos com a sua barbearia favorita.",
   "lang": "pt-BR",
   "start_url": "/",

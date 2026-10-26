@@ -35,8 +35,8 @@ export function applyDefaultPwa(pathname: string) {
   const isAdminArea = pathname.startsWith('/admin') || pathname.startsWith('/login') || pathname.startsWith('/cadastr')
   setLink('manifest', isAdminArea ? '/manifest-admin.json' : '/manifest.json')
   setLink('apple-touch-icon', '/apple-touch-icon.png')
-  setMeta('apple-mobile-web-app-title', isAdminArea ? 'Painel' : 'BarberApp')
-  document.title = isAdminArea ? 'Painel | BarberApp' : 'BarberApp | Agendamento Online'
+  setMeta('apple-mobile-web-app-title', 'SuaAgenda')
+  document.title = isAdminArea ? 'Painel | SuaAgenda' : 'SuaAgenda | Agendamento Online'
 }
 
 export function registerServiceWorker() {

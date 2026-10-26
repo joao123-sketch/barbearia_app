@@ -1,7 +1,7 @@
 {
   "id": "/admin",
-  "name": "BarberApp - Painel do Barbeiro",
-  "short_name": "Painel Barbeiro",
+  "name": "SuaAgenda - Painel",
+  "short_name": "SuaAgenda",
   "description": "Gerencie sua agenda, equipe e horários direto do celular.",
   "lang": "pt-BR",
   "start_url": "/admin",

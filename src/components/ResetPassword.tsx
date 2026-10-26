@@ -41,7 +41,8 @@ export const ResetPassword: React.FC = () => {
       className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center px-4 py-8 select-none"
     >
       <div className="w-full max-w-sm mx-auto space-y-6">
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-3">
+          <img src="/logo-js.png" alt="SuaAgenda" className="w-24 h-24 rounded-3xl mx-auto shadow-lg" />
           <h1 className="text-2xl font-black text-white tracking-tight">Nova senha</h1>
           <p className="text-xs text-slate-400">Escolha uma nova senha para entrar na sua conta.</p>
         </div>

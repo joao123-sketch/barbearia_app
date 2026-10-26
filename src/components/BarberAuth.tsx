@@ -98,7 +98,8 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
       className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center px-4 py-8 select-none"
     >
       <div className="w-full max-w-sm mx-auto space-y-6">
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-3">
+          <img src="/logo-js.png" alt="SuaAgenda" className="w-24 h-24 rounded-3xl mx-auto shadow-lg" />
           <h1 className="text-2xl font-black text-white tracking-tight">
             {view === 'login' ? 'Entrar' : 'Recuperar senha'}
           </h1>

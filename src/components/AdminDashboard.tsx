@@ -2276,7 +2276,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <div>
                   <h3 className="font-bold text-base text-white">Sua Mensalidade & Assinatura</h3>
-                  <p className="text-xs text-slate-400">Gerenciamento do plano do seu negócio no BarberApp</p>
+                  <p className="text-xs text-slate-400">Gerenciamento do plano do seu negócio na SuaAgenda</p>
                 </div>
               </div>
 
@@ -2695,7 +2695,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <h4 className="font-bold text-sm text-white">Zona de Perigo</h4>
               </div>
               <p className="text-slate-400 text-xs">
-                Se você não deseja mais utilizar o BarberApp, pode excluir permanentemente a sua conta. Todos os seus dados, histórico e link de clientes serão apagados.
+                Se você não deseja mais utilizar a SuaAgenda, pode excluir permanentemente a sua conta. Todos os seus dados, histórico e link de clientes serão apagados.
               </p>
               <button
                 onClick={() => {

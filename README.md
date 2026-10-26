@@ -1,4 +1,4 @@
-# 💈 BarberApp - Plataforma SaaS de Agendamento para Barbearias
+# SuaAgenda - Plataforma de Agendamento para Barbearias e Salões
 
 Plataforma moderna, elegante e mobile-first de agendamento online para barbearias e profissionais da beleza. Projetada para proporcionar **atrito zero** aos clientes e total controle de agenda e faturamento para os barbeiros.
 
