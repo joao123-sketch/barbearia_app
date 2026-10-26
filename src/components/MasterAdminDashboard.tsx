@@ -13,10 +13,12 @@ import {
   Check,
   Search,
   ShieldCheck,
-  Store
+  Store,
+  CreditCard,
+  QrCode
 } from 'lucide-react'
 import type { Barbershop, SubscriptionStatus } from '../types'
-import { DEFAULT_PIX_KEY } from '../lib/mockData'
+import { DEFAULT_PIX_KEY, DEFAULT_PIX_NAME, DEFAULT_PIX_QRCODE, DEFAULT_MONTHLY_FEE } from '../lib/mockData'
 
 interface MasterAdminDashboardProps {
   barbershops: Barbershop[]
@@ -33,10 +35,33 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
   const [searchTerm, setSearchTerm] = useState('')
   const [copiedPix, setCopiedPix] = useState(false)
 
-  // Modal de edição de barbearia
+  // Mensalidade Base Global da Plataforma
+  const [baseFee, setBaseFee] = useState<number>(() => {
+    const saved = localStorage.getItem('barber_master_base_fee')
+    return saved ? Number(saved) : DEFAULT_MONTHLY_FEE
+  })
+  const [isEditingBaseFee, setIsEditingBaseFee] = useState(false)
+  const [newBaseFeeInput, setNewBaseFeeInput] = useState(baseFee)
+
+  // Modal de edição individual de barbearia
   const [editingShop, setEditingShop] = useState<Barbershop | null>(null)
   const [editFee, setEditFee] = useState<number>(50)
   const [editDueDay, setEditDueDay] = useState<number>(10)
+
+  // Modal de Exclusão de Barbearia com trava de segurança
+  const [shopToDelete, setShopToDelete] = useState<Barbershop | null>(null)
+  const [deleteInputText, setDeleteInputText] = useState('')
+
+  // Visualizar QR Code PIX
+  const [showPixPreview, setShowPixPreview] = useState(false)
+
+  // Salvar nova mensalidade base global
+  const handleSaveBaseFee = (e: React.FormEvent) => {
+    e.preventDefault()
+    setBaseFee(newBaseFeeInput)
+    localStorage.setItem('barber_master_base_fee', String(newBaseFeeInput))
+    setIsEditingBaseFee(false)
+  }
 
   // Copiar chave PIX
   const handleCopyPix = () => {
@@ -107,15 +132,21 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
     }
   }
 
-  // Excluir Barbearia
-  const handleDeleteShop = (shopId: string, shopName: string) => {
-    if (window.confirm(`ATENÇÃO: Deseja realmente excluir permanentemente a conta de "${shopName}"?`)) {
-      const updated = barbershops.filter((s) => s.id !== shopId)
-      onUpdateBarbershops(updated)
+  // Excluir Barbearia com trava
+  const handleExecuteDelete = () => {
+    if (!shopToDelete) return
+    if (deleteInputText.trim() !== 'Excluir') {
+      alert('Digite exatamente "Excluir" para confirmar.')
+      return
     }
+
+    const updated = barbershops.filter((s) => s.id !== shopToDelete.id)
+    onUpdateBarbershops(updated)
+    setShopToDelete(null)
+    setDeleteInputText('')
   }
 
-  // Salvar alterações de mensalidade
+  // Salvar alterações de mensalidade individual
   const handleSaveEdit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingShop) return
@@ -134,8 +165,9 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
   const getCobrarWhatsappUrl = (shop: Barbershop) => {
     const phone = shop.phone_whatsapp.replace(/\D/g, '')
     const msg = `Olá, equipe da *${shop.name}*! Tudo bem?\n\n` +
-      `Passando para lembrar sobre a mensalidade do seu sistema de agendamentos no valor de *R$ ${shop.monthly_fee.toFixed(2).replace('.', ',')}*.\n\n` +
-      `🔑 *Chave PIX:* ${DEFAULT_PIX_KEY}\n\n` +
+      `Passando para lembrar sobre a mensalidade do seu sistema de agendamentos no valor de *R$ ${(shop.monthly_fee || 50).toFixed(2).replace('.', ',')}*.\n\n` +
+      `🔑 *Chave PIX:* ${DEFAULT_PIX_KEY}\n` +
+      `👤 *Titular:* ${DEFAULT_PIX_NAME} (Banco Inter)\n\n` +
       `Assim que realizar o pagamento, por favor envie o comprovante por aqui para mantermos seu sistema 100% ativo. Obrigado!`
 
     return `https://wa.me/${phone.startsWith('55') ? phone : '55' + phone}?text=${encodeURIComponent(msg)}`
@@ -143,7 +175,7 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
 
   return (
     <div className="min-h-screen bg-[#090A0F] text-slate-100 pb-24 select-none">
-      {/* ===================== TOPO MASTER ADMIN ===================== */}
+      {/* ===================== TOPO MASTER ADMIN (PRIVADO) ===================== */}
       <header className="sticky top-0 z-30 bg-[#0d0f17]/95 border-b border-slate-800/80 backdrop-blur-md px-4 py-3.5">
         <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -156,29 +188,71 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
                   Painel Master SaaS
                 </h1>
                 <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-bold">
-                  Dono da Plataforma
+                  Área Exclusiva João
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                Gestão de Barbearias, Mensalidades e Cobranças
+                Gestão Geral de Barbearias, Mensalidades e Recebíveis
               </p>
             </div>
           </div>
 
-          {/* Atalho Chave PIX */}
-          <button
-            onClick={handleCopyPix}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/40 text-xs text-slate-300 hover:text-white transition-all cursor-pointer"
-          >
-            <span className="text-[11px] text-slate-400 hidden sm:inline">Chave PIX:</span>
-            <span className="font-mono font-bold text-amber-400">{DEFAULT_PIX_KEY}</span>
-            {copiedPix ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowPixPreview(!showPixPreview)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/40 text-xs text-amber-400 cursor-pointer"
+            >
+              <QrCode className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Ver</span> PIX & QR
+            </button>
+
+            <button
+              onClick={handleCopyPix}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/40 text-xs text-slate-300 hover:text-white transition-all cursor-pointer"
+            >
+              <span className="font-mono font-bold text-amber-400">{DEFAULT_PIX_KEY}</span>
+              {copiedPix ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-5 space-y-5">
-        {/* ===================== CARDS DE MÉTRICAS (KPIS) ===================== */}
+        {/* ===================== PREVIEW DO PIX & BANCO INTER ===================== */}
+        {showPixPreview && (
+          <div className="p-4 rounded-3xl bg-slate-900 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-2xl animate-in fade-in">
+            <div className="flex items-center gap-4">
+              <div className="p-2 rounded-2xl bg-white shadow-md border border-amber-500/40 shrink-0">
+                <img
+                  src={DEFAULT_PIX_QRCODE}
+                  alt="QR Code Banco Inter"
+                  className="w-24 h-24 object-contain"
+                />
+              </div>
+              <div className="text-xs space-y-1">
+                <h4 className="font-bold text-white text-sm">QR Code & Chave PIX Ativos</h4>
+                <p className="text-slate-400">
+                  Titular: <strong className="text-amber-300">{DEFAULT_PIX_NAME}</strong> (Banco Inter)
+                </p>
+                <p className="text-slate-400">
+                  Chave CPF: <strong className="font-mono text-white">{DEFAULT_PIX_KEY}</strong>
+                </p>
+                <p className="text-[11px] text-emerald-400 font-medium">
+                  Configurado para R$ {(baseFee).toFixed(2).replace('.', ',')} por barbearia
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowPixPreview(false)}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white text-xs cursor-pointer self-end sm:self-center"
+            >
+              Fechar Preview
+            </button>
+          </div>
+        )}
+
+        {/* ===================== CARDS DE MÉTRICAS (KPIS) + CONFIGURAÇÃO DA MENSALIDADE BASE ===================== */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800">
             <div className="flex items-center justify-between text-slate-400 mb-1">
@@ -215,8 +289,66 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
               <AlertTriangle className="w-4 h-4 text-rose-400" />
             </div>
             <p className="text-2xl font-black text-rose-400">{overdueShops}</p>
-            <p className="text-[10px] text-slate-400 mt-0.5">{blockedShops} bloqueados</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">{blockedShops} bloqueadas</p>
           </div>
+        </div>
+
+        {/* ===================== CONFIGURADOR DA MENSALIDADE BASE ===================== */}
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-900 to-slate-900 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
+              <CreditCard className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm text-white">Preço Base da Mensalidade</h3>
+              <p className="text-slate-400 text-xs">
+                Valor cobrado por padrão para novas barbearias cadastradas.
+              </p>
+            </div>
+          </div>
+
+          {!isEditingBaseFee ? (
+            <div className="flex items-center gap-3 self-end sm:self-auto">
+              <span className="text-lg font-black text-amber-400">
+                R$ {baseFee.toFixed(2).replace('.', ',')} / mês
+              </span>
+              <button
+                onClick={() => {
+                  setNewBaseFeeInput(baseFee)
+                  setIsEditingBaseFee(true)
+                }}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center gap-1 cursor-pointer"
+              >
+                <Edit2 className="w-3.5 h-3.5 text-amber-400" />
+                <span>Alterar Valor</span>
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSaveBaseFee} className="flex items-center gap-2 self-end sm:self-auto">
+              <span className="text-slate-400 font-bold">R$</span>
+              <input
+                type="number"
+                step="5"
+                min="10"
+                value={newBaseFeeInput}
+                onChange={(e) => setNewBaseFeeInput(Number(e.target.value))}
+                className="w-24 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-amber-500/50 text-amber-300 font-bold text-sm text-right focus:outline-none"
+              />
+              <button
+                type="submit"
+                className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs cursor-pointer"
+              >
+                Salvar
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditingBaseFee(false)}
+                className="px-2 py-1.5 rounded-xl bg-slate-800 text-slate-400 text-xs cursor-pointer"
+              >
+                ✕
+              </button>
+            </form>
+          )}
         </div>
 
         {/* ===================== FILTROS E BUSCA ===================== */}
@@ -293,7 +425,13 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-extrabold text-sm text-white">{shop.name}</h3>
-                          
+
+                          {shop.owner_name && (
+                            <span className="text-[11px] text-slate-400 font-medium">
+                              (Dono: {shop.owner_name})
+                            </span>
+                          )}
+
                           {/* Badge de Status */}
                           <span
                             className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -398,7 +536,10 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
 
                       {/* Excluir Barbearia */}
                       <button
-                        onClick={() => handleDeleteShop(shop.id, shop.name)}
+                        onClick={() => {
+                          setShopToDelete(shop)
+                          setDeleteInputText('')
+                        }}
                         title="Excluir Definitivamente"
                         className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-500 hover:text-rose-400 border border-slate-700 text-xs cursor-pointer"
                       >
@@ -413,7 +554,7 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
         </div>
       </main>
 
-      {/* ===================== MODAL DE EDIÇÃO DE MENSALIDADE ===================== */}
+      {/* ===================== MODAL DE EDIÇÃO DE MENSALIDADE INDIVIDUAL ===================== */}
       {editingShop && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-sm bg-[#12151f] border border-slate-800 rounded-3xl p-5 text-slate-100 shadow-2xl">
@@ -470,6 +611,55 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== MODAL DE EXCLUSÃO COM TRAVA DE SEGURANÇA ===================== */}
+      {shopToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-[#12151f] border border-rose-500/50 rounded-3xl p-6 text-slate-100 shadow-2xl space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+
+            <div className="text-center space-y-1">
+              <h3 className="font-black text-base text-white">Excluir Conta da Barbearia</h3>
+              <p className="text-xs text-slate-400">
+                Deseja realmente apagar <strong>{shopToDelete.name}</strong> da plataforma?
+              </p>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <label className="block text-slate-300 font-semibold">
+                Digite exatamente <strong className="text-rose-400">Excluir</strong> para confirmar:
+              </label>
+              <input
+                type="text"
+                placeholder="Excluir"
+                value={deleteInputText}
+                onChange={(e) => setDeleteInputText(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-rose-500/40 text-white font-mono text-center focus:outline-none focus:border-rose-400"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShopToDelete(null)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold text-xs cursor-pointer"
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                disabled={deleteInputText.trim() !== 'Excluir'}
+                onClick={handleExecuteDelete}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs cursor-pointer transition-all"
+              >
+                Confirmar Exclusão
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -4,6 +4,8 @@ export interface Barbershop {
   id: string
   name: string
   slug: string
+  owner_name?: string
+  owner_email?: string
   slogan?: string
   description?: string
   logo_url?: string
@@ -20,6 +22,8 @@ export interface Barbershop {
   next_billing_date: string
   last_payment_date?: string
   pix_key?: string
+  // Pausas e Bloqueios de Agenda (Viagens / Férias)
+  blocked_dates?: string[] // Ex: ["2026-11-15", "2026-11-16"]
 }
 
 
@@ -66,6 +70,7 @@ export interface Appointment {
   total_price: number
   total_duration: number
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed'
+  reminder_preference?: '10min' | '30min' | '1hour'
   notes?: string
   created_at: string
 }

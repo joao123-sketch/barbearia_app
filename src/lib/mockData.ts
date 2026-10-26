@@ -2,12 +2,16 @@ import type { Barbershop, Barber, Service, WorkingHour, Appointment } from '../t
 
 
 export const DEFAULT_PIX_KEY = '092.136.103-35'
+export const DEFAULT_PIX_NAME = 'JOAO VICTOR DE SOUZA PEREIRA'
+export const DEFAULT_PIX_QRCODE = '/pix_qrcode.png'
 export const DEFAULT_MONTHLY_FEE = 50.00
 
 export const demoBarbershop: Barbershop = {
   id: 'barber-001',
   name: 'NK Barbearia Premium',
   slug: 'nk-barbearia',
+  owner_name: 'Nataniel Costa',
+  owner_email: 'nkbarbearia@gmail.com',
   slogan: 'Tradição, estilo e o melhor atendimento da cidade.',
   description: 'Ambiente climatizado, cerveja gelada, sinuca e os melhores profissionais especializados em corte clássico e degradê moderno.',
   logo_url: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=300&q=80',
@@ -22,7 +26,8 @@ export const demoBarbershop: Barbershop = {
   due_day: 10,
   next_billing_date: '2026-11-10',
   last_payment_date: '2026-10-10',
-  pix_key: DEFAULT_PIX_KEY
+  pix_key: DEFAULT_PIX_KEY,
+  blocked_dates: []
 }
 
 export const demoBarbershopsList: Barbershop[] = [
@@ -215,5 +220,47 @@ export const demoAppointments: Appointment[] = [
     total_duration: 30,
     status: 'pending',
     created_at: new Date().toISOString()
+  },
+  {
+    id: 'apt-4',
+    barbershop_id: 'barber-001',
+    barber_id: 'barber-1',
+    service_ids: ['serv-3'],
+    client_name: 'Guilherme Santos',
+    client_phone: '11955554444',
+    appointment_date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Ontem
+    start_time: '16:00',
+    total_price: 70.00,
+    total_duration: 60,
+    status: 'completed',
+    created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'apt-5',
+    barbershop_id: 'barber-001',
+    barber_id: 'barber-2',
+    service_ids: ['serv-1'],
+    client_name: 'Marcelo Oliveira',
+    client_phone: '11944443333',
+    appointment_date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 3 dias atrás
+    start_time: '14:30',
+    total_price: 45.00,
+    total_duration: 35,
+    status: 'completed',
+    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'apt-6',
+    barbershop_id: 'barber-001',
+    barber_id: 'barber-1',
+    service_ids: ['serv-2'],
+    client_name: 'Thiago Martins',
+    client_phone: '11933332222',
+    appointment_date: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 8 dias atrás (este mês)
+    start_time: '18:00',
+    total_price: 35.00,
+    total_duration: 30,
+    status: 'completed',
+    created_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString()
   }
 ]

@@ -6,13 +6,13 @@ import {
   Check,
   Calendar as CalendarIcon,
   ChevronRight,
-  Sparkles,
   Scissors,
   CheckCircle2,
-  ArrowLeft
+  ArrowLeft,
+  Bell
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
-import type { Barbershop, Barber, Service } from '../types'
+import type { Barbershop, Service } from '../types'
 import { PWAInstallPrompt } from './PWAInstallPrompt'
 
 const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
@@ -25,21 +25,18 @@ const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) =>
 
 interface BookingClientViewProps {
   barbershop: Barbershop
-  barbers: Barber[]
   services: Service[]
   onNewBooking?: (booking: any) => void
 }
 
 export const BookingClientView: React.FC<BookingClientViewProps> = ({
   barbershop,
-  barbers,
   services,
   onNewBooking
 }) => {
   // Estados do fluxo de agendamento
   const [step, setStep] = useState<'service' | 'datetime' | 'customer' | 'success'>('service')
   const [selectedServices, setSelectedServices] = useState<string[]>([])
-  const [selectedBarberId, setSelectedBarberId] = useState<string>('any')
   const [selectedCategory, setSelectedCategory] = useState<string>('todos')
 
   // Data selecionada (padrão: hoje)
@@ -47,13 +44,14 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
   const [selectedDate, setSelectedDate] = useState<string>(todayStr)
   const [selectedTime, setSelectedTime] = useState<string>('')
 
-  // Dados do cliente
+  // Dados do cliente e lembrete
   const [clientName, setClientName] = useState('')
   const [clientPhone, setClientPhone] = useState('')
   const [clientNotes, setClientNotes] = useState('')
+  const [reminderPreference, setReminderPreference] = useState<'10min' | '30min' | '1hour'>('30min')
   const [confirmedBooking, setConfirmedBooking] = useState<any>(null)
 
-  // Gerador de próximos 7 dias
+  // Gerador de próximos 7 dias com verificação de bloqueio/pausa
   const nextDays = useMemo(() => {
     const days = []
     const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
@@ -70,16 +68,19 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
       if (isToday) label = 'Hoje'
       else if (isTomorrow) label = 'Amanhã'
 
+      const isBlocked = Boolean(barbershop.blocked_dates?.includes(dateString))
+
       days.push({
         date: dateString,
         dayName: label,
         dayNumber: d.getDate(),
         month: monthNames[d.getMonth()],
-        dayOfWeek: d.getDay()
+        dayOfWeek: d.getDay(),
+        isBlocked
       })
     }
     return days
-  }, [])
+  }, [barbershop.blocked_dates])
 
   // Horários disponíveis simulados
   const availableTimes = useMemo(() => {
@@ -99,7 +100,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
       { time: '18:40', period: 'noite', available: true },
       { time: '19:20', period: 'noite', available: false }
     ]
-  }, [selectedDate, selectedBarberId])
+  }, [selectedDate])
 
   // Filtragem de serviços
   const filteredServices = useMemo(() => {
@@ -151,14 +152,9 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
       return
     }
 
-    const chosenBarber = barbers.find((b) => b.id === selectedBarberId)
-    const barberName = chosenBarber ? chosenBarber.name : 'Qualquer Profissional Disponível'
-
     const bookingData = {
       id: 'apt-' + Date.now(),
       barbershop_id: barbershop.id,
-      barber_id: selectedBarberId,
-      barber_name: barberName,
       service_ids: selectedServices,
       service_names: selectedServicesObjects.map((s) => s.name).join(' + '),
       client_name: clientName,
@@ -168,6 +164,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
       total_price: totalPrice,
       total_duration: totalDuration,
       status: 'confirmed',
+      reminder_preference: reminderPreference,
       notes: clientNotes,
       created_at: new Date().toISOString()
     }
@@ -366,45 +363,6 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
         {/* ===================== PASSO 1: SERVIÇOS ===================== */}
         {step === 'service' && (
           <div className="space-y-4 animate-in fade-in duration-200">
-            {/* Escolha do Barbeiro */}
-            <div>
-              <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">
-                Profissional de Preferência
-              </label>
-              <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none">
-                <button
-                  onClick={() => setSelectedBarberId('any')}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl border text-xs font-semibold shrink-0 transition-all ${
-                    selectedBarberId === 'any'
-                      ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-md shadow-amber-500/10'
-                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Sparkles className="w-4 h-4 text-amber-400" />
-                  <span>Sem preferência (Qualquer)</span>
-                </button>
-
-                {barbers.map((b) => (
-                  <button
-                    key={b.id}
-                    onClick={() => setSelectedBarberId(b.id)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border text-xs font-semibold shrink-0 transition-all ${
-                      selectedBarberId === b.id
-                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-md shadow-amber-500/10'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <img
-                      src={b.avatar_url}
-                      alt={b.name}
-                      className="w-6 h-6 rounded-full object-cover border border-amber-500/40"
-                    />
-                    <span>{b.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Categorias dos Serviços */}
             <div className="flex gap-2 overflow-x-auto pb-1 text-xs">
               {[
@@ -505,19 +463,22 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                   return (
                     <button
                       key={d.date}
-                      onClick={() => setSelectedDate(d.date)}
+                      disabled={d.isBlocked}
+                      onClick={() => !d.isBlocked && setSelectedDate(d.date)}
                       className={`p-2.5 rounded-2xl flex flex-col items-center justify-center border transition-all ${
-                        isSelected
+                        d.isBlocked
+                          ? 'bg-slate-950/80 border-slate-900 text-slate-600 opacity-50 cursor-not-allowed'
+                          : isSelected
                           ? 'bg-gradient-to-b from-amber-400 to-amber-500 border-amber-400 text-slate-950 font-bold shadow-lg shadow-amber-500/25 scale-[1.02]'
                           : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
                       }`}
                     >
-                      <span className={`text-[10px] uppercase font-semibold ${isSelected ? 'text-slate-950 font-extrabold' : 'text-slate-400'}`}>
+                      <span className={`text-[10px] uppercase font-semibold ${isSelected && !d.isBlocked ? 'text-slate-950 font-extrabold' : 'text-slate-400'}`}>
                         {d.dayName}
                       </span>
                       <span className="text-lg font-black mt-0.5">{d.dayNumber}</span>
-                      <span className={`text-[10px] ${isSelected ? 'text-slate-900' : 'text-slate-500'}`}>
-                        {d.month}
+                      <span className={`text-[10px] ${d.isBlocked ? 'text-rose-400 font-bold' : isSelected ? 'text-slate-900' : 'text-slate-500'}`}>
+                        {d.isBlocked ? 'Pausa' : d.month}
                       </span>
                     </button>
                   )
@@ -586,7 +547,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
             </div>
 
             {/* Formulário */}
-            <div className="space-y-3">
+            <div className="space-y-3.5">
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">
                   Seu Nome Completo *
@@ -613,6 +574,37 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                 />
                 <span className="text-[11px] text-slate-500 mt-1 block">
                   Você receberá a confirmação e lembretes por este número.
+                </span>
+              </div>
+
+              {/* Escolha do Tempo de Lembrete */}
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                  <Bell className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Com quanto tempo antes você quer ser lembrado?</span>
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: '10min', label: '10 min antes' },
+                    { id: '30min', label: '30 min (Recomendado)' },
+                    { id: '1hour', label: '1 hora antes' }
+                  ].map((rem) => (
+                    <button
+                      key={rem.id}
+                      type="button"
+                      onClick={() => setReminderPreference(rem.id as any)}
+                      className={`py-2 px-1.5 rounded-xl text-center text-xs font-bold border transition-all cursor-pointer ${
+                        reminderPreference === rem.id
+                          ? 'bg-amber-500 border-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {rem.label}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-[10px] text-emerald-400/90 mt-1.5 block">
+                  ✓ O sistema já envia o lembrete automaticamente no seu WhatsApp.
                 </span>
               </div>
 

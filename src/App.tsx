@@ -13,7 +13,6 @@ import {
   demoWorkingHours
 } from './lib/mockData'
 import type { Appointment, Service, Barbershop } from './types'
-import { Shield, PlusCircle, Crown } from 'lucide-react'
 
 function BookingRouteWrapper({
   barbershop,
@@ -26,10 +25,9 @@ function BookingRouteWrapper({
   services: Service[]
   onNewBooking: (b: any) => void
 }) {
-  const navigate = useNavigate()
   const { slug } = useParams()
 
-  // Procura barbearia correspondente na lista pelo slug ou usa atual
+  // Procura barbearia correspondente na lista pelo slug ou usa a atual
   const matchedShop = slug ? barbershopsList.find((s) => s.slug === slug) : null
 
   const currentShop: Barbershop = matchedShop || {
@@ -42,36 +40,8 @@ function BookingRouteWrapper({
 
   return (
     <div className="relative">
-      {/* Botões flutuantes para alternar entre Cliente, Admin, Cadastro e Painel Master facilmente */}
-      <div className="fixed top-3 left-3 z-50 flex items-center gap-2">
-        <button
-          onClick={() => navigate('/admin')}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-900/90 border border-amber-500/30 text-amber-400 backdrop-blur-md shadow-xl hover:bg-slate-800 transition-all active:scale-95 cursor-pointer"
-        >
-          <Shield className="w-3.5 h-3.5 text-amber-400" />
-          <span>Barbeiro</span>
-        </button>
-
-        <button
-          onClick={() => navigate('/master')}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 backdrop-blur-md shadow-xl hover:brightness-105 transition-all active:scale-95 cursor-pointer font-black"
-        >
-          <Crown className="w-3.5 h-3.5 fill-current" />
-          <span>Master SaaS</span>
-        </button>
-
-        <button
-          onClick={() => navigate('/cadastrar')}
-          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-900/90 border border-slate-700 text-slate-300 backdrop-blur-md shadow-xl hover:bg-slate-800 hover:text-white transition-all active:scale-95 cursor-pointer"
-        >
-          <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Nova Barbearia</span>
-        </button>
-      </div>
-
       <BookingClientView
         barbershop={currentShop}
-        barbers={demoBarbers}
         services={services}
         onNewBooking={onNewBooking}
       />
@@ -84,28 +54,22 @@ function AdminRouteWrapper({
   appointments,
   services,
   onUpdateAppointments,
-  onUpdateServices
+  onUpdateServices,
+  onUpdateBarbershop,
+  onDeleteBarbershop
 }: {
   barbershop: Barbershop
   appointments: Appointment[]
   services: Service[]
   onUpdateAppointments: (a: Appointment[]) => void
   onUpdateServices: (s: Service[]) => void
+  onUpdateBarbershop: (b: Barbershop) => void
+  onDeleteBarbershop: (id: string) => void
 }) {
   const navigate = useNavigate()
 
   return (
     <div className="relative">
-      <div className="fixed top-3 right-3 z-50">
-        <button
-          onClick={() => navigate('/master')}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 shadow-xl hover:brightness-105 transition-all cursor-pointer font-black"
-        >
-          <Crown className="w-3.5 h-3.5 fill-current" />
-          <span>Painel Master</span>
-        </button>
-      </div>
-
       <AdminDashboard
         barbershop={barbershop}
         barbers={demoBarbers}
@@ -115,13 +79,18 @@ function AdminRouteWrapper({
         onBackToClientView={() => navigate(`/${barbershop.slug}`)}
         onUpdateAppointments={onUpdateAppointments}
         onUpdateServices={onUpdateServices}
+        onUpdateBarbershop={onUpdateBarbershop}
+        onDeleteBarbershop={(id) => {
+          onDeleteBarbershop(id)
+          navigate('/')
+        }}
       />
     </div>
   )
 }
 
 export function App() {
-  // Lista de todas as barbearias (gestão Master)
+  // Lista de todas as barbearias cadastradas na plataforma (Visível no Master Admin)
   const [barbershopsList, setBarbershopsList] = useState<Barbershop[]>(() => {
     const saved = localStorage.getItem('barber_shops_list')
     if (saved) {
@@ -134,8 +103,13 @@ export function App() {
     return demoBarbershopsList
   })
 
-  // Barbearia ativa no momento
+  // Barbearia ativa no momento (para o barbeiro logado)
   const [currentBarbershop, setCurrentBarbershop] = useState<Barbershop>(() => {
+    const savedId = localStorage.getItem('barber_current_shop_id')
+    if (savedId) {
+      const found = barbershopsList.find((s) => s.id === savedId)
+      if (found) return found
+    }
     return barbershopsList[0] || demoBarbershop
   })
 
@@ -165,7 +139,7 @@ export function App() {
     return demoServices
   })
 
-  // Persistência
+  // Sincronização e persistência no LocalStorage
   useEffect(() => {
     localStorage.setItem('barber_shops_list', JSON.stringify(barbershopsList))
   }, [barbershopsList])
@@ -178,16 +152,42 @@ export function App() {
     localStorage.setItem('barber_services', JSON.stringify(services))
   }, [services])
 
+  useEffect(() => {
+    if (currentBarbershop) {
+      localStorage.setItem('barber_current_shop_id', currentBarbershop.id)
+    }
+  }, [currentBarbershop])
+
   const handleNewBooking = (booking: any) => {
     setAppointments((prev) => [booking, ...prev])
   }
 
-  // Cadastro de nova barbearia
+  // Cadastro de nova barbearia (Barber Onboarding)
   const handleRegisterBarbershop = (newShop: Barbershop, newServices: Service[]) => {
     setBarbershopsList((prev) => [newShop, ...prev])
     setCurrentBarbershop(newShop)
     setServices(newServices)
-    setAppointments([])
+  }
+
+  // Atualização de dados da barbearia ativa (ex: pausas, endereço, etc.)
+  const handleUpdateBarbershop = (updatedShop: Barbershop) => {
+    setCurrentBarbershop(updatedShop)
+    setBarbershopsList((prev) =>
+      prev.map((s) => (s.id === updatedShop.id ? updatedShop : s))
+    )
+  }
+
+  // Exclusão de barbearia pelo barbeiro
+  const handleDeleteBarbershop = (shopId: string) => {
+    const remaining = barbershopsList.filter((s) => s.id !== shopId)
+    setBarbershopsList(remaining)
+    localStorage.removeItem('barber_current_shop_id')
+    localStorage.removeItem('barber_current_user')
+    if (remaining.length > 0) {
+      setCurrentBarbershop(remaining[0])
+    } else {
+      setCurrentBarbershop(demoBarbershop)
+    }
   }
 
   // Atualização em lote pelo Master Admin
@@ -202,6 +202,7 @@ export function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Rota Padrão: Página de Agendamento da Barbearia Atual */}
         <Route
           path="/"
           element={
@@ -213,6 +214,8 @@ export function App() {
             />
           }
         />
+
+        {/* Link que o João envia para o Barbeiro se cadastrar */}
         <Route
           path="/cadastrar"
           element={
@@ -229,6 +232,8 @@ export function App() {
             />
           }
         />
+
+        {/* Painel Administrativo do Barbeiro */}
         <Route
           path="/admin"
           element={
@@ -238,10 +243,13 @@ export function App() {
               services={services}
               onUpdateAppointments={setAppointments}
               onUpdateServices={setServices}
+              onUpdateBarbershop={handleUpdateBarbershop}
+              onDeleteBarbershop={handleDeleteBarbershop}
             />
           }
         />
-        {/* Painel do Dono da Plataforma (João) */}
+
+        {/* Painel Master do Dono da Plataforma (Acesso Secreto Apenas por URL) */}
         <Route
           path="/master"
           element={
@@ -260,6 +268,8 @@ export function App() {
             />
           }
         />
+
+        {/* Link Público de cada Barbearia pelo seu Slug (ex: /nk-barbearia) */}
         <Route
           path="/:slug"
           element={
