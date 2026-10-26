@@ -142,7 +142,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSett
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault()
     const clean: PlatformSettings = {
-      monthly_fee: Number(draft.monthly_fee) > 0 ? Number(draft.monthly_fee) : settings.monthly_fee,
+      monthly_fee: Number(draft.monthly_fee) > 0 ? Math.round(Number(draft.monthly_fee) * 100) / 100 : settings.monthly_fee,
       pix_key: draft.pix_key.trim(),
       pix_name: draft.pix_name.trim(),
       pix_bank: draft.pix_bank.trim(),
@@ -507,7 +507,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSett
                   <label className="block text-slate-300 font-semibold mb-1">Mensalidade (R$)</label>
                   <input
                     type="number"
-                    step="1"
+                    step="0.01"
                     min="1"
                     value={draft.monthly_fee}
                     onChange={(e) => setDraft({ ...draft, monthly_fee: Number(e.target.value) })}
@@ -827,7 +827,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSett
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400">R$</span>
                   <input
                     type="number"
-                    step="5"
+                    step="0.01"
                     min="0"
                     value={editFee}
                     onChange={(e) => setEditFee(Number(e.target.value))}
