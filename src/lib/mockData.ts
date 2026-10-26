@@ -1,6 +1,9 @@
 import type { Barbershop, Barber, Service, WorkingHour, Appointment } from '../types'
 
 
+export const DEFAULT_PIX_KEY = '092.136.103-35'
+export const DEFAULT_MONTHLY_FEE = 50.00
+
 export const demoBarbershop: Barbershop = {
   id: 'barber-001',
   name: 'NK Barbearia Premium',
@@ -13,8 +16,77 @@ export const demoBarbershop: Barbershop = {
   address: 'Av. Paulista, 1500 - Sala 42, Bela Vista, São Paulo - SP',
   instagram: '@nkbarbearia',
   theme_color: '#EAB308',
-  created_at: new Date().toISOString()
+  created_at: new Date().toISOString(),
+  monthly_fee: 50.00,
+  subscription_status: 'active',
+  due_day: 10,
+  next_billing_date: '2026-11-10',
+  last_payment_date: '2026-10-10',
+  pix_key: DEFAULT_PIX_KEY
 }
+
+export const demoBarbershopsList: Barbershop[] = [
+  demoBarbershop,
+  {
+    id: 'barber-002',
+    name: 'Barbearia Navalha & Estilo',
+    slug: 'navalha-estilo',
+    slogan: 'Cortes clássicos e modernos no centro da cidade.',
+    description: 'Espaço aconchegante com atendimento personalizado.',
+    logo_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
+    banner_url: 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=1200&q=80',
+    phone_whatsapp: '5511988881111',
+    address: 'Rua Augusta, 850 - Consolação, São Paulo - SP',
+    instagram: '@navalhaestilo',
+    theme_color: '#EAB308',
+    created_at: new Date().toISOString(),
+    monthly_fee: 50.00,
+    subscription_status: 'pending',
+    due_day: 28,
+    next_billing_date: '2026-10-28',
+    pix_key: DEFAULT_PIX_KEY
+  },
+  {
+    id: 'barber-003',
+    name: 'Dom Lucas Barbearia VIP',
+    slug: 'dom-lucas',
+    slogan: 'Visagismo e cuidado premium para homens exigentes.',
+    description: 'Cortes exclusivos com os melhores produtos do mercado.',
+    logo_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+    banner_url: 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=1200&q=80',
+    phone_whatsapp: '5511977772222',
+    address: 'Rua Oscar Freire, 300 - Jardins, São Paulo - SP',
+    instagram: '@domlucasbarber',
+    theme_color: '#EAB308',
+    created_at: new Date().toISOString(),
+    monthly_fee: 50.00,
+    subscription_status: 'overdue',
+    due_day: 15,
+    next_billing_date: '2026-10-15',
+    last_payment_date: '2026-09-15',
+    pix_key: DEFAULT_PIX_KEY
+  },
+  {
+    id: 'barber-004',
+    name: 'Classic Barber Lounge',
+    slug: 'classic-barber',
+    slogan: 'O autêntico corte à moda antiga.',
+    description: 'Atendimento tradicional com toalha quente e navalha afiada.',
+    logo_url: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=300&q=80',
+    banner_url: 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=1200&q=80',
+    phone_whatsapp: '5511966663333',
+    address: 'Av. Brigadeiro Faria Lima, 2000 - Itaim Bibi, SP',
+    instagram: '@classicbarber',
+    theme_color: '#EAB308',
+    created_at: new Date().toISOString(),
+    monthly_fee: 50.00,
+    subscription_status: 'blocked',
+    due_day: 5,
+    next_billing_date: '2026-10-05',
+    pix_key: DEFAULT_PIX_KEY
+  }
+]
+
 
 export const demoBarbers: Barber[] = [
   {

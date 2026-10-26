@@ -18,6 +18,13 @@ CREATE TABLE IF NOT EXISTS public.barbershops (
     instagram VARCHAR(100),
     theme_color VARCHAR(20) DEFAULT '#EAB308',
     is_active BOOLEAN DEFAULT TRUE,
+    -- Campos de Assinatura & Cobrança SaaS (R$ 50,00 / PIX)
+    monthly_fee NUMERIC(10, 2) DEFAULT 50.00 NOT NULL,
+    subscription_status VARCHAR(20) DEFAULT 'active' NOT NULL, -- 'active', 'pending', 'overdue', 'blocked'
+    due_day SMALLINT DEFAULT 10 NOT NULL,
+    next_billing_date DATE DEFAULT (CURRENT_DATE + INTERVAL '30 days'),
+    last_payment_date DATE,
+    pix_key VARCHAR(100) DEFAULT '092.136.103-35',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

@@ -82,7 +82,12 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       banner_url: 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=1200&q=80',
       phone_whatsapp: phone.replace(/\D/g, '') || '5511999998888',
       address: address || 'Rua Principal, 100',
-      theme_color: '#EAB308'
+      theme_color: '#EAB308',
+      monthly_fee: 50.00,
+      subscription_status: 'active',
+      due_day: new Date().getDate(),
+      next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      pix_key: '092.136.103-35'
     }
 
     const createdServices: Service[] = servicesList.map((s, idx) => ({

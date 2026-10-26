@@ -1,3 +1,5 @@
+export type SubscriptionStatus = 'active' | 'pending' | 'overdue' | 'blocked'
+
 export interface Barbershop {
   id: string
   name: string
@@ -11,7 +13,15 @@ export interface Barbershop {
   instagram?: string
   theme_color?: string
   created_at?: string
+  // Assinatura SaaS & Cobrança
+  monthly_fee: number
+  subscription_status: SubscriptionStatus
+  due_day: number
+  next_billing_date: string
+  last_payment_date?: string
+  pix_key?: string
 }
+
 
 export interface Barber {
   id: string

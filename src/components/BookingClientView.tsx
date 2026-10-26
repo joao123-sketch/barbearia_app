@@ -289,9 +289,32 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
           </a>
         </div>
 
-        {/* Indicador de Passos */}
-        {step !== 'success' && (
-          <div className="flex items-center justify-between mb-5 bg-slate-900/60 p-2.5 rounded-2xl border border-slate-800/80">
+        {barbershop.subscription_status === 'blocked' ? (
+          <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 text-center space-y-3.5 my-6 shadow-2xl">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto">
+              <Clock className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-white">Agendamentos Online Pausados</h3>
+              <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
+                Esta barbearia está temporariamente indisponível para novos agendamentos online. Entre em contato diretamente pelo WhatsApp.
+              </p>
+            </div>
+            <a
+              href={`https://wa.me/${barbershop.phone_whatsapp.replace(/\D/g, '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition-transform"
+            >
+              <Phone className="w-4 h-4 fill-current" />
+              <span>Falar no WhatsApp da Barbearia</span>
+            </a>
+          </div>
+        ) : (
+          <>
+            {/* Indicador de Passos */}
+            {step !== 'success' && (
+              <div className="flex items-center justify-between mb-5 bg-slate-900/60 p-2.5 rounded-2xl border border-slate-800/80">
             <button
               onClick={() => setStep('service')}
               className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
@@ -682,6 +705,8 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               Fazer outro agendamento
             </button>
           </div>
+        )}
+          </>
         )}
       </div>
 

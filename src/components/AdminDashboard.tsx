@@ -13,10 +13,13 @@ import {
   Settings,
   Scissors,
   Share2,
-  Check
+  Check,
+  CreditCard,
+  Lock
 } from 'lucide-react'
 import type { Barbershop, Barber, Service, Appointment, WorkingHour } from '../types'
 import { PWAInstallPrompt } from './PWAInstallPrompt'
+import { DEFAULT_PIX_KEY } from '../lib/mockData'
 
 interface AdminDashboardProps {
   barbershop: Barbershop
@@ -50,6 +53,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     )
     setServices(updated)
     if (onUpdateServices) onUpdateServices(updated)
+  }
+
+  // Modal de pagamento PIX da mensalidade
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [copiedPixModal, setCopiedPixModal] = useState(false)
+
+  const handleCopyPixModal = () => {
+    navigator.clipboard.writeText(barbershop.pix_key || DEFAULT_PIX_KEY)
+    setCopiedPixModal(true)
+    setTimeout(() => setCopiedPixModal(false), 2000)
   }
 
   // Modal de novo agendamento manual
@@ -157,6 +170,67 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-5 space-y-5">
+        {/* ===================== AVISO SE ESTIVER BLOQUEADO ===================== */}
+        {barbershop.subscription_status === 'blocked' && (
+          <div className="p-5 rounded-3xl bg-rose-950/40 border border-rose-500/50 text-slate-200 space-y-3.5 shadow-2xl animate-pulse-subtle">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-2xl bg-rose-500/20 text-rose-400 shrink-0">
+                <Lock className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-black text-base text-white">Acesso Temporariamente Suspenso</h3>
+                <p className="text-xs text-rose-200/80">
+                  Seu link de agendamento público está pausado por pendência financeira na mensalidade.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs space-y-1">
+              <p className="text-slate-400">Para reativar instantaneamente sua barbearia, pague via PIX:</p>
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <span className="font-mono font-bold text-amber-400 text-sm">{barbershop.pix_key || DEFAULT_PIX_KEY}</span>
+                <button
+                  onClick={handleCopyPixModal}
+                  className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs flex items-center gap-1 cursor-pointer"
+                >
+                  {copiedPixModal ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedPixModal ? 'Copiado!' : 'Copiar PIX'}</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-400 pt-1">Valor: R$ {(barbershop.monthly_fee || 50).toFixed(2).replace('.', ',')}</p>
+            </div>
+          </div>
+        )}
+
+        {/* ===================== STATUS DA MENSALIDADE / ASSINATURA ===================== */}
+        {barbershop.subscription_status !== 'blocked' && (
+          <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5">
+              <div className={`p-2 rounded-xl shrink-0 ${barbershop.subscription_status === 'active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                <CreditCard className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="font-bold text-white flex items-center gap-2">
+                  <span>Mensalidade do Sistema: R$ {(barbershop.monthly_fee || 50).toFixed(2).replace('.', ',')}/mês</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${barbershop.subscription_status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                    {barbershop.subscription_status === 'active' ? 'Em Dia' : 'Vencendo'}
+                  </span>
+                </p>
+                <p className="text-slate-400 text-[11px] mt-0.5">
+                  Vencimento: {barbershop.next_billing_date || `Dia ${barbershop.due_day || 10}`}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowPaymentModal(true)}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-xs border border-amber-500/30 flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer self-start sm:self-auto"
+            >
+              <span>Pagar via PIX</span>
+            </button>
+          </div>
+        )}
+
         {/* ===================== CARD DO LINK PÚBLICO (DIVULGAÇÃO) ===================== */}
         <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-slate-900 to-slate-900 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl">
           <div className="flex items-start gap-3">
@@ -570,6 +644,71 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== MODAL DE PAGAMENTO PIX DA MENSALIDADE ===================== */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-[#12151f] border border-amber-500/30 rounded-3xl p-6 text-slate-100 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <h3 className="font-bold text-base text-white">Mensalidade BarberApp</h3>
+              </div>
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Valor da Mensalidade:</span>
+                <span className="font-extrabold text-amber-400 text-sm">
+                  R$ {(barbershop.monthly_fee || 50).toFixed(2).replace('.', ',')}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Vencimento:</span>
+                <span className="text-slate-200 font-semibold">
+                  {barbershop.next_billing_date || `Dia ${barbershop.due_day || 10}`}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 text-xs">
+              <label className="block text-slate-300 font-semibold">Chave PIX (CPF do Dono)</label>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800">
+                <span className="font-mono font-bold text-amber-300 text-sm">{barbershop.pix_key || DEFAULT_PIX_KEY}</span>
+                <button
+                  type="button"
+                  onClick={handleCopyPixModal}
+                  className="px-3 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-bold text-xs flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
+                >
+                  {copiedPixModal ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedPixModal ? 'Copiado!' : 'Copiar'}</span>
+                </button>
+              </div>
+              <span className="text-[11px] text-slate-500 block">
+                Abra seu banco, escolha Pix Chave e cole a chave acima.
+              </span>
+            </div>
+
+            <a
+              href={`https://wa.me/5511999998888?text=${encodeURIComponent(`Olá! Acabei de realizar o pagamento da mensalidade do BarberApp para a ${barbershop.name}. Segue o comprovante em anexo:`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+            >
+              <Phone className="w-4 h-4 fill-current" />
+              <span>Enviar Comprovante via WhatsApp</span>
+            </a>
           </div>
         </div>
       )}
