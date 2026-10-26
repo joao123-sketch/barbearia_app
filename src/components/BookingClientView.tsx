@@ -871,8 +871,8 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                     </button>
                   ))}
                 </div>
-                <span className="text-[10px] text-emerald-400/90 mt-1.5 block">
-                  ✓ O sistema já envia o lembrete automaticamente no seu WhatsApp.
+                <span className="text-[10px] text-slate-400 mt-1.5 block">
+                  Sua preferência fica salva no agendamento. Os lembretes automáticos ainda estão sendo preparados.
                 </span>
               </div>
 
