@@ -28,6 +28,15 @@ const PRESET_COLORS: Record<string, string> = {
   neutro: '#f6f1ea'
 }
 
+// Muda quando a logo muda: o celular baixa o ícone novo em vez de reaproveitar o antigo
+function logoVersion(value?: string | null): string {
+  if (!value) return '0'
+  const step = Math.max(1, Math.floor(value.length / 512))
+  let h = 5381
+  for (let i = 0; i < value.length; i += step) h = ((h << 5) + h + value.charCodeAt(i)) >>> 0
+  return h.toString(36) + value.length.toString(36)
+}
+
 async function loadShop(slug: string): Promise<Shop | null> {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/public_barbershops?slug=eq.${encodeURIComponent(slug)}&select=name,slug,logo_url,style_preset&limit=1`,
@@ -58,7 +67,7 @@ async function manifestResponse(slug: string, app: 'client' | 'admin') {
 
   const icons = logo
     ? [
-        { src: `/icon/${shop.slug}`, sizes: '192x192 512x512', type: logo.type, purpose: 'any' }
+        { src: `/icon/${shop.slug}?v=${logoVersion(shop.logo_url)}`, sizes: '192x192 512x512', type: logo.type, purpose: 'any' }
       ]
     : [
         { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },

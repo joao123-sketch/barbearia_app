@@ -40,6 +40,7 @@ import type { Barbershop, Barber, Service, Appointment, WorkingHour } from '../t
 import { PWAInstallPrompt } from './PWAInstallPrompt'
 import { DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from '../lib/platform'
 import { newId } from '../lib/db'
+import { AccountSettings } from './AccountSettings'
 import { getTerms } from '../lib/terms'
 import { formatBR, formatMoney, getBillingState } from '../lib/billing'
 import { normalizePhone, toWaNumber } from '../lib/phone'
@@ -969,37 +970,74 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         )}
 
-        {/* ===================== ALERTA SE ESTIVER BLOQUEADO ===================== */}
-        {(billing.status === 'blocked' || billing.status === 'expired') && (
-          <div className="p-5 rounded-3xl bg-rose-950/40 border border-rose-500/50 text-slate-200 space-y-3.5 shadow-2xl">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-2xl bg-rose-500/20 text-rose-400 shrink-0">
-                <Lock className="w-6 h-6" />
+        {/* ===================== ACESSO SUSPENSO (BLOQUEADO, PERÍODO ENCERRADO OU FALTA O 1º PAGAMENTO) ===================== */}
+        {(billing.status === 'blocked' || billing.status === 'expired') && (() => {
+          const firstPayment = barbershop.subscription_status === 'pending' && !barbershop.last_payment_date
+          const title =
+            billing.status === 'blocked' ? 'Acesso suspenso' : firstPayment ? 'Falta o primeiro pagamento' : 'Período encerrado'
+          const message =
+            billing.status === 'blocked'
+              ? 'Seu acesso foi suspenso pela administração. Entre em contato para regularizar.'
+              : firstPayment
+              ? 'Este WhatsApp já usou o período de teste grátis em outra conta. Pague a primeira mensalidade para liberar o link e o painel.'
+              : 'Seu período acabou e o link de agendamento está pausado. Pague para liberar mais 30 dias.'
+          return (
+            <div className="rounded-3xl bg-slate-900 border border-rose-500/40 shadow-xl overflow-hidden">
+              <div className="p-4 flex items-start gap-3 bg-rose-500/10">
+                <div className="p-2.5 rounded-2xl bg-rose-500/20 text-rose-400 shrink-0">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-white">{title}</h3>
+                  <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">{message}</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-black text-base text-white">Acesso Temporariamente Suspenso</h3>
-                <p className="text-xs text-rose-200/80">
-                  {billing.status === 'expired' ? 'Seu período acabou e o link de agendamento público está pausado. Pague para liberar mais 30 dias.' : 'Seu link de agendamento público está pausado.'}
-                </p>
-              </div>
-            </div>
 
-            <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs space-y-2">
-              <p className="text-slate-400">Pague via PIX para reativação imediata:</p>
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-mono font-bold text-amber-400 text-sm">{platform.pix_key}</span>
-                <button
-                  onClick={handleCopyPix}
-                  className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs flex items-center gap-1 cursor-pointer"
-                >
-                  {copiedPixKey ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedPixKey ? 'Copiado!' : 'Copiar PIX'}</span>
-                </button>
-              </div>
-              <p className="text-[11px] text-slate-400">Titular: {platform.pix_name} - {platform.pix_bank}</p>
+              {billing.status === 'expired' && (
+                <div className="p-4 space-y-3 text-xs">
+                  <p className="text-slate-300">
+                    Mensalidade: <strong className="text-white">R$ {formatMoney(barbershop.monthly_fee || platform.monthly_fee)}</strong> · libera 30 dias
+                  </p>
+
+                  <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-950 border border-slate-800">
+                    {platform.pix_qrcode && (
+                      <div className="p-1.5 rounded-xl bg-white shrink-0">
+                        <img src={platform.pix_qrcode} alt="QR Code PIX" className="w-24 h-24 object-contain" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <p className="text-slate-400">Chave PIX</p>
+                      <p className="font-mono font-bold text-amber-400 text-sm break-all">{platform.pix_key}</p>
+                      <button
+                        onClick={handleCopyPix}
+                        className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs flex items-center gap-1 cursor-pointer"
+                      >
+                        {copiedPixKey ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedPixKey ? 'Copiado!' : 'Copiar chave'}</span>
+                      </button>
+                      <p className="text-[11px] text-slate-400">
+                        {platform.pix_name}
+                        {platform.pix_bank ? ` · ${platform.pix_bank}` : ''}
+                      </p>
+                    </div>
+                  </div>
+
+                  {platform.contact_whatsapp && (
+                    <a
+                      href={`https://wa.me/${toWaNumber(platform.contact_whatsapp)}?text=${encodeURIComponent(`Olá! Realizei o pagamento de ${barbershop.name}. Segue o comprovante:`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-all"
+                    >
+                      <Phone className="w-4 h-4 fill-current" />
+                      <span>Enviar comprovante pelo WhatsApp</span>
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* ===================== CARD DO LINK PÚBLICO (SÓ NA ABA HOJE) ===================== */}
         {activeTab === 'agenda' && (
@@ -2678,6 +2716,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
             </form>
 
+            <AccountSettings
+              phone={barbershop.phone_whatsapp}
+              onChangePhone={(phone) => {
+                setProfilePhone(phone)
+                if (onUpdateBarbershop) onUpdateBarbershop({ ...barbershop, phone_whatsapp: phone })
+              }}
+            />
+
             {onLogout && (
               <button
                 onClick={onLogout}
@@ -3047,111 +3093,122 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* ===================== MODAL DE ADICIONAR / EDITAR BARBEIRO ===================== */}
+      {/* ===================== MODAL DE ADICIONAR / EDITAR PROFISSIONAL ===================== */}
       {showBarberModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-5 text-slate-100 shadow-2xl space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="font-bold text-base text-white flex items-center gap-2">
-                <Users className="w-4 h-4 text-amber-400" />
-                <span>{editingBarber ? 'Editar Profissional' : 'Novo Profissional na Equipe'}</span>
-              </h3>
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4"
+          onClick={() => setShowBarberModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full sm:max-w-md max-h-[92vh] flex flex-col bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl text-slate-100 shadow-2xl"
+          >
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
+              <h3 className="font-black text-lg text-white">{editingBarber ? 'Editar profissional' : 'Adicionar profissional'}</h3>
               <button
                 type="button"
                 onClick={() => setShowBarberModal(false)}
-                className="text-slate-400 hover:text-white"
+                aria-label="Fechar"
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSaveBarber} className="space-y-3.5 text-xs">
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Nome do profissional *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: Carlos Oliveira"
-                  value={barberModalName}
-                  onChange={(e) => setBarberModalName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-amber-500 text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Cargo / Especialidade</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Especialista em coloração"
-                  value={barberModalRole}
-                  onChange={(e) => setBarberModalRole(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-amber-500 text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">WhatsApp do Profissional (Opcional)</label>
-                <input
-                  type="tel"
-                  placeholder="(11) 99999-9999"
-                  value={barberModalPhone}
-                  onChange={(e) => setBarberModalPhone(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-amber-500 text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Foto (opcional)</label>
-                <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-amber-500/50 bg-slate-800 shrink-0 flex items-center justify-center text-amber-400">
+            <form onSubmit={handleSaveBarber} className="flex flex-col min-h-0 flex-1">
+              <div className="px-5 pb-4 space-y-5 overflow-y-auto text-sm">
+                {/* Foto desta pessoa (não é a logo do negócio) */}
+                <div className="flex items-center gap-4">
+                  <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-amber-500/50 bg-slate-800 shrink-0 flex items-center justify-center text-amber-400">
                     {barberModalAvatar ? (
                       <img src={barberModalAvatar} alt="Foto" className="w-full h-full object-cover" />
                     ) : (
-                      <Camera className="w-5 h-5" />
+                      <Camera className="w-7 h-7" />
                     )}
                   </div>
-                  <div className="flex flex-col items-start gap-1.5">
+                  <div className="min-w-0 space-y-1.5">
                     <input type="file" accept="image/*" onChange={handleBarberPhotoUpload} className="hidden" id="barber-photo-upload" />
                     <label
                       htmlFor="barber-photo-upload"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer active:scale-95 transition-all"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer active:scale-95 transition-all"
                     >
                       <Camera className="w-3.5 h-3.5" />
                       <span>{barberModalAvatar ? 'Trocar foto' : 'Enviar foto'}</span>
                     </label>
                     {barberModalAvatar && (
-                      <button type="button" onClick={() => setBarberModalAvatar('')} className="text-[11px] text-rose-400 hover:underline cursor-pointer">
+                      <button type="button" onClick={() => setBarberModalAvatar('')} className="block text-xs text-rose-400 hover:underline cursor-pointer">
                         Remover foto
                       </button>
                     )}
+                    <p className="text-xs text-slate-500">Aparece para os clientes na escolha do profissional. Não muda a logo do negócio.</p>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-200 font-bold mb-1.5">Nome *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: Carlos Oliveira"
+                    value={barberModalName}
+                    onChange={(e) => setBarberModalName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-200 font-bold mb-1.5">
+                    Função <span className="text-slate-500 font-normal">(opcional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Cabeleireira, Barbeiro, Manicure"
+                    value={barberModalRole}
+                    onChange={(e) => setBarberModalRole(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-200 font-bold mb-1.5">
+                    WhatsApp <span className="text-slate-500 font-normal">(opcional)</span>
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="(11) 99999-9999"
+                    value={barberModalPhone}
+                    onChange={(e) => setBarberModalPhone(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-200 font-bold mb-1.5">
+                    Sobre <span className="text-slate-500 font-normal">(opcional)</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Ex: Mais de 8 anos de experiência"
+                    value={barberModalBio}
+                    onChange={(e) => setBarberModalBio(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 resize-none"
+                  />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Sobre / Bio (Opcional)</label>
-                <textarea
-                  rows={2}
-                  placeholder="Ex: Mais de 8 anos de experiência em cortes clássicos e modernos."
-                  value={barberModalBio}
-                  onChange={(e) => setBarberModalBio(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-amber-500 text-xs"
-                />
-              </div>
-
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-3 px-5 py-4 border-t border-slate-800 shrink-0 pb-[calc(1rem+env(safe-area-inset-bottom))]">
                 <button
                   type="button"
                   onClick={() => setShowBarberModal(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold cursor-pointer"
+                  className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold cursor-pointer"
+                  className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black cursor-pointer active:scale-95 transition-all"
                 >
-                  {editingBarber ? 'Atualizar' : 'Adicionar'}
+                  {editingBarber ? 'Salvar' : 'Adicionar'}
                 </button>
               </div>
             </form>

@@ -283,6 +283,7 @@ export function friendlyError(message: string): string {
     account_already_has_business: 'Esta conta já tem um negócio cadastrado.',
     'User already registered': 'Já existe uma conta com este e-mail.',
     'Invalid login credentials': 'Usuário ou senha incorretos.',
+    'is invalid': 'Este e-mail não é aceito. Confira o endereço ou use outro.',
     barbershops_slug_key: 'Este link já está em uso. Escolha outro nome de link.',
     barbershops_phone_whatsapp_key: 'Já existe uma conta com este WhatsApp.'
   }

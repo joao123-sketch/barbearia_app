@@ -5,6 +5,7 @@ import { buildShopTheme, getModeFor, shopThemeAttrs, useShopChrome } from '../li
 import { requestPasswordReset, signIn } from '../lib/auth'
 import { friendlyError } from '../lib/db'
 import { BarberOnboarding } from './BarberOnboarding'
+import { PasswordInput } from './PasswordInput'
 
 interface BarberAuthProps {
   hasSession: boolean
@@ -99,7 +100,6 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
     >
       <div className="w-full max-w-sm mx-auto space-y-6">
         <div className="text-center space-y-3">
-          <img src="/logo-js.png" alt="SuaAgenda" className="w-24 h-24 rounded-3xl mx-auto shadow-lg" />
           <h1 className="text-2xl font-black text-white tracking-tight">
             {view === 'login' ? 'Entrar' : 'Recuperar senha'}
           </h1>
@@ -126,6 +126,9 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
                   type="text"
                   required
                   autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   placeholder="E-mail ou WhatsApp"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
@@ -138,14 +141,13 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
                   <Lock className="w-3.5 h-3.5 text-amber-400" />
                   <span>Senha</span>
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
                   required
                   autoComplete="current-password"
                   placeholder="Sua senha"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className={inputClass}
+                  inputClassName={inputClass}
                 />
                 <button
                   type="button"

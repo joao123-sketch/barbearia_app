@@ -23,11 +23,21 @@ function setMeta(name: string, content: string) {
 }
 
 // Aponta o navegador para o app do negócio (nome e logo dele na tela inicial)
-export function applyShopPwa(slug: string, name: string, app: 'client' | 'admin') {
+// Muda quando a logo muda: o celular baixa o ícone novo em vez de reaproveitar o antigo
+function logoVersion(value?: string | null): string {
+  if (!value) return '0'
+  const step = Math.max(1, Math.floor(value.length / 512))
+  let h = 5381
+  for (let i = 0; i < value.length; i += step) h = ((h << 5) + h + value.charCodeAt(i)) >>> 0
+  return h.toString(36) + value.length.toString(36)
+}
+
+export function applyShopPwa(slug: string, name: string, app: 'client' | 'admin', logoUrl?: string | null) {
   const query = app === 'admin' ? '?app=admin' : ''
   setLink('manifest', `/manifest/${slug}.webmanifest${query}`)
-  setLink('apple-touch-icon', `/icon/${slug}`)
-  setLink('icon', `/icon/${slug}`)
+  const icon = `/icon/${slug}?v=${logoVersion(logoUrl)}`
+  setLink('apple-touch-icon', icon)
+  setLink('icon', icon)
   setMeta('apple-mobile-web-app-title', name.length > 14 ? name.slice(0, 14).trim() : name)
   document.title = app === 'admin' ? `${name} · Painel` : name
 }

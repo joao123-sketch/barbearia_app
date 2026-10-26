@@ -242,6 +242,13 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
               ))}
             </div>
 
+            {isIOS && (
+              <p className="mt-4 text-xs text-slate-400 leading-relaxed">
+                Dica: no iPhone o app instalado guarda o login separado do Safari. Na primeira vez que abrir, entre com seu
+                e-mail ou WhatsApp e a senha. Depois disso o login fica salvo.
+              </p>
+            )}
+
             <button
               onClick={() => setShowIOSModal(false)}
               className="mt-6 w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/20 hover:brightness-105 transition-all"

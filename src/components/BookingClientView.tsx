@@ -74,6 +74,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
   const look = getLook(preset.id)
   const terms = getTerms(barbershop.business_type)
   const centered = look.hero === 'center'
+  const serviceOn = barbershop.service_active ?? isServiceActive(barbershop)
 
   // Equipe de barbeiros ativos
   const activeBarbers = useMemo(() => {
@@ -366,10 +367,17 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
             )}
           </div>
           <div className={centered ? '' : 'flex-1 pb-1'}>
-            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold mb-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-              ABERTO HOJE
-            </div>
+            {serviceOn ? (
+              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold mb-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                ABERTO HOJE
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-bold mb-1">
+                <Clock className="w-3 h-3" />
+                AGENDAMENTO PAUSADO
+              </div>
+            )}
             <h1 className="text-xl font-black tracking-tight leading-tight text-white">
               {barbershop.name}
             </h1>
@@ -432,22 +440,22 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
           </a>
         </div>
 
-        {!(barbershop.service_active ?? isServiceActive(barbershop)) ? (
-          <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 text-center space-y-3.5 my-6 shadow-2xl">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto">
-              <Clock className="w-6 h-6" />
+        {!serviceOn ? (
+          <div className="shop-summary p-6 rounded-3xl bg-slate-900 border border-slate-800 text-center space-y-4 my-6">
+            <div className="w-14 h-14 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center mx-auto">
+              <Clock className="w-7 h-7" />
             </div>
-            <div>
-              <h3 className="font-bold text-base text-white">Agendamentos Online Pausados</h3>
-              <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
-                Este espaço está temporariamente indisponível para novos agendamentos online. Entre em contato diretamente pelo WhatsApp.
+            <div className="space-y-1.5">
+              <h3 className="font-black text-lg text-white">Agendamento online pausado</h3>
+              <p className="text-sm text-slate-400 max-w-xs mx-auto leading-relaxed">
+                No momento não é possível marcar horário por aqui. Fale direto com {barbershop.name} pelo WhatsApp.
               </p>
             </div>
             <a
               href={`https://wa.me/${toWaNumber(barbershop.phone_whatsapp)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition-transform"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-emerald-500 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 active:scale-95 transition-transform"
             >
               <Phone className="w-4 h-4 fill-current" />
               <span>Falar no WhatsApp</span>
@@ -1036,7 +1044,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
       )}
 
       {/* Banner PWA flutuante sutil se o cliente não tiver instalado ainda */}
-      {step === 'service' && selectedServices.length === 0 && (
+      {serviceOn && step === 'service' && selectedServices.length === 0 && (
         <PWAInstallPrompt variant="banner" />
       )}
     </div>

@@ -4,6 +4,7 @@ import { Lock } from 'lucide-react'
 import { buildShopTheme, getModeFor, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
 import { updatePassword, useSession } from '../lib/auth'
 import { friendlyError } from '../lib/db'
+import { PasswordInput } from './PasswordInput'
 
 // Página aberta pelo link do e-mail de recuperação: o Supabase já entrega uma sessão temporária
 export const ResetPassword: React.FC = () => {
@@ -42,7 +43,6 @@ export const ResetPassword: React.FC = () => {
     >
       <div className="w-full max-w-sm mx-auto space-y-6">
         <div className="text-center space-y-3">
-          <img src="/logo-js.png" alt="SuaAgenda" className="w-24 h-24 rounded-3xl mx-auto shadow-lg" />
           <h1 className="text-2xl font-black text-white tracking-tight">Nova senha</h1>
           <p className="text-xs text-slate-400">Escolha uma nova senha para entrar na sua conta.</p>
         </div>
@@ -66,14 +66,13 @@ export const ResetPassword: React.FC = () => {
                 <Lock className="w-3.5 h-3.5 text-amber-400" />
                 <span>Nova senha</span>
               </label>
-              <input
-                type="password"
+              <PasswordInput
                 required
                 autoComplete="new-password"
                 placeholder="Mínimo 6 caracteres"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3.5 py-3 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-sm"
+                inputClassName="w-full px-3.5 py-3 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-sm"
               />
             </div>
             <button

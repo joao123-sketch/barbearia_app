@@ -56,3 +56,37 @@ export async function accountExists(phone?: string, email?: string): Promise<boo
   const { data } = await supabase.rpc('account_exists', { p_phone: phone || null, p_email: email || null })
   return Boolean(data)
 }
+
+// Já usou o teste grátis? (o cadastro avisa antes de criar a conta)
+export async function trialAlreadyUsed(phone: string): Promise<boolean> {
+  const { data } = await supabase.rpc('trial_used', { p_phone: phone })
+  return Boolean(data)
+}
+
+// Confere a senha atual (entrando de novo) antes de mudar dados sensíveis
+async function confirmCurrentPassword(currentPassword: string) {
+  const { data } = await supabase.auth.getUser()
+  const email = data.user?.email
+  if (!email) throw new Error('not_authenticated')
+  const { error } = await supabase.auth.signInWithPassword({ email, password: currentPassword })
+  if (error) throw new Error('Senha atual incorreta.')
+}
+
+export async function changePassword(currentPassword: string, newPassword: string) {
+  await confirmCurrentPassword(currentPassword)
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) throw error
+}
+
+// Devolve true se o e-mail já foi trocado, ou false se o Supabase pediu confirmação pelo novo e-mail
+export async function changeEmail(currentPassword: string, newEmail: string): Promise<boolean> {
+  await confirmCurrentPassword(currentPassword)
+  const { data, error } = await supabase.auth.updateUser({ email: newEmail.trim().toLowerCase() })
+  if (error) throw error
+  return !data.user?.new_email
+}
+
+export async function currentEmail(): Promise<string | undefined> {
+  const { data } = await supabase.auth.getUser()
+  return data.user?.email
+}

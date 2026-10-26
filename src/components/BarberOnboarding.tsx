@@ -16,7 +16,8 @@ import {
 } from 'lucide-react'
 import type { ShopStylePreset, BusinessType } from '../types'
 import { fileToResizedDataUrl } from '../lib/image'
-import { accountExists, signUp, useSession } from '../lib/auth'
+import { accountExists, signUp, trialAlreadyUsed, useSession } from '../lib/auth'
+import { PasswordInput } from './PasswordInput'
 import { defaultWorkingHours, fetchMonthlyFee, friendlyError, registerBarbershop, saveWorkingHours } from '../lib/db'
 import { getTerms } from '../lib/terms'
 import { normalizePhone } from '../lib/phone'
@@ -107,6 +108,19 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
     return () => window.clearTimeout(timer)
   }, [phone, email, loggedEmail])
   const existingAccount = existing !== null
+
+  // Este WhatsApp já usou o teste grátis (conta apagada antes, por exemplo)? Avisa antes de criar
+  const [trialUsed, setTrialUsed] = useState(false)
+  useEffect(() => {
+    if (normalizePhone(phone).length < 10) {
+      setTrialUsed(false)
+      return
+    }
+    const timer = window.setTimeout(() => {
+      trialAlreadyUsed(phone).then(setTrialUsed).catch(() => setTrialUsed(false))
+    }, 400)
+    return () => window.clearTimeout(timer)
+  }, [phone])
   const existingByPhone = existing === 'phone'
 
   // Gerar slug automaticamente ao digitar o nome da barbearia
@@ -272,7 +286,6 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
       <div className="w-full max-w-lg mx-auto space-y-6">
         {/* Header com Logo e Título */}
         <div className="text-center space-y-2">
-          <img src="/logo-js.png" alt="SuaAgenda" className="w-24 h-24 rounded-3xl mx-auto shadow-lg" />
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
             Cadastre seu negócio
           </h1>
@@ -507,13 +520,13 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
                     <Lock className="w-3.5 h-3.5 text-amber-400" />
                     <span>Criar Senha de Acesso *</span>
                   </label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     required
+                    autoComplete="new-password"
                     placeholder="Mínimo 6 caracteres"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-sm"
+                    inputClassName="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-sm"
                   />
                   <span className="text-[10px] text-amber-300/80 mt-1 block">
                     Você entra com seu e-mail ou WhatsApp e esta senha.
@@ -521,6 +534,14 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
                 </div>
                 )}
               </div>
+
+              {trialUsed && !existingAccount && (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/40 text-xs text-slate-200 leading-relaxed">
+                  <strong className="text-amber-300">Este WhatsApp já usou o teste grátis.</strong> Você pode criar a conta, mas o
+                  acesso só é liberado depois do pagamento da primeira mensalidade
+                  {baseFee !== null ? ` (R$ ${formatMoney(baseFee)})` : ''}. Se quiser testar sem pagar, use outro número.
+                </div>
+              )}
 
               {existingAccount && (
                 <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/40 text-xs space-y-2">

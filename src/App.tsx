@@ -75,7 +75,7 @@ function BookingPage({
   // Quem instala a partir desta página leva o nome e a logo do negócio, e abre direto no agendamento
   const readyShop = state.status === 'ready' ? state.shop : null
   useEffect(() => {
-    if (readyShop) applyShopPwa(readyShop.slug, readyShop.name, 'client')
+    if (readyShop) applyShopPwa(readyShop.slug, readyShop.name, 'client', readyShop.logo_url)
   }, [readyShop])
 
   if (state.status === 'loading') return <FullScreenMessage title="Carregando..." />
@@ -122,7 +122,7 @@ function AdminRoute({
   // Dono que instala a partir do painel leva o nome e a logo do negócio, e abre direto no painel
   const shopForPwa = owner.shop
   useEffect(() => {
-    if (shopForPwa) applyShopPwa(shopForPwa.slug, shopForPwa.name, 'admin')
+    if (shopForPwa) applyShopPwa(shopForPwa.slug, shopForPwa.name, 'admin', shopForPwa.logo_url)
   }, [shopForPwa])
 
   if (!ready || (session && owner.loading)) return <FullScreenMessage title="Carregando..." />
