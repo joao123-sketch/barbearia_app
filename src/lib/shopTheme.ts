@@ -83,10 +83,11 @@ export function getLook(presetId: string | undefined): Look {
 }
 
 // Atributos que ligam as regras de tipografia/sombra do index.css
-export function shopThemeAttrs(presetId: string | undefined) {
+export function shopThemeAttrs(presetId: string | undefined, mode?: ThemeMode) {
   const look = getLook(presetId)
   return {
     'data-shop-theme': presetId || 'elegante',
+    'data-shop-mode': mode ?? 'dark',
     'data-shop-caps': look.caps ? 'true' : 'false',
     'data-shop-flat': look.flat ? 'true' : 'false'
   }

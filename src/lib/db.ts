@@ -42,7 +42,8 @@ const toService = (r: any): Service => ({
 const toBarber = (r: any): Barber => ({
   ...r,
   avatar_url: r.avatar_url ?? undefined,
-  role: r.role ?? undefined,
+  // O banco grava o cargo inicial sem acento
+  role: r.role === 'Responsavel' ? 'Responsável' : (r.role ?? undefined),
   bio: r.bio ?? undefined,
   phone: r.phone ?? undefined
 })

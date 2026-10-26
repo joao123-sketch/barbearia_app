@@ -310,16 +310,16 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
 
   return (
     <div
-      {...shopThemeAttrs(preset.id)}
+      {...shopThemeAttrs(preset.id, theme)}
       style={buildShopTheme(preset.id, theme)}
       className="min-h-screen pb-28 select-none transition-colors bg-slate-950 text-slate-100"
     >
       {/* ===================== TOPO / BANNER ===================== */}
-      <div className={`relative w-full overflow-hidden bg-slate-900 ${centered ? 'h-36 sm:h-52' : 'h-48 sm:h-64'}`}>
+      <div className={`shop-banner relative w-full overflow-hidden bg-slate-900 ${centered ? 'h-36 sm:h-52' : 'h-48 sm:h-64'}`}>
         {barbershop.banner_url ? (
           <img src={barbershop.banner_url} alt={barbershop.name} className="w-full h-full object-cover opacity-60" />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-amber-500/40 via-slate-900 to-slate-950" />
+          <div className="shop-banner-fill w-full h-full bg-gradient-to-br from-amber-500/40 via-slate-900 to-slate-950" />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" />
 
@@ -353,7 +353,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
       <div className="max-w-md mx-auto px-4 -mt-16 relative z-10">
         <div className={centered ? 'flex flex-col items-center text-center gap-2.5 mb-4' : 'flex items-end gap-3.5 mb-4'}>
           <div
-            className={`overflow-hidden border-2 border-amber-500/80 shadow-2xl bg-slate-900 shrink-0 ${
+            className={`shop-logo overflow-hidden border-2 border-amber-500/80 shadow-2xl bg-slate-900 shrink-0 ${
               centered ? 'w-24 h-24 rounded-full' : 'w-20 h-20 rounded-2xl'
             }`}
           >
@@ -382,13 +382,13 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
         </div>
 
         {/* Contatos: um embaixo do outro */}
-        <div className="flex flex-col gap-2 mb-5 text-xs">
+        <div className="shop-contacts flex flex-col gap-2 mb-5 text-xs">
           <a
             href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(googleMapsQuery)}`}
             target="_blank"
             rel="noopener noreferrer"
             title="Ver rota no Google Maps"
-            className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white active:scale-[0.99] transition-transform"
+            className="shop-contact flex items-center gap-3 px-3.5 py-3 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white active:scale-[0.99] transition-transform"
           >
             <MapPin className="w-4 h-4 text-amber-500 shrink-0" />
             <span className="min-w-0 flex-1">
@@ -406,7 +406,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               href={`https://instagram.com/${barbershop.instagram.replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/^@/, '')}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white active:scale-[0.99] transition-transform"
+              className="shop-contact flex items-center gap-3 px-3.5 py-3 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white active:scale-[0.99] transition-transform"
             >
               <InstagramIcon className="w-4 h-4 text-pink-400 shrink-0" />
               <span className="min-w-0 flex-1">
@@ -422,7 +422,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
             href={`https://wa.me/${toWaNumber(barbershop.phone_whatsapp)}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white active:scale-[0.99] transition-transform"
+            className="shop-contact flex items-center gap-3 px-3.5 py-3 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white active:scale-[0.99] transition-transform"
           >
             <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
             <span className="min-w-0 flex-1">
@@ -457,7 +457,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
           <>
             {/* Indicador de Passos */}
             {step !== 'success' && (
-              <div className={`flex items-center justify-between mb-5 p-2 rounded-2xl border ${
+              <div className={`shop-steps flex items-center justify-between mb-5 p-2 rounded-2xl border ${
                 isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900/60 border-slate-800/80'
               }`}>
                 <button
@@ -521,7 +521,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
-                    className={`px-3 py-1.5 rounded-xl font-medium shrink-0 transition-all capitalize ${
+                    className={`shop-chip ${selectedCategory === cat ? 'shop-chip-active' : ''} px-3 py-1.5 rounded-xl font-medium shrink-0 transition-all capitalize ${
                       selectedCategory === cat
                         ? 'bg-slate-200 text-slate-950 font-bold'
                         : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
@@ -547,7 +547,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                     <div
                       key={service.id}
                       onClick={() => toggleService(service.id)}
-                      className={`p-4 rounded-2xl border transition-all cursor-pointer active:scale-[0.99] ${
+                      className={`shop-service ${isSelected ? 'shop-service-selected' : ''} p-4 rounded-2xl border transition-all cursor-pointer active:scale-[0.99] ${
                         isSelected
                           ? 'bg-gradient-to-r from-amber-500/15 to-transparent border-amber-500 shadow-lg shadow-amber-500/10'
                           : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
@@ -595,7 +595,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                       </div>
 
                       <div
-                        className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                        className={`shop-check w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-colors ${
                           isSelected
                             ? 'bg-amber-500 text-slate-950 font-bold'
                             : 'border-2 border-slate-700 bg-slate-800/60'
@@ -711,7 +711,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                       key={d.date}
                       disabled={d.isBlocked}
                       onClick={() => !d.isBlocked && setSelectedDate(d.date)}
-                      className={`p-2.5 rounded-2xl flex flex-col items-center justify-center border transition-all cursor-pointer ${
+                      className={`shop-day ${isSelected ? 'shop-day-selected' : ''} p-2.5 rounded-2xl flex flex-col items-center justify-center border transition-all cursor-pointer ${
                         d.isBlocked
                           ? 'bg-slate-950/80 border-slate-900 text-slate-600 opacity-50 cursor-not-allowed'
                           : isSelected
@@ -748,7 +748,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                       key={item.time}
                       disabled={!item.available}
                       onClick={() => setSelectedTime(item.time)}
-                      className={`py-3 px-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                      className={`shop-time ${isSelected ? 'shop-time-selected' : ''} py-3 px-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                         isSelected
                           ? `${preset.primaryButton} shadow-md`
                           : item.available
@@ -771,7 +771,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
         {step === 'customer' && (
           <div className="space-y-4 animate-in fade-in duration-200">
             {/* Resumo Rápido */}
-            <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2 text-xs">
+            <div className="shop-summary p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2 text-xs">
               <h4 className="font-bold text-white text-sm mb-2 flex items-center justify-between">
                 <span>Resumo do Agendamento</span>
                 <span className={`font-extrabold text-base ${preset.accentText}`}>
@@ -899,7 +899,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
             </div>
 
             {/* Cartão de Confirmação */}
-            <div className="p-4 rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-amber-500/30 text-left text-xs space-y-2.5 shadow-2xl">
+            <div className="shop-ticket p-4 rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-amber-500/30 text-left text-xs space-y-2.5 shadow-2xl">
               <div className="flex justify-between items-center border-b border-slate-800 pb-2">
                 <span className="text-slate-400">Cliente:</span>
                 <span className="font-bold text-white">{confirmedBooking.client_name}</span>
@@ -971,7 +971,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
 
       {/* ===================== BARRA INFERIOR FLUTUANTE ===================== */}
       {step !== 'success' && selectedServices.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 border-t border-slate-800/90 backdrop-blur-xl p-3.5">
+        <div className="shop-bar fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 border-t border-slate-800/90 backdrop-blur-xl p-3.5">
           <div className="max-w-md mx-auto flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] text-slate-400">
