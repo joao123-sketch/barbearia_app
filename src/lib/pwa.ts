@@ -9,6 +9,7 @@ function setLink(rel: string, href: string) {
     document.head.appendChild(link)
   }
   link.href = href
+  link.removeAttribute('type') // o tipo (png/jpeg) varia conforme a logo
 }
 
 function setMeta(name: string, content: string) {
@@ -26,6 +27,7 @@ export function applyShopPwa(slug: string, name: string, app: 'client' | 'admin'
   const query = app === 'admin' ? '?app=admin' : ''
   setLink('manifest', `/manifest/${slug}.webmanifest${query}`)
   setLink('apple-touch-icon', `/icon/${slug}`)
+  setLink('icon', `/icon/${slug}`)
   setMeta('apple-mobile-web-app-title', name.length > 14 ? name.slice(0, 14).trim() : name)
   document.title = app === 'admin' ? `${name} · Painel` : name
 }
@@ -35,6 +37,9 @@ export function applyDefaultPwa(pathname: string) {
   const isAdminArea = pathname.startsWith('/admin') || pathname.startsWith('/login') || pathname.startsWith('/cadastr')
   setLink('manifest', isAdminArea ? '/manifest-admin.json' : '/manifest.json')
   setLink('apple-touch-icon', '/apple-touch-icon.png')
+  // A logo da SuaAgenda aparece só como ícone da aba nas telas de entrada do dono
+  const isSignIn = pathname.startsWith('/login') || pathname.startsWith('/cadastr') || pathname.startsWith('/redefinir')
+  setLink('icon', isSignIn ? '/favicon-js.png' : '/icon-192.png')
   setMeta('apple-mobile-web-app-title', 'SuaAgenda')
   document.title = isAdminArea ? 'Painel | SuaAgenda' : 'SuaAgenda | Agendamento Online'
 }
