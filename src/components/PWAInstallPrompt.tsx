@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Download, Share2, PlusSquare, X, Smartphone, Sparkles, CheckCircle2 } from 'lucide-react'
 
 interface BeforeInstallPromptEvent extends Event {
@@ -23,6 +24,13 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
   const [showIOSModal, setShowIOSModal] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const [installSuccess, setInstallSuccess] = useState(false)
+  // O cabeçalho do painel usa desfoque (backdrop-filter), que prende elementos "fixed" dentro dele.
+  // Por isso o aviso é desenhado na raiz do tema (mantém as cores), fora do cabeçalho.
+  const anchorRef = useRef<HTMLSpanElement>(null)
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    setPortalTarget((anchorRef.current?.closest('[data-shop-theme]') as HTMLElement | null) ?? document.body)
+  }, [])
 
   useEffect(() => {
     // Verifica se já está instalado (standalone)
@@ -82,6 +90,7 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
 
   return (
     <>
+      <span ref={anchorRef} className="hidden" />
       {/* Botão de instalação estilizado */}
       {variant === 'button' && (
         <button
@@ -137,7 +146,7 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
       )}
 
       {/* Modal Guiado para iPhone (iOS) e navegadores sem suporte direto */}
-      {showIOSModal && (
+      {showIOSModal && portalTarget && createPortal(
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
           <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 text-slate-100 shadow-2xl animate-in slide-in-from-bottom duration-300">
             <div className="flex justify-between items-center mb-4">
@@ -199,10 +208,10 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
             </button>
           </div>
         </div>
-      )}
+      , portalTarget)}
 
       {/* Notificação de Sucesso */}
-      {installSuccess && (
+      {installSuccess && portalTarget && createPortal(
         <div className="fixed top-4 left-4 right-4 z-50 max-w-sm mx-auto p-4 rounded-2xl bg-emerald-950/90 border border-emerald-500/40 text-emerald-200 flex items-center gap-3 backdrop-blur-md shadow-2xl">
           <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" />
           <div className="text-xs">
@@ -210,7 +219,7 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
             <p>O ícone agora está disponível na sua tela de aplicativos.</p>
           </div>
         </div>
-      )}
+      , portalTarget)}
     </>
   )
 }
