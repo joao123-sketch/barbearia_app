@@ -1,15 +1,16 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Lock, User, Mail, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react'
-import type { Barbershop, Service } from '../types'
 import { buildShopTheme, getModeFor, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
-import { checkPassword, findAccount, resetPassword, startSession } from '../lib/auth'
+import { requestPasswordReset, signIn } from '../lib/auth'
+import { friendlyError } from '../lib/db'
 import { BarberOnboarding } from './BarberOnboarding'
 
 interface BarberAuthProps {
-  barbershops: Barbershop[]
-  onSelectBarbershop: (shop: Barbershop) => void
-  onRegisterBarbershop: (shop: Barbershop, services: Service[], initialTeamNames?: string[]) => void
+  hasSession: boolean
+  hasShop: boolean
+  shopLoading: boolean
+  onRegistered: () => Promise<void>
 }
 
 type View = 'login' | 'forgot' | 'register'
@@ -17,79 +18,75 @@ type View = 'login' | 'forgot' | 'register'
 const inputClass =
   'w-full px-3.5 py-3 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-sm'
 const primaryClass =
-  'w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer'
+  'w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer disabled:opacity-60'
 
-export const BarberAuth: React.FC<BarberAuthProps> = ({
-  barbershops,
-  onSelectBarbershop,
-  onRegisterBarbershop
-}) => {
+export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, shopLoading, onRegistered }) => {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const next = params.get('next') || '/admin'
+
   const [view, setView] = useState<View>('login')
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
 
   // Recuperação de senha
   const [recoveryEmail, setRecoveryEmail] = useState('')
-  const [recoveryFound, setRecoveryFound] = useState(false)
-  const [newPassword, setNewPassword] = useState('')
-  const [recovered, setRecovered] = useState(false)
+  const [recoverySent, setRecoverySent] = useState(false)
 
   // Entrada e recuperação usam o visual neutro; o cadastro muda conforme o estilo escolhido
   const neutralMode = getModeFor('neutro', null)
   useShopChrome('neutro', neutralMode)
 
-  const goTo = (next: View) => {
+  // Quem já está logado vai direto ao painel; logado sem negócio completa o cadastro
+  useEffect(() => {
+    if (!hasSession || shopLoading) return
+    if (hasShop) navigate(next, { replace: true })
+    else setView('register')
+  }, [hasSession, hasShop, shopLoading, navigate, next])
+
+  const goTo = (target: View) => {
     setError('')
-    setView(next)
+    setView(target)
   }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    const account = findAccount(identifier)
-    if (!account || !(await checkPassword(account, password))) {
-      setError('Usuário ou senha incorretos.')
-      return
+    setBusy(true)
+    try {
+      await signIn(identifier, password)
+      // o efeito acima leva ao painel assim que a sessão e o negócio carregam
+    } catch (err) {
+      setError(friendlyError(err instanceof Error ? err.message : String(err)))
+    } finally {
+      setBusy(false)
     }
-    const shop = barbershops.find((s) => s.id === account.shop_id)
-    if (!shop) {
-      setError('Não encontramos o negócio desta conta neste aparelho.')
-      return
-    }
-    startSession(account)
-    onSelectBarbershop(shop)
-    navigate('/admin')
   }
 
-  // Provisório: sem servidor de e-mail ainda, a troca de senha acontece na hora.
-  // Com o banco (Supabase Auth) isto vira o envio do link por e-mail.
-  const handleForgotEmail = (e: React.FormEvent) => {
+  const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (!findAccount(recoveryEmail)) {
-      setError('Não encontramos uma conta com este e-mail.')
-      return
+    setBusy(true)
+    try {
+      await requestPasswordReset(recoveryEmail)
+      setRecoverySent(true)
+    } catch (err) {
+      setError(friendlyError(err instanceof Error ? err.message : String(err)))
+    } finally {
+      setBusy(false)
     }
-    setRecoveryFound(true)
-  }
-
-  const handleNewPassword = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    if (newPassword.length < 6) {
-      setError('Crie uma senha com no mínimo 6 caracteres.')
-      return
-    }
-    if (await resetPassword(recoveryEmail, newPassword)) setRecovered(true)
   }
 
   if (view === 'register') {
     return (
       <BarberOnboarding
-        onRegisterBarbershop={onRegisterBarbershop}
         onBack={() => goTo('login')}
+        onRegistered={async () => {
+          await onRegistered()
+          navigate('/admin')
+        }}
       />
     )
   }
@@ -108,7 +105,7 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({
           <p className="text-xs text-slate-400 max-w-xs mx-auto">
             {view === 'login'
               ? 'Acesse o painel do seu negócio.'
-              : 'Informe o e-mail da sua conta para criar uma nova senha.'}
+              : 'Informe o e-mail da sua conta. Enviaremos um link para criar uma nova senha.'}
           </p>
         </div>
 
@@ -153,8 +150,7 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({
                   type="button"
                   onClick={() => {
                     setRecoveryEmail(identifier.includes('@') ? identifier : '')
-                    setRecoveryFound(false)
-                    setRecovered(false)
+                    setRecoverySent(false)
                     goTo('forgot')
                   }}
                   className="mt-2 text-[11px] text-amber-400 hover:underline cursor-pointer"
@@ -164,9 +160,9 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({
               </div>
             </div>
 
-            <button type="submit" className={primaryClass}>
-              <span>Entrar</span>
-              <ArrowRight className="w-4 h-4" />
+            <button type="submit" disabled={busy} className={primaryClass}>
+              <span>{busy ? 'Entrando...' : 'Entrar'}</span>
+              {!busy && <ArrowRight className="w-4 h-4" />}
             </button>
 
             <div className="pt-3 border-t border-slate-800">
@@ -187,16 +183,19 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({
               <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400 text-xs">{error}</div>
             )}
 
-            {recovered ? (
+            {recoverySent ? (
               <div className="text-center space-y-3">
                 <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
-                <p className="text-sm text-slate-200 font-semibold">Senha alterada!</p>
+                <p className="text-sm text-slate-200 font-semibold">Confira seu e-mail</p>
+                <p className="text-xs text-slate-400">
+                  Se este e-mail tiver uma conta, enviamos um link para criar a nova senha. Veja também a caixa de spam.
+                </p>
                 <button type="button" onClick={() => goTo('login')} className={primaryClass}>
                   Voltar para o login
                 </button>
               </div>
-            ) : !recoveryFound ? (
-              <form onSubmit={handleForgotEmail} className="space-y-4 text-xs">
+            ) : (
+              <form onSubmit={handleForgot} className="space-y-4 text-xs">
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
                     <Mail className="w-3.5 h-3.5 text-amber-400" />
@@ -211,34 +210,13 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({
                     className={inputClass}
                   />
                 </div>
-                <button type="submit" className={primaryClass}>
-                  Continuar
-                </button>
-              </form>
-            ) : (
-              <form onSubmit={handleNewPassword} className="space-y-4 text-xs">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
-                    <Lock className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Nova senha</span>
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    autoComplete="new-password"
-                    placeholder="Mínimo 6 caracteres"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className={inputClass}
-                  />
-                </div>
-                <button type="submit" className={primaryClass}>
-                  Salvar nova senha
+                <button type="submit" disabled={busy} className={primaryClass}>
+                  {busy ? 'Enviando...' : 'Enviar link'}
                 </button>
               </form>
             )}
 
-            {!recovered && (
+            {!recoverySent && (
               <button
                 type="button"
                 onClick={() => goTo('login')}

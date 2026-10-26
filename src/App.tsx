@@ -1,151 +1,150 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, useNavigate, useParams, useLocation, Navigate } from 'react-router-dom'
-import { applyManifestForPath } from './lib/pwa'
-import { endSession, getSession } from './lib/auth'
-import { normalizePhone } from './lib/phone'
-import { getModeFor, type ThemeMode } from './lib/shopTheme'
-import { BookingClientView } from './components/BookingClientView'
+import { BookingClientView, type BookingInput } from './components/BookingClientView'
 import { AdminDashboard } from './components/AdminDashboard'
 import { BarberAuth } from './components/BarberAuth'
+import { ResetPassword } from './components/ResetPassword'
 import { MasterAdminDashboard } from './components/MasterAdminDashboard'
-import {
-  demoBarbershop,
-  demoBarbershopsList,
-  demoBarbers,
-  demoServices,
-  demoAppointments,
-  demoWorkingHours
-} from './lib/mockData'
-import type { Appointment, Service, Barbershop, Barber } from './types'
+import { applyManifestForPath } from './lib/pwa'
+import { signOut, useSession } from './lib/auth'
+import { getModeFor, type ThemeMode } from './lib/shopTheme'
+import { useOwnerData } from './lib/useOwnerData'
+import { createPublicAppointment, fetchBusySlots, fetchPublicShopBySlug, fetchShopCatalog } from './lib/db'
+import type { Barber, Barbershop, Service, WorkingHour } from './types'
 
-function BookingRouteWrapper({
-  barbershop,
-  barbershopsList,
-  services,
-  barbers,
-  themeOverride,
-  onToggleTheme,
-  onNewBooking
-}: {
-  barbershop: Barbershop
-  barbershopsList: Barbershop[]
-  services: Service[]
-  barbers: Barber[]
-  themeOverride: ThemeMode | null
-  onToggleTheme: (current: ThemeMode) => void
-  onNewBooking: (b: any) => void
-}) {
-  const { slug } = useParams()
+type OwnerData = ReturnType<typeof useOwnerData>
 
-  // Procura barbearia correspondente na lista pelo slug ou usa a atual
-  const matchedShop = slug ? barbershopsList.find((s) => s.slug === slug) : null
-
-  const currentShop: Barbershop = matchedShop || {
-    ...barbershop,
-    slug: slug || barbershop.slug,
-    name: slug && slug !== barbershop.slug
-      ? slug.replace(/-/g, ' ').toUpperCase()
-      : barbershop.name
-  }
-
-  // Filtrar serviços específicos desta barbearia
-  const shopServices = services.filter((s) => s.barbershop_id === currentShop.id)
-  const shopBarbers = barbers.filter((b) => b.barbershop_id === currentShop.id && b.active)
-  const mode = getModeFor(currentShop.style_preset, themeOverride)
-  const navigate = useNavigate()
-  // Dono logado vendo a própria página ("Ver como cliente") ganha o botão de voltar ao painel
-  const isOwnerPreview = getSession()?.shop_id === currentShop.id
-
+function FullScreenMessage({ title, text }: { title: string; text?: string }) {
   return (
-    <div className="relative">
-      <BookingClientView
-        barbershop={currentShop}
-        services={shopServices}
-        barbers={shopBarbers}
-        theme={mode}
-        onToggleTheme={() => onToggleTheme(mode)}
-        onNewBooking={onNewBooking}
-        onBackToPanel={isOwnerPreview ? () => navigate('/admin') : undefined}
-      />
+    <div className="min-h-screen bg-[#090A0F] text-slate-100 flex flex-col items-center justify-center gap-2 px-6 text-center">
+      <p className="font-bold">{title}</p>
+      {text && <p className="text-sm text-slate-400 max-w-xs">{text}</p>}
     </div>
   )
 }
 
-function AdminRouteWrapper({
-  barbershop,
-  appointments,
-  services,
-  barbers,
-  workingHours,
+// Página pública de agendamento: carrega o negócio pelo link (/b/slug) direto do banco
+function BookingPage({
   themeOverride,
   onToggleTheme,
-  onUpdateAppointments,
-  onUpdateServices,
-  onUpdateBarbers,
-  onUpdateBarbershop,
-  onDeleteBarbershop,
-  onUpdateWorkingHours
+  ownerShopId
 }: {
-  barbershop: Barbershop
-  appointments: Appointment[]
-  services: Service[]
-  barbers: Barber[]
-  workingHours: import('./types').WorkingHour[]
   themeOverride: ThemeMode | null
   onToggleTheme: (current: ThemeMode) => void
-  onUpdateAppointments: (a: Appointment[]) => void
-  onUpdateServices: (s: Service[]) => void
-  onUpdateBarbers: (b: Barber[]) => void
-  onUpdateBarbershop: (b: Barbershop) => void
-  onDeleteBarbershop: (id: string) => void
-  onUpdateWorkingHours: (wh: import('./types').WorkingHour[]) => void
+  ownerShopId?: string
 }) {
+  const { slug } = useParams()
   const navigate = useNavigate()
+  const [state, setState] = useState<
+    | { status: 'loading' }
+    | { status: 'notfound' }
+    | { status: 'error' }
+    | { status: 'ready'; shop: Barbershop; services: Service[]; barbers: Barber[]; hours: WorkingHour[] }
+  >({ status: 'loading' })
 
-  // Painel só abre com sessão iniciada
-  if (!getSession()) return <Navigate to="/login" replace />
+  useEffect(() => {
+    let cancelled = false
+    setState({ status: 'loading' })
+    ;(async () => {
+      try {
+        const shop = slug ? await fetchPublicShopBySlug(slug) : null
+        if (cancelled) return
+        if (!shop) {
+          setState({ status: 'notfound' })
+          return
+        }
+        const catalog = await fetchShopCatalog(shop.id)
+        if (cancelled) return
+        setState({
+          status: 'ready',
+          shop,
+          services: catalog.services.filter((s) => s.active),
+          barbers: catalog.barbers.filter((b) => b.active),
+          hours: catalog.workingHours
+        })
+      } catch {
+        if (!cancelled) setState({ status: 'error' })
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [slug])
 
-  // Isolamento estrito de agendamentos, serviços e equipe da barbearia atual
-  const shopAppointments = appointments.filter((a) => a.barbershop_id === barbershop.id)
-  const shopServices = services.filter((s) => s.barbershop_id === barbershop.id)
-  const shopBarbers = barbers.filter((b) => b.barbershop_id === barbershop.id)
-  const mode = getModeFor(barbershop.style_preset, themeOverride)
+  if (state.status === 'loading') return <FullScreenMessage title="Carregando..." />
+  if (state.status === 'notfound')
+    return <FullScreenMessage title="Página não encontrada" text="Confira se o link está correto com quem te enviou." />
+  if (state.status === 'error')
+    return <FullScreenMessage title="Não foi possível carregar" text="Verifique sua conexão e tente de novo." />
+
+  const { shop, services, barbers, hours } = state
+  const mode = getModeFor(shop.style_preset, themeOverride)
+
+  const createBooking = async (input: BookingInput) => {
+    await createPublicAppointment({ shopId: shop.id, ...input })
+  }
 
   return (
-    <div className="relative">
-      <AdminDashboard
-        barbershop={barbershop}
-        barbers={shopBarbers}
-        services={shopServices}
-        appointments={shopAppointments}
-        workingHours={workingHours}
-        theme={mode}
-        onToggleTheme={() => onToggleTheme(mode)}
-        onBackToClientView={() => navigate(`/${barbershop.slug}`)}
-        onLogout={() => {
-          endSession()
-          navigate('/login')
-        }}
-        onUpdateAppointments={(updatedShopApts) => {
-          const others = appointments.filter((a) => a.barbershop_id !== barbershop.id)
-          onUpdateAppointments([...updatedShopApts, ...others])
-        }}
-        onUpdateServices={(updatedShopServices) => {
-          const others = services.filter((s) => s.barbershop_id !== barbershop.id)
-          onUpdateServices([...updatedShopServices, ...others])
-        }}
-        onUpdateBarbers={(updatedShopBarbers) => {
-          const others = barbers.filter((b) => b.barbershop_id !== barbershop.id)
-          onUpdateBarbers([...updatedShopBarbers, ...others])
-        }}
-        onUpdateBarbershop={onUpdateBarbershop}
-        onDeleteBarbershop={(id) => {
-          onDeleteBarbershop(id)
-          navigate('/')
-        }}
-        onUpdateWorkingHours={onUpdateWorkingHours}
-      />
-    </div>
+    <BookingClientView
+      barbershop={shop}
+      services={services}
+      barbers={barbers}
+      workingHours={hours}
+      theme={mode}
+      onToggleTheme={() => onToggleTheme(mode)}
+      loadBusySlots={(date) => fetchBusySlots(shop.id, date)}
+      onCreateBooking={createBooking}
+      onBackToPanel={ownerShopId === shop.id ? () => navigate('/admin') : undefined}
+    />
+  )
+}
+
+// Painel do dono: exige login e um negócio cadastrado
+function AdminRoute({
+  owner,
+  themeOverride,
+  onToggleTheme
+}: {
+  owner: OwnerData
+  themeOverride: ThemeMode | null
+  onToggleTheme: (current: ThemeMode) => void
+}) {
+  const navigate = useNavigate()
+  const { session, ready } = useSession()
+
+  if (!ready || (session && owner.loading)) return <FullScreenMessage title="Carregando..." />
+  if (!session) return <Navigate to="/login" replace />
+  if (!owner.shop) return <Navigate to="/cadastrar" replace />
+
+  const shop = owner.shop
+  const mode = getModeFor(shop.style_preset, themeOverride)
+
+  return (
+    <AdminDashboard
+      barbershop={shop}
+      barbers={owner.barbers}
+      services={owner.services}
+      appointments={owner.appointments}
+      workingHours={owner.workingHours}
+      platform={owner.platform}
+      theme={mode}
+      onToggleTheme={() => onToggleTheme(mode)}
+      onBackToClientView={() => navigate(`/b/${shop.slug}`)}
+      onLogout={async () => {
+        await signOut()
+        navigate('/login')
+      }}
+      onUpdateAppointments={owner.updateAppointments}
+      onUpdateServices={owner.updateServices}
+      onUpdateBarbers={owner.updateBarbers}
+      onUpdateBarbershop={owner.updateShop}
+      onUpdateWorkingHours={owner.updateWorkingHours}
+      onDeleteBarbershop={async () => {
+        await owner.removeShop()
+        await signOut()
+        navigate('/login')
+      }}
+    />
   )
 }
 
@@ -155,336 +154,68 @@ function ManifestSwitcher() {
   return null
 }
 
-export function App() {
-  // Lista de todas as barbearias cadastradas na plataforma (Visível no Master Admin)
-  const [barbershopsList, setBarbershopsList] = useState<Barbershop[]>(() => {
-    const saved = localStorage.getItem('barber_shops_list')
-    if (saved) {
-      try {
-        return JSON.parse(saved)
-      } catch {
-        return demoBarbershopsList
-      }
-    }
-    return demoBarbershopsList
-  })
+function AppRoutes() {
+  const { session, ready } = useSession()
+  const owner = useOwnerData(session?.user.id)
 
-  // Barbearia ativa no momento (para o barbeiro logado)
-  const [currentBarbershop, setCurrentBarbershop] = useState<Barbershop>(() => {
-    const savedId = localStorage.getItem('barber_current_shop_id')
-    if (savedId) {
-      const found = barbershopsList.find((s) => s.id === savedId)
-      if (found) return found
-    }
-    return barbershopsList[0] || demoBarbershop
-  })
-
-  // Agendamentos
-  const [appointments, setAppointments] = useState<Appointment[]>(() => {
-    const saved = localStorage.getItem('barber_appointments')
-    if (saved) {
-      try {
-        return JSON.parse(saved)
-      } catch {
-        return demoAppointments
-      }
-    }
-    return demoAppointments
-  })
-
-  // Serviços
-  const [services, setServices] = useState<Service[]>(() => {
-    const saved = localStorage.getItem('barber_services')
-    if (saved) {
-      try {
-        return JSON.parse(saved)
-      } catch {
-        return demoServices
-      }
-    }
-    return demoServices
-  })
-
-  // Horários de Atendimento Semanal
-  const [workingHours, setWorkingHours] = useState<import('./types').WorkingHour[]>(() => {
-    const saved = localStorage.getItem('barber_working_hours')
-    if (saved) {
-      try {
-        return JSON.parse(saved)
-      } catch {
-        return demoWorkingHours
-      }
-    }
-    return demoWorkingHours
-  })
-
-  // Tema Claro / Escuro: sem escolha do usuário, cada estilo usa o seu modo inicial
+  // Tema: sem escolha do usuário, cada estilo usa o seu modo inicial
   const [themeOverride, setThemeOverride] = useState<ThemeMode | null>(() => {
-    const saved = localStorage.getItem('barber_theme_user')
-    return saved === 'light' || saved === 'dark' ? saved : null
+    try {
+      const saved = localStorage.getItem('barber_theme_user')
+      return saved === 'light' || saved === 'dark' ? saved : null
+    } catch {
+      return null
+    }
   })
-
-  useEffect(() => {
-    const effective = themeOverride ?? 'dark'
-    document.documentElement.classList.toggle('light', effective === 'light')
-    document.documentElement.classList.toggle('dark', effective === 'dark')
-  }, [themeOverride])
 
   const toggleTheme = (current: ThemeMode) => {
     const next: ThemeMode = current === 'dark' ? 'light' : 'dark'
-    localStorage.setItem('barber_theme_user', next)
+    try {
+      localStorage.setItem('barber_theme_user', next)
+    } catch {
+      // modo privado: a escolha vale só nesta visita
+    }
     setThemeOverride(next)
   }
 
-  // Sincronização e persistência no LocalStorage
-  useEffect(() => {
-    localStorage.setItem('barber_shops_list', JSON.stringify(barbershopsList))
-  }, [barbershopsList])
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/login" replace />} />
 
-  useEffect(() => {
-    localStorage.setItem('barber_appointments', JSON.stringify(appointments))
-  }, [appointments])
+      {/* Entrar, cadastrar conta e recuperar senha */}
+      {['/cadastrar', '/cadastro', '/login'].map((path) => (
+        <Route
+          key={path}
+          path={path}
+          element={<BarberAuth hasSession={ready && Boolean(session)} hasShop={Boolean(owner.shop)} shopLoading={owner.loading} onRegistered={owner.reload} />}
+        />
+      ))}
+      <Route path="/redefinir-senha" element={<ResetPassword />} />
 
-  useEffect(() => {
-    localStorage.setItem('barber_services', JSON.stringify(services))
-  }, [services])
+      <Route path="/admin" element={<AdminRoute owner={owner} themeOverride={themeOverride} onToggleTheme={toggleTheme} />} />
 
-  useEffect(() => {
-    localStorage.setItem('barber_working_hours', JSON.stringify(workingHours))
-  }, [workingHours])
+      {/* Painel geral da plataforma (só o administrador) */}
+      <Route path="/master" element={<MasterAdminDashboard />} />
+      <Route path="/superadmin" element={<MasterAdminDashboard />} />
 
-  useEffect(() => {
-    if (currentBarbershop) {
-      localStorage.setItem('barber_current_shop_id', currentBarbershop.id)
-    }
-  }, [currentBarbershop])
+      {/* Link público de cada negócio (/b/nome ou /nome) */}
+      <Route
+        path="/b/:slug"
+        element={<BookingPage themeOverride={themeOverride} onToggleTheme={toggleTheme} ownerShopId={owner.shop?.id} />}
+      />
+      <Route
+        path="/:slug"
+        element={<BookingPage themeOverride={themeOverride} onToggleTheme={toggleTheme} ownerShopId={owner.shop?.id} />}
+      />
+    </Routes>
+  )
+}
 
-  const handleNewBooking = (booking: any) => {
-    setAppointments((prev) => [booking, ...prev])
-  }
-
-  // Barbeiros da Plataforma (Equipes das Barbearias)
-  const [barbers, setBarbers] = useState<Barber[]>(() => {
-    const saved = localStorage.getItem('barber_team')
-    if (saved) {
-      try {
-        return JSON.parse(saved)
-      } catch {
-        return demoBarbers
-      }
-    }
-    return demoBarbers
-  })
-
-  useEffect(() => {
-    localStorage.setItem('barber_team', JSON.stringify(barbers))
-  }, [barbers])
-
-  // Cadastro de nova barbearia (Barber Onboarding)
-  const handleRegisterBarbershop = (
-    newShop: Barbershop,
-    newServices: Service[],
-    initialTeamNames: string[] = []
-  ) => {
-    setBarbershopsList((prev) => [newShop, ...prev])
-    setCurrentBarbershop(newShop)
-    setServices((prev) => [...newServices, ...prev])
-
-    // Cria barbeiro principal do proprietário automaticamente
-    const ownerBarber: Barber = {
-      id: 'barber-' + Date.now(),
-      barbershop_id: newShop.id,
-      name: newShop.owner_name || 'Barbeiro Principal',
-      avatar_url: newShop.logo_url,
-      role: 'Responsável',
-      bio: 'Profissional especialista.',
-      active: true
-    }
-
-    const teamList: Barber[] = [ownerBarber]
-    initialTeamNames.forEach((name, idx) => {
-      if (name.trim()) {
-        teamList.push({
-          id: `barber-${Date.now()}-${idx + 1}`,
-          barbershop_id: newShop.id,
-          name: name.trim(),
-          role: 'Profissional',
-          bio: '',
-          active: true
-        })
-      }
-    })
-
-    setBarbers((prev) => [...teamList, ...prev])
-  }
-
-  // Atualização de dados da barbearia ativa (ex: pausas, endereço, etc.)
-  const handleUpdateBarbershop = (updatedShop: Barbershop) => {
-    setCurrentBarbershop(updatedShop)
-    setBarbershopsList((prev) =>
-      prev.map((s) => (s.id === updatedShop.id ? updatedShop : s))
-    )
-  }
-
-  // Exclusão de barbearia pelo barbeiro (com registro de auditoria anti-fraude)
-  const handleDeleteBarbershop = (shopId: string) => {
-    const shopToDelete = barbershopsList.find((s) => s.id === shopId)
-    if (shopToDelete) {
-      const cleanPhone = normalizePhone(shopToDelete.phone_whatsapp)
-      const auditRaw = localStorage.getItem('barber_audit_history')
-      let auditList: any[] = []
-      if (auditRaw) {
-        try {
-          auditList = JSON.parse(auditRaw)
-        } catch {
-          auditList = []
-        }
-      }
-      const existing = auditList.find((a) => a.phone === cleanPhone)
-      if (existing) {
-        existing.deleted_at = new Date().toISOString()
-        existing.trial_used = true
-      } else {
-        auditList.push({
-          phone: cleanPhone,
-          shop_name: shopToDelete.name,
-          created_at: shopToDelete.created_at || new Date().toISOString(),
-          deleted_at: new Date().toISOString(),
-          trial_used: true
-        })
-      }
-      localStorage.setItem('barber_audit_history', JSON.stringify(auditList))
-    }
-
-    const remaining = barbershopsList.filter((s) => s.id !== shopId)
-    setBarbershopsList(remaining)
-    localStorage.removeItem('barber_current_shop_id')
-    endSession()
-    if (remaining.length > 0) {
-      setCurrentBarbershop(remaining[0])
-    } else {
-      setCurrentBarbershop(demoBarbershop)
-    }
-  }
-
-  // Atualização em lote pelo Master Admin
-  const handleUpdateBarbershopsList = (updated: Barbershop[]) => {
-    setBarbershopsList(updated)
-    const updatedCurrent = updated.find((s) => s.id === currentBarbershop.id)
-    if (updatedCurrent) {
-      setCurrentBarbershop(updatedCurrent)
-    }
-  }
-
+export function App() {
   return (
     <BrowserRouter>
       <ManifestSwitcher />
-      <Routes>
-        {/* Rota Padrão: Página de Agendamento da Barbearia Atual */}
-        <Route
-          path="/"
-          element={
-            <BookingRouteWrapper
-              barbershop={currentBarbershop}
-              barbershopsList={barbershopsList}
-              services={services}
-              barbers={barbers}
-              themeOverride={themeOverride}
-              onToggleTheme={toggleTheme}
-              onNewBooking={handleNewBooking}
-            />
-          }
-        />
-
-        {/* Link enviado ao dono do negócio: entrar ou cadastrar conta */}
-        {['/cadastrar', '/cadastro', '/login'].map((path) => (
-          <Route
-            key={path}
-            path={path}
-            element={
-              <BarberAuth
-                barbershops={barbershopsList}
-                onSelectBarbershop={(shop) => setCurrentBarbershop(shop)}
-                onRegisterBarbershop={handleRegisterBarbershop}
-              />
-            }
-          />
-        ))}
-
-        {/* Painel Administrativo do Barbeiro */}
-        <Route
-          path="/admin"
-          element={
-            <AdminRouteWrapper
-              barbershop={currentBarbershop}
-              appointments={appointments}
-              services={services}
-              barbers={barbers}
-              workingHours={workingHours}
-              themeOverride={themeOverride}
-              onToggleTheme={toggleTheme}
-              onUpdateAppointments={setAppointments}
-              onUpdateServices={setServices}
-              onUpdateBarbers={setBarbers}
-              onUpdateBarbershop={handleUpdateBarbershop}
-              onDeleteBarbershop={handleDeleteBarbershop}
-              onUpdateWorkingHours={setWorkingHours}
-            />
-          }
-        />
-
-        {/* Painel Master do Dono da Plataforma (Acesso Secreto Apenas por URL) */}
-        <Route
-          path="/master"
-          element={
-            <MasterAdminDashboard
-              barbershops={barbershopsList}
-              onUpdateBarbershops={handleUpdateBarbershopsList}
-            />
-          }
-        />
-        <Route
-          path="/superadmin"
-          element={
-            <MasterAdminDashboard
-              barbershops={barbershopsList}
-              onUpdateBarbershops={handleUpdateBarbershopsList}
-            />
-          }
-        />
-
-        {/* Link copiado no painel do barbeiro (ex: /b/nk-barbearia) */}
-        <Route
-          path="/b/:slug"
-          element={
-            <BookingRouteWrapper
-              barbershop={currentBarbershop}
-              barbershopsList={barbershopsList}
-              services={services}
-              barbers={barbers}
-              themeOverride={themeOverride}
-              onToggleTheme={toggleTheme}
-              onNewBooking={handleNewBooking}
-            />
-          }
-        />
-
-        {/* Link Público de cada Barbearia pelo seu Slug (ex: /nk-barbearia) */}
-        <Route
-          path="/:slug"
-          element={
-            <BookingRouteWrapper
-              barbershop={currentBarbershop}
-              barbershopsList={barbershopsList}
-              services={services}
-              barbers={barbers}
-              themeOverride={themeOverride}
-              onToggleTheme={toggleTheme}
-              onNewBooking={handleNewBooking}
-            />
-          }
-        />
-      </Routes>
+      <AppRoutes />
     </BrowserRouter>
   )
 }

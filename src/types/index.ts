@@ -36,6 +36,7 @@ export interface Barbershop {
   last_payment_date?: string
   pix_key?: string
   // Pausas e Bloqueios de Agenda (Viagens / Férias)
+  service_active?: boolean // só na visão pública: o link está liberado?
   blocked_dates?: string[] // Ex: ["2026-11-15", "2026-11-16"]
 }
 

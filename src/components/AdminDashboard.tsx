@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 import {
   Calendar,
   CalendarDays,
@@ -38,7 +38,8 @@ import {
 } from 'lucide-react'
 import type { Barbershop, Barber, Service, Appointment, WorkingHour } from '../types'
 import { PWAInstallPrompt } from './PWAInstallPrompt'
-import { getPlatformSettings } from '../lib/platform'
+import { DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from '../lib/platform'
+import { newId } from '../lib/db'
 import { formatBR, formatMoney, getBillingState } from '../lib/billing'
 import { normalizePhone, toWaNumber } from '../lib/phone'
 import { BR_STATES } from '../lib/states'
@@ -64,6 +65,7 @@ interface AdminDashboardProps {
   workingHours: WorkingHour[]
   theme?: 'dark' | 'light'
   onToggleTheme?: () => void
+  platform?: PlatformSettings
   onBackToClientView?: () => void
   onLogout?: () => void
   onUpdateAppointments?: (appointments: Appointment[]) => void
@@ -82,6 +84,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   workingHours: initialWorkingHours,
   theme = 'dark',
   onToggleTheme,
+  platform: platformProp,
   onBackToClientView,
   onLogout,
   onUpdateAppointments,
@@ -94,6 +97,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [activeTab, setActiveTab] = useState<AdminTab>('agenda')
   const [sidebarExpanded, setSidebarExpanded] = useState(false)
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments)
+  useEffect(() => {
+    setAppointments(initialAppointments)
+  }, [initialAppointments])
   const [localWorkingHours, setLocalWorkingHours] = useState<WorkingHour[]>(initialWorkingHours)
   const [workingHoursSaved, setWorkingHoursSaved] = useState(false)
   const [services, setServices] = useState<Service[]>(initialServices)
@@ -478,7 +484,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     } else {
       // Novo serviço
       const newServ: Service = {
-        id: 'serv-' + Date.now(),
+        id: newId(),
         barbershop_id: barbershop.id,
         name: serviceName,
         price: Number(servicePrice),
@@ -512,7 +518,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const selectedService = services.find((s) => s.id === newServiceId)
     const assignedBarberId = newBookingBarberId || barbersList[0]?.id || initialBarbers[0]?.id
     const newApt: Appointment = {
-      id: 'apt-' + Date.now(),
+      id: newId(),
       barbershop_id: barbershop.id,
       barber_id: assignedBarberId,
       service_ids: [newServiceId],
@@ -588,7 +594,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )
     } else {
       const newB: Barber = {
-        id: 'barber-' + Date.now(),
+        id: newId(),
         barbershop_id: barbershop.id,
         name: barberModalName.trim(),
         role: barberModalRole.trim() || 'Profissional',
@@ -726,7 +732,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Cores claro/escuro vêm do tema do estilo (shopTheme), então as classes são sempre as "escuras"
   const isLight = false
   const isLightMode = theme === 'light'
-  const platform = getPlatformSettings()
+  const platform = platformProp ?? DEFAULT_PLATFORM_SETTINGS
   useShopChrome(barbershop.style_preset, isLightMode ? 'light' : 'dark')
 
   const adminTabsList = [

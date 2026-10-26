@@ -1,79 +1,58 @@
-import { normalizePhone } from './phone'
+import { useEffect, useState } from 'react'
+import type { Session } from '@supabase/supabase-js'
+import { supabase } from './supabase'
 
-// Contas do barbeiro neste aparelho. Provisório: troca por Supabase Auth quando o banco entrar.
-export interface BarberAccount {
-  email: string
-  phone: string
-  password_hash: string
-  owner_name: string
-  shop_id: string
-  shop_slug: string
+// Sessão do Supabase Auth (fica guardada no navegador e renova sozinha)
+export function useSession() {
+  const [session, setSession] = useState<Session | null>(null)
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+      setReady(true)
+    })
+    const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next))
+    return () => data.subscription.unsubscribe()
+  }, [])
+
+  return { session, ready }
 }
 
-const ACCOUNTS_KEY = 'barber_accounts'
-const SESSION_KEY = 'barber_current_user'
-
-export async function hashPassword(password: string): Promise<string> {
-  const data = new TextEncoder().encode(password)
-  const digest = await crypto.subtle.digest('SHA-256', data)
-  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('')
+// "Usuário" pode ser o e-mail ou o WhatsApp: o banco devolve o e-mail da conta
+export async function signIn(identifier: string, password: string) {
+  const { data: email } = await supabase.rpc('email_for_login', { p_identifier: identifier.trim() })
+  if (!email) throw new Error('Invalid login credentials')
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) throw error
 }
 
-export function loadAccounts(): BarberAccount[] {
-  try {
-    return JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || '[]')
-  } catch {
-    return []
-  }
+export async function signUp(email: string, password: string) {
+  const { data, error } = await supabase.auth.signUp({ email: email.trim().toLowerCase(), password })
+  if (error) throw error
+  // Com a confirmação de e-mail desligada a sessão já vem pronta
+  if (!data.session) throw new Error('Não foi possível iniciar a sessão. Tente entrar com o e-mail e a senha.')
 }
 
-function saveAccounts(list: BarberAccount[]) {
-  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list))
+export async function signOut() {
+  await supabase.auth.signOut()
 }
 
-export function findAccount(identifier: string): BarberAccount | undefined {
-  const raw = identifier.trim().toLowerCase()
-  const digits = normalizePhone(raw)
-  return loadAccounts().find(
-    (a) => a.email.toLowerCase() === raw || (digits.length >= 10 && normalizePhone(a.phone) === digits)
-  )
+// Envia o e-mail com o link para criar uma nova senha
+export async function requestPasswordReset(email: string) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+    redirectTo: `${window.location.origin}/redefinir-senha`
+  })
+  if (error) throw error
 }
 
-export async function createAccount(account: Omit<BarberAccount, 'password_hash'>, password: string) {
-  const list = loadAccounts()
-  list.push({ ...account, password_hash: await hashPassword(password) })
-  saveAccounts(list)
+export async function updatePassword(newPassword: string) {
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) throw error
 }
 
-export async function checkPassword(account: BarberAccount, password: string): Promise<boolean> {
-  return account.password_hash === (await hashPassword(password))
-}
-
-export async function resetPassword(email: string, newPassword: string): Promise<boolean> {
-  const list = loadAccounts()
-  const acc = list.find((a) => a.email.toLowerCase() === email.trim().toLowerCase())
-  if (!acc) return false
-  acc.password_hash = await hashPassword(newPassword)
-  saveAccounts(list)
-  return true
-}
-
-export function startSession(account: BarberAccount) {
-  localStorage.setItem(
-    SESSION_KEY,
-    JSON.stringify({ phone: account.phone, email: account.email, owner_name: account.owner_name, shop_id: account.shop_id, shop_slug: account.shop_slug })
-  )
-}
-
-export function getSession(): { shop_id: string } | null {
-  try {
-    const s = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null')
-    return s?.shop_id ? s : null
-  } catch {
-    return null
-  }
-}
-
-export function endSession() {
-  localStorage.removeItem(SESSION_KEY)
+// Já existe conta com este WhatsApp ou e-mail? (para sugerir "Entrar")
+export async function accountExists(phone?: string, email?: string): Promise<boolean> {
+  const { data } = await supabase.rpc('account_exists', { p_phone: phone || null, p_email: email || null })
+  return Boolean(data)
 }

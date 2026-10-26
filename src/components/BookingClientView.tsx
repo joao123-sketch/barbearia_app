@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   MapPin,
   Clock,
@@ -15,12 +15,15 @@ import {
   Users
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
-import type { Barbershop, Service, Barber } from '../types'
+import type { Barbershop, Service, Barber, WorkingHour } from '../types'
 import { getStylePreset } from '../lib/stylePresets'
 import { buildShopTheme, getLook, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
 import { getTerms } from '../lib/terms'
 import { toWaNumber } from '../lib/phone'
-import { isServiceActive } from '../lib/billing'
+import { isServiceActive, toDateStr } from '../lib/billing'
+import { buildSlots } from '../lib/slots'
+import { friendlyError } from '../lib/db'
+import type { BusySlot } from '../lib/db'
 import { PWAInstallPrompt } from './PWAInstallPrompt'
 
 const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
@@ -31,13 +34,26 @@ const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) =>
   </svg>
 )
 
+export interface BookingInput {
+  barberId?: string
+  serviceIds: string[]
+  clientName: string
+  clientPhone: string
+  date: string
+  start: string
+  notes?: string
+  reminder?: string
+}
+
 interface BookingClientViewProps {
   barbershop: Barbershop
   services: Service[]
   barbers?: Barber[]
   theme?: 'dark' | 'light'
   onToggleTheme?: () => void
-  onNewBooking?: (booking: any) => void
+  workingHours?: WorkingHour[]
+  loadBusySlots?: (date: string) => Promise<BusySlot[]>
+  onCreateBooking?: (input: BookingInput) => Promise<void>
   onBackToPanel?: () => void // só quando o dono abriu a página pelo painel ("Ver como cliente")
 }
 
@@ -47,7 +63,9 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
   barbers = [],
   theme = 'dark',
   onToggleTheme,
-  onNewBooking,
+  workingHours = [],
+  loadBusySlots,
+  onCreateBooking,
   onBackToPanel
 }) => {
   // Estilo visual configurado para a barbearia
@@ -73,7 +91,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
   )
 
   // Data selecionada (padrão: hoje)
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], [])
+  const todayStr = useMemo(() => toDateStr(new Date()), [])
   const [selectedDate, setSelectedDate] = useState<string>(todayStr)
   const [selectedTime, setSelectedTime] = useState<string>('')
 
@@ -93,7 +111,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
     for (let i = 0; i < 7; i++) {
       const d = new Date()
       d.setDate(d.getDate() + i)
-      const dateString = d.toISOString().split('T')[0]
+      const dateString = toDateStr(d)
       const isToday = i === 0
       const isTomorrow = i === 1
 
@@ -115,25 +133,19 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
     return days
   }, [barbershop.blocked_dates])
 
-  // Horários disponíveis simulados
-  const availableTimes = useMemo(() => {
-    return [
-      { time: '09:00', period: 'manha', available: true },
-      { time: '09:40', period: 'manha', available: true },
-      { time: '10:20', period: 'manha', available: false },
-      { time: '11:00', period: 'manha', available: true },
-      { time: '11:40', period: 'manha', available: true },
-      { time: '14:00', period: 'tarde', available: true },
-      { time: '14:40', period: 'tarde', available: true },
-      { time: '15:20', period: 'tarde', available: false },
-      { time: '16:00', period: 'tarde', available: true },
-      { time: '16:40', period: 'tarde', available: true },
-      { time: '17:20', period: 'tarde', available: true },
-      { time: '18:00', period: 'noite', available: true },
-      { time: '18:40', period: 'noite', available: true },
-      { time: '19:20', period: 'noite', available: false }
-    ]
-  }, [selectedDate])
+  // Horários ocupados do dia escolhido (vêm do banco, sem dados de outros clientes)
+  const [busySlots, setBusySlots] = useState<BusySlot[]>([])
+  const [bookingError, setBookingError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const refreshBusy = useCallback(() => {
+    if (!loadBusySlots) return
+    loadBusySlots(selectedDate).then(setBusySlots).catch(() => setBusySlots([]))
+  }, [loadBusySlots, selectedDate])
+
+  useEffect(() => {
+    refreshBusy()
+  }, [refreshBusy])
 
   // Filtragem de serviços
   const filteredServices = useMemo(() => {
@@ -153,6 +165,25 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
   const totalDuration = useMemo(() => {
     return selectedServicesObjects.reduce((acc, curr) => acc + curr.duration_minutes, 0)
   }, [selectedServicesObjects])
+
+  // Horários do dia: funcionamento do negócio + duração escolhida + horários já ocupados
+  const availableTimes = useMemo(
+    () =>
+      buildSlots({
+        date: selectedDate,
+        hours: workingHours.find((h) => h.day_of_week === new Date(selectedDate + 'T00:00:00').getDay()),
+        duration: totalDuration,
+        busy: busySlots,
+        barberIds: activeBarbers.map((b) => b.id),
+        selectedBarber: selectedBarberId
+      }),
+    [selectedDate, workingHours, totalDuration, busySlots, activeBarbers, selectedBarberId]
+  )
+
+  // Se o horário escolhido deixou de estar livre (outra pessoa agendou, trocou serviço...), limpa a escolha
+  useEffect(() => {
+    if (selectedTime && !availableTimes.some((t) => t.time === selectedTime && t.available)) setSelectedTime('')
+  }, [availableTimes, selectedTime])
 
   // Alternar serviço
   const toggleService = (id: string) => {
@@ -178,43 +209,59 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
     setClientPhone(value)
   }
 
-  // Finalizar agendamento
-  const handleFinishBooking = () => {
+  // Finalizar agendamento: o servidor confere horário, preço e conflito antes de gravar
+  const handleFinishBooking = async () => {
     if (!clientName.trim() || clientPhone.length < 14) {
       alert('Por favor, informe seu nome e um número de WhatsApp válido.')
       return
     }
+    if (submitting) return
 
     const chosenBarber = activeBarbers.find((b) => b.id === selectedBarberId)
-    const assignedBarberId = selectedBarberId === 'any' ? (activeBarbers[0]?.id || undefined) : selectedBarberId
     const assignedBarberName = chosenBarber
       ? chosenBarber.name
       : selectedBarberId === 'any' && activeBarbers.length > 0
       ? terms.anyProfessional
       : undefined
 
-    const bookingData = {
-      id: 'apt-' + Date.now(),
+    setSubmitting(true)
+    setBookingError('')
+    try {
+      if (onCreateBooking) {
+        await onCreateBooking({
+          barberId: selectedBarberId === 'any' ? undefined : selectedBarberId,
+          serviceIds: selectedServices,
+          clientName: clientName.trim(),
+          clientPhone,
+          date: selectedDate,
+          start: selectedTime,
+          notes: clientNotes.trim() || undefined,
+          reminder: reminderPreference
+        })
+      }
+    } catch (err) {
+      setBookingError(friendlyError(err instanceof Error ? err.message : String(err)))
+      refreshBusy()
+      setSelectedTime('')
+      setStep('datetime')
+      setSubmitting(false)
+      return
+    }
+    setSubmitting(false)
+
+    setConfirmedBooking({
       barbershop_id: barbershop.id,
-      barber_id: assignedBarberId,
       barber_name: assignedBarberName,
-      service_ids: selectedServices,
-      service_names: selectedServicesObjects.map((s) => s.name).join(' + '),
+      service_names: selectedServicesObjects.map((sv) => sv.name).join(' + '),
       client_name: clientName,
       client_phone: clientPhone,
       appointment_date: selectedDate,
       start_time: selectedTime,
       total_price: totalPrice,
       total_duration: totalDuration,
-      status: 'confirmed',
-      reminder_preference: reminderPreference,
-      notes: clientNotes,
-      created_at: new Date().toISOString()
-    }
-
-    setConfirmedBooking(bookingData)
-    if (onNewBooking) onNewBooking(bookingData)
-
+      notes: clientNotes
+    })
+    refreshBusy()
     setStep('success')
 
     // Disparar confetes de comemoração
@@ -385,7 +432,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
           </a>
         </div>
 
-        {!isServiceActive(barbershop) ? (
+        {!(barbershop.service_active ?? isServiceActive(barbershop)) ? (
           <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 text-center space-y-3.5 my-6 shadow-2xl">
             <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto">
               <Clock className="w-6 h-6" />
@@ -567,6 +614,9 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
         {/* ===================== PASSO 2: DATA & HORÁRIO ===================== */}
         {step === 'datetime' && (
           <div className="space-y-5 animate-in fade-in duration-200">
+            {bookingError && (
+              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400 text-xs">{bookingError}</div>
+            )}
             {/* Escolha do Barbeiro / Profissional (quando equipe > 1) */}
             {activeBarbers.length > 1 && (
               <div>
@@ -973,9 +1023,10 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               {step === 'customer' && (
                 <button
                   onClick={handleFinishBooking}
-                  className={`px-5 py-3 rounded-xl font-black text-sm flex items-center gap-2 shadow-lg active:scale-95 transition-transform cursor-pointer ${preset.primaryButton}`}
+                  disabled={submitting}
+                  className={`px-5 py-3 rounded-xl font-black text-sm flex items-center gap-2 shadow-lg active:scale-95 transition-transform cursor-pointer disabled:opacity-60 ${preset.primaryButton}`}
                 >
-                  <span>Confirmar</span>
+                  <span>{submitting ? 'Confirmando...' : 'Confirmar'}</span>
                   <Check className="w-4 h-4 stroke-[3]" />
                 </button>
               )}

@@ -1,11 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+// URL e chave "publishable" são públicas por desenho (a proteção real está nas regras RLS do banco).
+// O valor padrão evita depender de variáveis de build no Cloudflare.
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://jkahsamhmaijhfgjijfg.supabase.co'
+const supabaseAnonKey =
+  import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_Pp50y6WaFzFqr0yVUKSx3g_qi5nZQOi'
 
-// Exporta o client configurado ou null se não houver variáveis ainda
-export const supabase = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null
-
-export const isSupabaseConfigured = () => Boolean(supabase)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)

@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   DollarSign,
   AlertTriangle,
@@ -20,22 +21,94 @@ import {
   Camera
 } from 'lucide-react'
 import type { Barbershop } from '../types'
-import { getPlatformSettings, savePlatformSettings, type PlatformSettings } from '../lib/platform'
-import { PAID_PERIOD_DAYS, TRIAL_DAYS, addDays, formatBR, formatMoney, getBillingState, toDateStr } from '../lib/billing'
+import { DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from '../lib/platform'
+import { useSession } from '../lib/auth'
+import {
+  adminConfirmPayment,
+  adminScheduleFee,
+  adminSetBlocked,
+  deleteShop,
+  fetchAllShops,
+  fetchPlatformSettings,
+  friendlyError,
+  isPlatformAdmin,
+  savePlatformSettingsDb
+} from '../lib/db'
+import { TRIAL_DAYS, formatBR, formatMoney, getBillingState } from '../lib/billing'
 import { normalizePhone, toWaNumber } from '../lib/phone'
 import { fileToResizedDataUrl } from '../lib/image'
 
-interface MasterAdminDashboardProps {
-  barbershops: Barbershop[]
-  onUpdateBarbershops: (shops: Barbershop[]) => void
-  onNavigateToShop?: (slug: string) => void
+// Entrada do painel geral: só o administrador da plataforma (conta marcada no banco) enxerga as contas
+export const MasterAdminDashboard: React.FC = () => {
+  const navigate = useNavigate()
+  const { session, ready } = useSession()
+  const [state, setState] = useState<'loading' | 'denied' | 'ready'>('loading')
+  const [barbershops, setBarbershops] = useState<Barbershop[]>([])
+  const [settings, setSettings] = useState<PlatformSettings>(DEFAULT_PLATFORM_SETTINGS)
+
+  const reload = async () => {
+    const [shops, platform] = await Promise.all([fetchAllShops(), fetchPlatformSettings()])
+    setBarbershops(shops)
+    if (platform) setSettings(platform)
+  }
+
+  useEffect(() => {
+    if (!ready) return
+    if (!session) {
+      navigate('/login?next=/master', { replace: true })
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      if (!(await isPlatformAdmin())) {
+        if (!cancelled) setState('denied')
+        return
+      }
+      await reload()
+      if (!cancelled) setState('ready')
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [ready, session])
+
+  if (state === 'loading') {
+    return <div className="min-h-screen bg-[#090A0F] text-slate-300 flex items-center justify-center text-sm">Carregando...</div>
+  }
+  if (state === 'denied') {
+    return (
+      <div className="min-h-screen bg-[#090A0F] text-slate-100 flex flex-col items-center justify-center gap-3 px-6 text-center">
+        <p className="font-bold">Acesso restrito</p>
+        <p className="text-sm text-slate-400 max-w-xs">Esta área é exclusiva do administrador da plataforma.</p>
+        <button onClick={() => navigate('/admin')} className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-sm cursor-pointer">
+          Ir para o meu painel
+        </button>
+      </div>
+    )
+  }
+
+  return <MasterPanel barbershops={barbershops} settings={settings} onSettings={setSettings} reload={reload} />
 }
 
-export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
-  barbershops,
-  onUpdateBarbershops,
-  onNavigateToShop
-}) => {
+interface MasterPanelProps {
+  barbershops: Barbershop[]
+  settings: PlatformSettings
+  onSettings: (s: PlatformSettings) => void
+  reload: () => Promise<void>
+}
+
+const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSettings, reload }) => {
+  const run = async (action: () => Promise<unknown>) => {
+    try {
+      await action()
+      await reload()
+      return true
+    } catch (err) {
+      alert(friendlyError(err instanceof Error ? err.message : String(err)))
+      return false
+    }
+  }
+
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [copiedPix, setCopiedPix] = useState(false)
@@ -50,7 +123,6 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
   }
 
   // Cobrança da plataforma: mensalidade, chave PIX, titular e QR Code
-  const [settings, setSettings] = useState<PlatformSettings>(() => getPlatformSettings())
   const [draft, setDraft] = useState<PlatformSettings>(settings)
   const [isEditingSettings, setIsEditingSettings] = useState(false)
   const [applyFeeToAll, setApplyFeeToAll] = useState(false)
@@ -67,7 +139,7 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
   // Visualizar QR Code PIX
   const [showPixPreview, setShowPixPreview] = useState(false)
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault()
     const clean: PlatformSettings = {
       monthly_fee: Number(draft.monthly_fee) > 0 ? Number(draft.monthly_fee) : settings.monthly_fee,
@@ -81,15 +153,13 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
       alert('Informe a chave PIX.')
       return
     }
-    savePlatformSettings(clean)
-    setSettings(clean)
-
-    // Novo valor vale para quem se cadastrar daqui para frente; nas contas atuais só se marcado, no próximo pagamento
-    if (applyFeeToAll && clean.monthly_fee !== settings.monthly_fee) {
-      onUpdateBarbershops(
-        barbershops.map((sh) => (sh.monthly_fee === clean.monthly_fee ? sh : { ...sh, next_monthly_fee: clean.monthly_fee }))
-      )
-    }
+    const ok = await run(async () => {
+      await savePlatformSettingsDb(clean)
+      // Novo valor vale para quem se cadastrar daqui para frente; nas contas atuais só se marcado, no próximo pagamento
+      if (applyFeeToAll && clean.monthly_fee !== settings.monthly_fee) await adminScheduleFee(clean.monthly_fee)
+    })
+    if (!ok) return
+    onSettings(clean)
     setApplyFeeToAll(false)
     setIsEditingSettings(false)
     setSettingsSaved(true)
@@ -138,79 +208,52 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
     .filter((s) => getBillingState(s).status === 'active')
     .reduce((acc, curr) => acc + (curr.monthly_fee || settings.monthly_fee), 0)
 
-  // Confirmar pagamento PIX: libera mais 30 dias a partir de hoje (ou do fim do período atual, se ainda vigente)
-  const handleConfirmPayment = (shopId: string) => {
-    const today = new Date()
-    const todayStr = toDateStr(today)
-
-    const updated = barbershops.map((s) => {
-      if (s.id !== shopId) return s
-      const base = s.next_billing_date && s.next_billing_date >= todayStr ? s.next_billing_date : todayStr
-      return {
-        ...s,
-        subscription_status: 'active' as const,
-        // Reajuste agendado vale a partir deste pagamento
-        monthly_fee: s.next_monthly_fee || s.monthly_fee,
-        next_monthly_fee: undefined,
-        last_payment_date: todayStr,
-        next_billing_date: addDays(base, PAID_PERIOD_DAYS)
-      }
-    })
-
-    onUpdateBarbershops(updated)
-    alert(`Pagamento registrado! Acesso liberado por mais ${PAID_PERIOD_DAYS} dias.`)
+  // Confirmar pagamento PIX: o banco libera mais 30 dias (a partir de hoje, ou do fim do período atual se ainda vigente)
+  const handleConfirmPayment = async (shopId: string) => {
+    if (await run(() => adminConfirmPayment(shopId))) alert('Pagamento registrado! Acesso liberado por mais 30 dias.')
   }
 
   // Alternar Bloqueio / Desbloqueio
-  const handleToggleBlock = (shopId: string) => {
+  const handleToggleBlock = async (shopId: string) => {
     const shop = barbershops.find((s) => s.id === shopId)
     if (!shop) return
 
-    const newStatus = shop.subscription_status === 'blocked' ? ('active' as const) : ('blocked' as const)
-    const confirmMsg = newStatus === 'blocked'
+    const blocking = shop.subscription_status !== 'blocked'
+    const confirmMsg = blocking
       ? `Tem certeza que deseja bloquear "${shop.name}"? O link público e o painel dele serão suspensos.`
       : `Deseja reativar o acesso de "${shop.name}"?`
 
-    if (window.confirm(confirmMsg)) {
-      const updated = barbershops.map((s) =>
-        s.id === shopId ? { ...s, subscription_status: newStatus } : s
-      )
-      onUpdateBarbershops(updated)
-    }
+    if (window.confirm(confirmMsg)) await run(() => adminSetBlocked(shopId, blocking))
   }
 
-  // Excluir Barbearia com trava
-  const handleExecuteDelete = () => {
+  // Excluir conta com trava
+  const handleExecuteDelete = async () => {
     if (!shopToDelete) return
     if (deleteInputText.trim() !== 'Excluir') {
       alert('Digite exatamente "Excluir" para confirmar.')
       return
     }
-
-    const updated = barbershops.filter((s) => s.id !== shopToDelete.id)
-    onUpdateBarbershops(updated)
-    setShopToDelete(null)
-    setDeleteInputText('')
+    if (await run(() => deleteShop(shopToDelete.id))) {
+      setShopToDelete(null)
+      setDeleteInputText('')
+    }
   }
 
-  // Salvar alterações de mensalidade individual (muda somente no mês seguinte)
-  const handleSaveEdit = (e: React.FormEvent) => {
+  // Novo valor para uma conta: vale a partir do próximo pagamento
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingShop) return
 
     const newFee = Number(editFee)
-    const updated = barbershops.map((s) =>
-      s.id === editingShop.id
-        ? {
-            ...s,
-            next_monthly_fee: newFee
-          }
-        : s
-    )
-
-    onUpdateBarbershops(updated)
-    setEditingShop(null)
-    alert(`Reajuste para R$ ${newFee.toFixed(2).replace('.', ',')} agendado com sucesso para a barbearia ${editingShop.name}! Passará a valer a partir do próximo pagamento.`)
+    if (!(newFee > 0)) {
+      alert('Informe um valor maior que zero.')
+      return
+    }
+    const target = editingShop
+    if (await run(() => adminScheduleFee(newFee, target.id))) {
+      setEditingShop(null)
+      alert(`Reajuste para R$ ${newFee.toFixed(2).replace('.', ',')} agendado para ${target.name}. Passará a valer a partir do próximo pagamento.`)
+    }
   }
 
   // Montar link do WhatsApp para cobrar o barbeiro
@@ -692,7 +735,7 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
                     <div className="flex items-center gap-2 flex-wrap self-end sm:self-center pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/80 w-full sm:w-auto justify-end">
                       {/* Abrir Link do Cliente */}
                       <button
-                        onClick={() => onNavigateToShop ? onNavigateToShop(shop.slug) : window.open(`/b/${shop.slug}`, '_blank')}
+                        onClick={() => window.open(`/b/${shop.slug}`, '_blank')}
                         title="Ver Link do Cliente"
                         className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs cursor-pointer"
                       >

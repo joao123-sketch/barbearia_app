@@ -1,13 +1,8 @@
 import type { Barbershop } from '../types'
-import { getPlatformSettings } from './platform'
 
 // Sistema pré-pago: 20 dias grátis; depois cada pagamento libera mais 30 dias.
 export const TRIAL_DAYS = 20
 export const PAID_PERIOD_DAYS = 30
-
-export function getBaseFee(): number {
-  return getPlatformSettings().monthly_fee
-}
 
 export function formatMoney(value: number): string {
   return value.toFixed(2).replace('.', ',')

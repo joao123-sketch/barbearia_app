@@ -1,7 +1,7 @@
-import { DEFAULT_MONTHLY_FEE, DEFAULT_PIX_KEY, DEFAULT_PIX_NAME, DEFAULT_PIX_QRCODE } from './mockData'
+import { DEFAULT_MONTHLY_FEE } from './mockData'
 
-// Configurações de cobrança da plataforma, editadas no painel geral (/master).
-// Provisório no aparelho; com o banco de dados passam a valer para todos.
+// Configurações de cobrança da plataforma: mensalidade, chave PIX, QR Code e contato.
+// Ficam no banco (tabela platform_settings) e só o administrador altera, pelo painel geral.
 export interface PlatformSettings {
   monthly_fee: number
   pix_key: string
@@ -11,31 +11,11 @@ export interface PlatformSettings {
   contact_whatsapp: string // recebe os comprovantes de pagamento
 }
 
-const KEY = 'barber_platform_settings'
-
-const DEFAULTS: PlatformSettings = {
+export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   monthly_fee: DEFAULT_MONTHLY_FEE,
-  pix_key: DEFAULT_PIX_KEY,
-  pix_name: DEFAULT_PIX_NAME,
-  pix_bank: 'Banco Inter',
-  pix_qrcode: DEFAULT_PIX_QRCODE,
+  pix_key: '',
+  pix_name: '',
+  pix_bank: '',
+  pix_qrcode: '',
   contact_whatsapp: ''
-}
-
-export function getPlatformSettings(): PlatformSettings {
-  try {
-    const saved = JSON.parse(localStorage.getItem(KEY) || '{}')
-    const legacyFee = Number(localStorage.getItem('barber_master_base_fee'))
-    return {
-      ...DEFAULTS,
-      ...(legacyFee > 0 ? { monthly_fee: legacyFee } : {}),
-      ...saved
-    }
-  } catch {
-    return DEFAULTS
-  }
-}
-
-export function savePlatformSettings(settings: PlatformSettings) {
-  localStorage.setItem(KEY, JSON.stringify(settings))
 }

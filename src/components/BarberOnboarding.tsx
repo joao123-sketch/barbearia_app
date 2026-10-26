@@ -1,5 +1,4 @@
-import React, { useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useEffect, useState, useRef } from 'react'
 import {
   Scissors,
   Store,
@@ -15,12 +14,13 @@ import {
   Users,
   Palette
 } from 'lucide-react'
-import type { Barbershop, Service, ShopStylePreset, BusinessType } from '../types'
+import type { ShopStylePreset, BusinessType } from '../types'
 import { fileToResizedDataUrl } from '../lib/image'
-import { createAccount, findAccount, startSession } from '../lib/auth'
+import { accountExists, signUp, useSession } from '../lib/auth'
+import { defaultWorkingHours, fetchMonthlyFee, friendlyError, registerBarbershop, saveWorkingHours } from '../lib/db'
 import { getTerms } from '../lib/terms'
 import { normalizePhone } from '../lib/phone'
-import { TRIAL_DAYS, addDays, formatMoney, getBaseFee } from '../lib/billing'
+import { TRIAL_DAYS, formatMoney } from '../lib/billing'
 import { BR_STATES } from '../lib/states'
 import { STYLE_PRESETS, STYLE_PRESET_ORDER } from '../lib/stylePresets'
 import { buildShopTheme, getModeFor, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
@@ -34,15 +34,15 @@ const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) =>
 )
 
 interface BarberOnboardingProps {
-  onRegisterBarbershop: (shop: Barbershop, services: Service[], initialTeamNames?: string[]) => void
   onBack: () => void
+  onRegistered: () => Promise<void>
 }
 
-export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
-  onRegisterBarbershop,
-  onBack
-}) => {
-  const navigate = useNavigate()
+export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRegistered }) => {
+  // Já logado (criou a conta mas não terminou o negócio): não pede e-mail e senha de novo
+  const { session } = useSession()
+  const loggedEmail = session?.user.email
+  const [submitting, setSubmitting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Dados do Barbeiro e Estabelecimento
@@ -62,7 +62,10 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
   const terms = getTerms(businessType ?? undefined)
   const [instagram, setInstagram] = useState('')
   const [uf, setUf] = useState('')
-  const baseFee = getBaseFee()
+  const [baseFee, setBaseFee] = useState<number | null>(null)
+  useEffect(() => {
+    fetchMonthlyFee().then(setBaseFee).catch(() => setBaseFee(null))
+  }, [])
 
   // Estilo Visual Escolhido
   const [stylePreset, setStylePreset] = useState<ShopStylePreset>('neutro')
@@ -88,9 +91,23 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
   const [hasCustomLogo, setHasCustomLogo] = useState(false)
 
   // Conta já existente com este WhatsApp ou e-mail: sugere entrar em vez de cadastrar de novo
-  const existingByPhone = normalizePhone(phone).length >= 10 ? findAccount(phone) : undefined
-  const existingByEmail = /^\S+@\S+\.\S+$/.test(email.trim()) ? findAccount(email) : undefined
-  const existingAccount = existingByPhone || existingByEmail
+  const [existing, setExisting] = useState<'phone' | 'email' | null>(null)
+  useEffect(() => {
+    const phoneOk = normalizePhone(phone).length >= 10
+    const emailOk = !loggedEmail && /^\S+@\S+\.\S+$/.test(email.trim())
+    if (!phoneOk && !emailOk) {
+      setExisting(null)
+      return
+    }
+    const timer = window.setTimeout(async () => {
+      if (phoneOk && (await accountExists(phone, undefined))) setExisting('phone')
+      else if (emailOk && (await accountExists(undefined, email))) setExisting('email')
+      else setExisting(null)
+    }, 400)
+    return () => window.clearTimeout(timer)
+  }, [phone, email, loggedEmail])
+  const existingAccount = existing !== null
+  const existingByPhone = existing === 'phone'
 
   // Gerar slug automaticamente ao digitar o nome da barbearia
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -161,11 +178,11 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       alert('Por favor, informe um WhatsApp válido com DDD.')
       return
     }
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+    if (!loggedEmail && !/^\S+@\S+\.\S+$/.test(email.trim())) {
       alert('Informe um e-mail válido. Ele é usado para recuperar a sua senha.')
       return
     }
-    if (password.length < 6) {
+    if (!loggedEmail && password.length < 6) {
       alert('Crie uma senha com no mínimo 6 caracteres.')
       return
     }
@@ -195,44 +212,10 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
     }
 
     const cleanPhone = normalizePhone(phone)
-
-    // RECONHECIMENTO DE CADASTRO E PREVENÇÃO DE FRAUDE (Anti-Trial Abuser)
-    const auditRaw = localStorage.getItem('barber_audit_history')
-    let auditList: Array<{ phone: string; shop_name: string; created_at: string; trial_used: boolean }> = []
-    if (auditRaw) {
-      try {
-        auditList = JSON.parse(auditRaw)
-      } catch {
-        auditList = []
-      }
-    }
-    const previousRecord = auditList.find((a) => a.phone === cleanPhone)
-    // Pré-pago: 20 dias grátis para quem nunca teve conta; quem já usou o teste paga antes de usar
-    const today = new Date()
-    let initialStatus: import('../types').SubscriptionStatus = 'trial'
-    let accessUntil = addDays(today, TRIAL_DAYS)
-
-    if (previousRecord) {
-      const confirmReactivation = window.confirm(
-        '⚠️ Identificamos que este número de WhatsApp já possuiu uma conta anterior no BarberApp e já utilizou o período de avaliação.\n\n' +
-        `Sua conta será criada, mas o acesso só é liberado após o pagamento antecipado da mensalidade de R$ ${formatMoney(baseFee)}.\n\nDeseja prosseguir?`
-      )
-      if (!confirmReactivation) return
-      initialStatus = 'pending'
-      accessUntil = addDays(today, -1)
-    } else {
-      auditList.push({
-        phone: cleanPhone,
-        shop_name: shopName.trim(),
-        created_at: new Date().toISOString(),
-        trial_used: true
-      })
-      localStorage.setItem('barber_audit_history', JSON.stringify(auditList))
-    }
-
-    const newShopId = 'shop-' + Date.now()
-
-    const finalSlug = slug || shopName.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'meu-negocio'
+    const finalSlug =
+      slug ||
+      shopName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') ||
+      'meu-negocio'
 
     // Formatar Instagram limpo
     let cleanInstagram = instagram.trim()
@@ -243,49 +226,41 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
 
     const fullAddress = `${street.trim()}, ${number.trim()} - ${neighborhood.trim()}, ${city.trim()} - ${uf}${referencePoint.trim() ? ` (${referencePoint.trim()})` : ''}`
 
-    const newBarbershop: Barbershop = {
-      id: newShopId,
-      name: shopName.trim(),
-      slug: finalSlug,
-      owner_name: ownerName.trim(),
-      business_type: businessType,
-      owner_email: email.trim(),
-      slogan: slogan.trim() || terms.defaultSlogan,
-      description: 'Atendimento de alta qualidade, conforto e estilo.',
-      logo_url: logoUrl || undefined,
-      phone_whatsapp: cleanPhone,
-      address: fullAddress,
-      street: street.trim(),
-      number: number.trim(),
-      neighborhood: neighborhood.trim(),
-      city: city.trim(),
-      state: uf,
-      reference_point: referencePoint.trim() || undefined,
-      instagram: cleanInstagram || undefined,
-      theme_color: '#EAB308',
-      style_preset: stylePreset,
-      created_at: new Date().toISOString(),
-      monthly_fee: baseFee,
-      subscription_status: initialStatus, // trial por 20 dias (ou pending se já usou o teste antes)
-      next_billing_date: accessUntil,
-      blocked_dates: []
+    setSubmitting(true)
+    try {
+      // 1) cria o login (e-mail + senha) se ainda não estiver logado
+      if (!loggedEmail) await signUp(email, password)
+
+      // 2) o banco cria o negócio: 20 dias grátis, ou pagamento antes se este WhatsApp já usou o teste
+      const shopId = await registerBarbershop(
+        {
+          business_type: businessType,
+          name: shopName.trim(),
+          slug: finalSlug,
+          owner_name: ownerName.trim(),
+          slogan: slogan.trim() || terms.defaultSlogan,
+          logo_url: logoUrl || null,
+          phone_whatsapp: cleanPhone,
+          street: street.trim(),
+          number: number.trim(),
+          neighborhood: neighborhood.trim(),
+          city: city.trim(),
+          state: uf,
+          reference_point: referencePoint.trim() || null,
+          address: fullAddress,
+          instagram: cleanInstagram || null,
+          style_preset: stylePreset
+        },
+        teamType === 'team' ? teamMembers : []
+      )
+
+      // 3) horário de funcionamento inicial (o dono ajusta depois no painel)
+      await saveWorkingHours(shopId, defaultWorkingHours())
+      await onRegistered()
+    } catch (err) {
+      alert(friendlyError(err instanceof Error ? err.message : String(err)))
+      setSubmitting(false)
     }
-
-    // Não cadastra serviços iniciais agora; o barbeiro cadastra diretamente no painel
-    const createdServices: Service[] = []
-
-    const account = {
-      email: email.trim(),
-      phone: cleanPhone,
-      owner_name: ownerName.trim(),
-      shop_id: newShopId,
-      shop_slug: finalSlug
-    }
-    await createAccount(account, password)
-    startSession({ ...account, password_hash: '' })
-
-    onRegisterBarbershop(newBarbershop, createdServices, teamType === 'team' ? teamMembers : [])
-    navigate('/admin')
   }
 
   return (
@@ -528,6 +503,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
                 </div>
 
                 {/* Senha de Acesso */}
+                {!loggedEmail && (
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
                     <Lock className="w-3.5 h-3.5 text-amber-400" />
@@ -545,6 +521,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
                     Você entra com seu e-mail ou WhatsApp e esta senha.
                   </span>
                 </div>
+                )}
               </div>
 
               {existingAccount && (
@@ -668,7 +645,8 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
                   </div>
                 </div>
 
-                {/* E-mail (Opcional) */}
+                {/* E-mail */}
+                {!loggedEmail && (
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
                     <Mail className="w-3.5 h-3.5 text-blue-400" />
@@ -683,6 +661,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
                     className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-xs"
                   />
                 </div>
+                )}
               </div>
 
               {/* Slug / Link personalizado */}
@@ -709,7 +688,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
                   <span>{TRIAL_DAYS} dias grátis para testar</span>
                 </p>
                 <p className="text-[11px] text-slate-300">
-                  Depois, a mensalidade é de <strong className="text-amber-400">R$ {formatMoney(baseFee)}</strong>, paga antecipadamente por PIX a cada 30 dias. Sem fidelidade.
+                  Depois, a mensalidade é de <strong className="text-amber-400">{baseFee !== null ? `R$ ${formatMoney(baseFee)}` : 'o valor da mensalidade'}</strong>, paga antecipadamente por PIX a cada 30 dias. Sem fidelidade.
                 </p>
               </div>
 
@@ -827,10 +806,11 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
 
             <button
               type="submit"
-              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 active:scale-95 transition-all cursor-pointer"
+              disabled={submitting}
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 active:scale-95 transition-all cursor-pointer disabled:opacity-60"
             >
               <Sparkles className="w-4 h-4" />
-              <span>Concluir Cadastro & Acessar Painel</span>
+              <span>{submitting ? 'Criando sua conta...' : 'Concluir Cadastro & Acessar Painel'}</span>
             </button>
 
             <div className="text-center pt-1">
