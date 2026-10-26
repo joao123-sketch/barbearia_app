@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import type { Appointment, Barber, Barbershop, Service, WorkingHour } from '../types'
 import type { PlatformSettings } from './platform'
+import type { PushKeys } from './push'
 
 // ---------- conversões banco <-> app ----------
 
@@ -223,6 +224,45 @@ export function defaultWorkingHours(): WorkingHour[] {
     lunch_start: '12:00',
     lunch_end: '13:00'
   }))
+}
+
+// ---------- notificações push ----------
+
+export async function saveOwnerPush(shopId: string, keys: PushKeys) {
+  const { error } = await supabase.from('push_subscriptions').insert({
+    kind: 'owner',
+    barbershop_id: shopId,
+    endpoint: keys.endpoint,
+    p256dh: keys.p256dh,
+    auth: keys.auth
+  })
+  // 23505 = este aparelho já estava cadastrado
+  if (error && error.code !== '23505') throw new Error(error.message)
+}
+
+export async function hasOwnerPush(shopId: string, endpoint: string): Promise<boolean> {
+  const { count } = await supabase
+    .from('push_subscriptions')
+    .select('id', { count: 'exact', head: true })
+    .eq('kind', 'owner')
+    .eq('barbershop_id', shopId)
+    .eq('endpoint', endpoint)
+  return (count ?? 0) > 0
+}
+
+export async function removeOwnerPush(shopId: string, endpoint: string) {
+  check(await supabase.from('push_subscriptions').delete().eq('kind', 'owner').eq('barbershop_id', shopId).eq('endpoint', endpoint))
+}
+
+export async function registerClientPush(appointmentId: string, keys: PushKeys) {
+  check(
+    await supabase.rpc('register_client_push', {
+      p_appointment: appointmentId,
+      p_endpoint: keys.endpoint,
+      p_p256dh: keys.p256dh,
+      p_auth: keys.auth
+    })
+  )
 }
 
 // ---------- cadastro do dono ----------

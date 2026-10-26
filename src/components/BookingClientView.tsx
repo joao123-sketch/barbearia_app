@@ -20,6 +20,9 @@ import { getStylePreset } from '../lib/stylePresets'
 import { buildShopTheme, getLook, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
 import { getTerms } from '../lib/terms'
 import { toWaNumber } from '../lib/phone'
+import { normalizeInstagram } from '../lib/instagram'
+import { pushSupport, subscribePush } from '../lib/push'
+import { registerClientPush } from '../lib/db'
 import { isServiceActive, toDateStr } from '../lib/billing'
 import { buildSlots } from '../lib/slots'
 import { friendlyError } from '../lib/db'
@@ -53,7 +56,7 @@ interface BookingClientViewProps {
   onToggleTheme?: () => void
   workingHours?: WorkingHour[]
   loadBusySlots?: (date: string) => Promise<BusySlot[]>
-  onCreateBooking?: (input: BookingInput) => Promise<void>
+  onCreateBooking?: (input: BookingInput) => Promise<string>
   onBackToPanel?: () => void // só quando o dono abriu a página pelo painel ("Ver como cliente")
 }
 
@@ -75,6 +78,8 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
   const terms = getTerms(barbershop.business_type)
   const centered = look.hero === 'center'
   const serviceOn = barbershop.service_active ?? isServiceActive(barbershop)
+  // Mostra só o @ da pessoa, mesmo que antes tenha sido salvo um link completo
+  const instagramHandle = normalizeInstagram(barbershop.instagram)
 
   // Equipe de barbeiros ativos
   const activeBarbers = useMemo(() => {
@@ -137,6 +142,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
   // Horários ocupados do dia escolhido (vêm do banco, sem dados de outros clientes)
   const [busySlots, setBusySlots] = useState<BusySlot[]>([])
   const [bookingError, setBookingError] = useState('')
+  const [reminderState, setReminderState] = useState<'idle' | 'busy' | 'on' | 'denied' | 'error'>('idle')
   const [submitting, setSubmitting] = useState(false)
 
   const refreshBusy = useCallback(() => {
@@ -225,11 +231,12 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
       ? terms.anyProfessional
       : undefined
 
+    let appointmentId: string | undefined
     setSubmitting(true)
     setBookingError('')
     try {
       if (onCreateBooking) {
-        await onCreateBooking({
+        appointmentId = await onCreateBooking({
           barberId: selectedBarberId === 'any' ? undefined : selectedBarberId,
           serviceIds: selectedServices,
           clientName: clientName.trim(),
@@ -250,7 +257,9 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
     }
     setSubmitting(false)
 
+    setReminderState('idle')
     setConfirmedBooking({
+      id: appointmentId,
       barbershop_id: barbershop.id,
       barber_name: assignedBarberName,
       service_names: selectedServicesObjects.map((sv) => sv.name).join(' + '),
@@ -409,9 +418,9 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
             </span>
           </a>
 
-          {barbershop.instagram && (
+          {instagramHandle && (
             <a
-              href={`https://instagram.com/${barbershop.instagram.replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/^@/, '')}`}
+              href={`https://instagram.com/${instagramHandle.slice(1)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="shop-contact flex items-center gap-3 px-3.5 py-3 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white active:scale-[0.99] transition-transform"
@@ -420,7 +429,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               <span className="min-w-0 flex-1">
                 <span className="block text-[10px] uppercase tracking-wide text-slate-400">Instagram</span>
                 <span className="block truncate">
-                  {barbershop.instagram.startsWith('@') ? barbershop.instagram : `@${barbershop.instagram}`}
+                  {instagramHandle}
                 </span>
               </span>
             </a>
@@ -946,6 +955,54 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               <Phone className="w-4 h-4 fill-current" />
               <span>Enviar Confirmação no WhatsApp</span>
             </a>
+
+            {/* Lembrete por notificação (grátis): o cliente ativa neste aparelho */}
+            {confirmedBooking?.id && pushSupport() !== 'unsupported' && (
+              <div className="shop-summary p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs space-y-2.5">
+                <p className="font-bold text-white flex items-center gap-1.5">
+                  <Bell className="w-4 h-4 text-amber-400" />
+                  <span>Lembrete antes do horário</span>
+                </p>
+                {pushSupport() === 'ios-install' ? (
+                  <p className="text-slate-400 leading-relaxed">
+                    No iPhone, para receber o lembrete, salve o app na tela inicial (botão abaixo), abra por ele e faça o
+                    agendamento por lá.
+                  </p>
+                ) : reminderState === 'on' ? (
+                  <p className="text-emerald-400 font-semibold">
+                    ✓ Lembrete ativado! Vamos avisar {reminderPreference === '10min' ? '10 minutos' : reminderPreference === '1hour' ? '1 hora' : '30 minutos'} antes.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-slate-400 leading-relaxed">
+                      Ative a notificação neste aparelho e avisamos{' '}
+                      {reminderPreference === '10min' ? '10 minutos' : reminderPreference === '1hour' ? '1 hora' : '30 minutos'} antes do seu horário.
+                    </p>
+                    {reminderState === 'denied' && (
+                      <p className="text-rose-400">As notificações estão bloqueadas neste aparelho. Libere nas configurações e tente de novo.</p>
+                    )}
+                    {reminderState === 'error' && <p className="text-rose-400">Não foi possível ativar agora. Tente de novo.</p>}
+                    <button
+                      type="button"
+                      disabled={reminderState === 'busy'}
+                      onClick={async () => {
+                        setReminderState('busy')
+                        try {
+                          const keys = await subscribePush()
+                          await registerClientPush(confirmedBooking.id, keys)
+                          setReminderState('on')
+                        } catch (err) {
+                          setReminderState(err instanceof Error && err.message === 'permission_denied' ? 'denied' : 'error')
+                        }
+                      }}
+                      className={`w-full py-3 rounded-xl font-bold cursor-pointer active:scale-95 transition-transform disabled:opacity-60 ${preset.primaryButton}`}
+                    >
+                      {reminderState === 'busy' ? 'Ativando...' : 'Receber lembrete neste aparelho'}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Botão de Instalação do App */}
             <div className="pt-2 border-t border-slate-800/80">

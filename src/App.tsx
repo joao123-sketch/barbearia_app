@@ -87,9 +87,7 @@ function BookingPage({
   const { shop, services, barbers, hours } = state
   const mode = getModeFor(shop.style_preset, themeOverride)
 
-  const createBooking = async (input: BookingInput) => {
-    await createPublicAppointment({ shopId: shop.id, ...input })
-  }
+  const createBooking = (input: BookingInput) => createPublicAppointment({ shopId: shop.id, ...input })
 
   return (
     <BookingClientView

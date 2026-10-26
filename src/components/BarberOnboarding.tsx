@@ -18,6 +18,7 @@ import type { ShopStylePreset, BusinessType } from '../types'
 import { fileToResizedDataUrl } from '../lib/image'
 import { accountExists, signUp, trialAlreadyUsed, useSession } from '../lib/auth'
 import { PasswordInput } from './PasswordInput'
+import { normalizeInstagram } from '../lib/instagram'
 import { defaultWorkingHours, fetchMonthlyFee, friendlyError, registerBarbershop, saveWorkingHours } from '../lib/db'
 import { getTerms } from '../lib/terms'
 import { normalizePhone } from '../lib/phone'
@@ -232,11 +233,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
       'meu-negocio'
 
     // Formatar Instagram limpo
-    let cleanInstagram = instagram.trim()
-    if (cleanInstagram) {
-      cleanInstagram = cleanInstagram.replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/^@/, '')
-      cleanInstagram = `@${cleanInstagram}`
-    }
+    const cleanInstagram = normalizeInstagram(instagram)
 
     const fullAddress = `${street.trim()}, ${number.trim()} - ${neighborhood.trim()}, ${city.trim()} - ${uf}${referencePoint.trim() ? ` (${referencePoint.trim()})` : ''}`
 

@@ -41,6 +41,8 @@ import { PWAInstallPrompt } from './PWAInstallPrompt'
 import { DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from '../lib/platform'
 import { newId } from '../lib/db'
 import { AccountSettings } from './AccountSettings'
+import { OwnerNotifications } from './OwnerNotifications'
+import { normalizeInstagram } from '../lib/instagram'
 import { getTerms } from '../lib/terms'
 import { formatBR, formatMoney, getBillingState } from '../lib/billing'
 import { normalizePhone, toWaNumber } from '../lib/phone'
@@ -715,7 +717,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       ...barbershop,
       name: profileName,
       logo_url: profileLogo,
-      instagram: profileInstagram ? (profileInstagram.startsWith('@') ? profileInstagram : `@${profileInstagram}`) : '',
+      instagram: normalizeInstagram(profileInstagram),
       phone_whatsapp: normalizePhone(profilePhone),
       address: fullAddress,
       street: profileStreet.trim(),
@@ -1038,6 +1040,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           )
         })()}
+
+        {activeTab === 'agenda' && <OwnerNotifications shopId={barbershop.id} variant="banner" />}
 
         {/* ===================== CARD DO LINK PÚBLICO (SÓ NA ABA HOJE) ===================== */}
         {activeTab === 'agenda' && (
@@ -2715,6 +2719,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <span>Salvar alterações</span>
               </button>
             </form>
+
+            <OwnerNotifications shopId={barbershop.id} variant="card" />
 
             <AccountSettings
               phone={barbershop.phone_whatsapp}
