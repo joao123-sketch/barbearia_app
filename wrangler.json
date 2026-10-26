@@ -1,0 +1,12 @@
+{
+  "name": "barbearia-app",
+  "compatibility_date": "2024-09-23",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS"
+  },
+  "vars": {
+    "VITE_SUPABASE_ANON_KEY": "sb_publishable_Pp50y6WaFzFqr0yVUKSx3g_qi5nZQOi",
+    "VITE_SUPABASE_URL": "https://jkahsamhmaijhfgjijfg.supabase.co"
+  }
+}
