@@ -115,7 +115,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     .reduce((acc, curr) => acc + curr.total_price, 0)
 
   return (
-    <div className="min-h-screen bg-[#090A0F] text-slate-100 pb-20 select-none">
+    <div className="min-h-screen bg-[#090A0F] text-slate-100 pb-32 sm:pb-20 select-none">
       {/* ===================== TOPO ADMINISTRATIVO ===================== */}
       <header className="sticky top-0 z-30 bg-[#0d0f17]/95 border-b border-slate-800/80 backdrop-blur-md px-4 py-3">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
@@ -230,8 +230,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         </div>
 
-        {/* ===================== ABAS DO PAINEL ===================== */}
-        <div className="flex gap-2 border-b border-slate-800 pb-2 overflow-x-auto text-xs">
+        {/* ===================== ABAS DO PAINEL (DESKTOP) ===================== */}
+        <div className="hidden sm:flex gap-2 border-b border-slate-800 pb-2 overflow-x-auto text-xs">
           {[
             { id: 'agenda', label: 'Agenda do Dia', icon: Calendar },
             { id: 'servicos', label: 'Serviços & Preços', icon: Scissors },
@@ -573,6 +573,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         </div>
       )}
+
+      {/* ===================== BARRA DE NAVEGAÇÃO INFERIOR PARA CELULAR (TAB BAR) ===================== */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#0d0f17]/95 border-t border-slate-800/90 backdrop-blur-xl sm:hidden px-2 py-2">
+        <div className="grid grid-cols-4 gap-1 max-w-md mx-auto">
+          {[
+            { id: 'agenda', label: 'Agenda', icon: Calendar },
+            { id: 'servicos', label: 'Serviços', icon: Scissors },
+            { id: 'horarios', label: 'Horários', icon: Clock },
+            { id: 'perfil', label: 'Perfil', icon: Settings }
+          ].map((tab) => {
+            const Icon = tab.icon
+            const isActive = activeTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-all cursor-pointer ${
+                  isActive
+                    ? 'text-amber-400 bg-amber-500/10 font-bold'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Icon className={`w-5 h-5 mb-1 ${isActive ? 'stroke-[2.5]' : ''}`} />
+                <span className="text-[11px] leading-none">{tab.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </nav>
     </div>
   )
 }
