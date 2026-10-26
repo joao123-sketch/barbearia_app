@@ -97,10 +97,10 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
       {variant === 'compact' && (
         <button
           onClick={handleInstallClick}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-400 hover:bg-amber-500/25 transition-all cursor-pointer ${className}`}
+          className={`flex items-center gap-1.5 p-2 min-[420px]:px-3 min-[420px]:py-1.5 rounded-full text-xs font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-400 hover:bg-amber-500/25 transition-all cursor-pointer ${className}`}
         >
           <Smartphone className="w-3.5 h-3.5 text-amber-400" />
-          <span>Baixar App</span>
+          <span className="hidden min-[420px]:inline">Baixar App</span>
         </button>
       )}
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
+import { applyManifestForPath } from './lib/pwa'
 import { BookingClientView } from './components/BookingClientView'
 import { AdminDashboard } from './components/AdminDashboard'
 import { BarberOnboarding } from './components/BarberOnboarding'
@@ -131,6 +132,12 @@ function AdminRouteWrapper({
       />
     </div>
   )
+}
+
+function ManifestSwitcher() {
+  const { pathname } = useLocation()
+  useEffect(() => applyManifestForPath(pathname), [pathname])
+  return null
 }
 
 export function App() {
@@ -359,6 +366,7 @@ export function App() {
 
   return (
     <BrowserRouter>
+      <ManifestSwitcher />
       <Routes>
         {/* Rota Padrão: Página de Agendamento da Barbearia Atual */}
         <Route
@@ -443,6 +451,22 @@ export function App() {
             <MasterAdminDashboard
               barbershops={barbershopsList}
               onUpdateBarbershops={handleUpdateBarbershopsList}
+            />
+          }
+        />
+
+        {/* Link copiado no painel do barbeiro (ex: /b/nk-barbearia) */}
+        <Route
+          path="/b/:slug"
+          element={
+            <BookingRouteWrapper
+              barbershop={currentBarbershop}
+              barbershopsList={barbershopsList}
+              services={services}
+              barbers={barbers}
+              theme={theme}
+              onToggleTheme={toggleTheme}
+              onNewBooking={handleNewBooking}
             />
           }
         />

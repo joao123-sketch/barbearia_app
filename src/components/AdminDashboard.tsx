@@ -23,7 +23,6 @@ import {
   MessageCircle,
   ChevronRight,
   ChevronLeft,
-  Menu,
   Camera,
   History,
   CheckCircle2,
@@ -724,17 +723,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   return (
     <div className={`min-h-screen select-none transition-colors ${isLight ? 'bg-slate-100 text-slate-900' : 'bg-[#090A0F] text-slate-100'}`}>
-      {/* ===================== OVERLAY PARA MOBILE QUANDO SIDEBAR EXPANDIDA ===================== */}
-      {sidebarExpanded && (
-        <div
-          onClick={() => setSidebarExpanded(false)}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 sm:hidden transition-opacity"
-        />
-      )}
-
       {/* ===================== BARRA LATERAL ESQUERDA (SIDEBAR RETRÁTIL) ===================== */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col justify-between transition-all duration-300 border-r shadow-2xl ${
+        className={`hidden sm:flex fixed top-0 bottom-0 left-0 z-50 flex-col justify-between transition-all duration-300 border-r shadow-2xl ${
           sidebarExpanded ? 'w-56 sm:w-64' : 'w-14 sm:w-16'
         } ${
           isLight
@@ -834,32 +825,54 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </aside>
 
+      {/* ===================== BARRA INFERIOR (CELULAR) ===================== */}
+      <nav
+        className={`sm:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-7 border-t backdrop-blur-xl pb-[env(safe-area-inset-bottom)] ${
+          isLight ? 'bg-white/95 border-slate-200' : 'bg-[#0d0f17]/95 border-slate-800/90'
+        }`}
+      >
+        {adminTabsList.map((tab) => {
+          const Icon = tab.icon
+          const isActive = activeTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setActiveTab(tab.id)
+                window.scrollTo({ top: 0 })
+              }}
+              aria-label={tab.fullLabel}
+              className={`relative flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-bold cursor-pointer transition-colors ${
+                isActive ? 'text-amber-400' : isLight ? 'text-slate-500' : 'text-slate-500'
+              }`}
+            >
+              {isActive && <span className="absolute top-0 inset-x-3 h-0.5 rounded-full bg-amber-400" />}
+              <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5]' : ''}`} />
+              <span className="truncate max-w-full px-0.5">{tab.label}</span>
+            </button>
+          )
+        })}
+      </nav>
+
       {/* ===================== ÁREA PRINCIPAL COM PADDING DA SIDEBAR ===================== */}
-      <div className="pl-14 sm:pl-16 min-h-screen flex flex-col">
+      <div className="sm:pl-16 min-h-screen flex flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:pb-0">
         {/* Topo Administrativo */}
-        <header className={`sticky top-0 z-30 border-b backdrop-blur-md px-4 py-3 transition-colors ${
+        <header className={`sticky top-0 z-30 border-b backdrop-blur-md px-3 sm:px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] transition-colors ${
           isLight ? 'bg-white/90 border-slate-200' : 'bg-[#0d0f17]/95 border-slate-800/80'
         }`}>
           <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setSidebarExpanded(!sidebarExpanded)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer sm:hidden"
-                title="Abrir menu"
-              >
-                <Menu className="w-5 h-5 text-amber-400" />
-              </button>
-              <div>
-                <h1 className={`font-black text-sm sm:text-base leading-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="min-w-0">
+                <h1 className={`font-black text-sm sm:text-base leading-tight truncate ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {adminTabsList.find(t => t.id === activeTab)?.fullLabel || 'Painel do Barbeiro'}
                 </h1>
-                <p className="text-[11px] text-amber-400 font-semibold truncate max-w-[180px] sm:max-w-none">
+                <p className="text-[11px] text-amber-400 font-semibold truncate sm:max-w-none">
                   {barbershop.name}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               {onToggleTheme && (
                 <button
                   onClick={onToggleTheme}
@@ -879,7 +892,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   }`}
                 >
                   <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="hidden sm:inline">Ver como</span> Cliente
+                  <span className="hidden sm:inline">Ver como Cliente</span>
                 </button>
               )}
               <PWAInstallPrompt variant="compact" buttonText="App" />
@@ -959,7 +972,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               : 'bg-gradient-to-r from-amber-500/15 via-slate-900 to-slate-900 border border-amber-500/30 shadow-xl text-white'
           }`}
         >
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-3 min-w-0">
             <div
               className={`p-2.5 rounded-xl shrink-0 mt-0.5 ${
                 isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/20 text-amber-400'
@@ -967,7 +980,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             >
               <Share2 className="w-5 h-5" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h2 className={`font-bold text-sm ${isLight ? 'text-slate-900' : 'text-white'}`}>
                 Seu Link de Agendamento
               </h2>
@@ -975,7 +988,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 Coloque na bio do seu Instagram ou envie no WhatsApp dos clientes.
               </p>
               <span
-                className={`text-xs font-mono mt-1.5 inline-block px-2.5 py-0.5 rounded-lg max-w-[280px] sm:max-w-sm truncate border ${
+                className={`text-xs font-mono mt-1.5 inline-block px-2.5 py-0.5 rounded-lg max-w-full sm:max-w-sm truncate border ${
                   isLight
                     ? 'bg-amber-100/80 text-amber-900 border-amber-300/80 font-bold'
                     : 'bg-slate-950/60 text-amber-300 border-amber-500/20'
