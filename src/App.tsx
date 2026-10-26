@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { applyManifestForPath } from './lib/pwa'
+import { getModeFor, type ThemeMode } from './lib/shopTheme'
 import { BookingClientView } from './components/BookingClientView'
 import { AdminDashboard } from './components/AdminDashboard'
 import { BarberOnboarding } from './components/BarberOnboarding'
@@ -21,7 +22,7 @@ function BookingRouteWrapper({
   barbershopsList,
   services,
   barbers,
-  theme,
+  themeOverride,
   onToggleTheme,
   onNewBooking
 }: {
@@ -29,8 +30,8 @@ function BookingRouteWrapper({
   barbershopsList: Barbershop[]
   services: Service[]
   barbers: Barber[]
-  theme: 'dark' | 'light'
-  onToggleTheme: () => void
+  themeOverride: ThemeMode | null
+  onToggleTheme: (current: ThemeMode) => void
   onNewBooking: (b: any) => void
 }) {
   const { slug } = useParams()
@@ -49,6 +50,7 @@ function BookingRouteWrapper({
   // Filtrar serviços específicos desta barbearia
   const shopServices = services.filter((s) => s.barbershop_id === currentShop.id)
   const shopBarbers = barbers.filter((b) => b.barbershop_id === currentShop.id && b.active)
+  const mode = getModeFor(currentShop.style_preset, themeOverride)
 
   return (
     <div className="relative">
@@ -56,8 +58,8 @@ function BookingRouteWrapper({
         barbershop={currentShop}
         services={shopServices}
         barbers={shopBarbers}
-        theme={theme}
-        onToggleTheme={onToggleTheme}
+        theme={mode}
+        onToggleTheme={() => onToggleTheme(mode)}
         onNewBooking={onNewBooking}
       />
     </div>
@@ -70,7 +72,7 @@ function AdminRouteWrapper({
   services,
   barbers,
   workingHours,
-  theme,
+  themeOverride,
   onToggleTheme,
   onUpdateAppointments,
   onUpdateServices,
@@ -84,8 +86,8 @@ function AdminRouteWrapper({
   services: Service[]
   barbers: Barber[]
   workingHours: import('./types').WorkingHour[]
-  theme: 'dark' | 'light'
-  onToggleTheme: () => void
+  themeOverride: ThemeMode | null
+  onToggleTheme: (current: ThemeMode) => void
   onUpdateAppointments: (a: Appointment[]) => void
   onUpdateServices: (s: Service[]) => void
   onUpdateBarbers: (b: Barber[]) => void
@@ -108,8 +110,8 @@ function AdminRouteWrapper({
         services={shopServices}
         appointments={shopAppointments}
         workingHours={workingHours}
-        theme={theme}
-        onToggleTheme={onToggleTheme}
+        theme={themeOverride ?? 'dark'}
+        onToggleTheme={() => onToggleTheme(themeOverride ?? 'dark')}
         onBackToClientView={() => navigate(`/${barbershop.slug}`)}
         onUpdateAppointments={(updatedShopApts) => {
           const others = appointments.filter((a) => a.barbershop_id !== barbershop.id)
@@ -203,24 +205,22 @@ export function App() {
     return demoWorkingHours
   })
 
-  // Tema Claro / Escuro
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    return (localStorage.getItem('barber_theme') as 'dark' | 'light') || 'dark'
+  // Tema Claro / Escuro: sem escolha do usuário, cada estilo usa o seu modo inicial
+  const [themeOverride, setThemeOverride] = useState<ThemeMode | null>(() => {
+    const saved = localStorage.getItem('barber_theme_user')
+    return saved === 'light' || saved === 'dark' ? saved : null
   })
 
   useEffect(() => {
-    localStorage.setItem('barber_theme', theme)
-    if (theme === 'light') {
-      document.documentElement.classList.add('light')
-      document.documentElement.classList.remove('dark')
-    } else {
-      document.documentElement.classList.add('dark')
-      document.documentElement.classList.remove('light')
-    }
-  }, [theme])
+    const effective = themeOverride ?? 'dark'
+    document.documentElement.classList.toggle('light', effective === 'light')
+    document.documentElement.classList.toggle('dark', effective === 'dark')
+  }, [themeOverride])
 
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
+  const toggleTheme = (current: ThemeMode) => {
+    const next: ThemeMode = current === 'dark' ? 'light' : 'dark'
+    localStorage.setItem('barber_theme_user', next)
+    setThemeOverride(next)
   }
 
   // Sincronização e persistência no LocalStorage
@@ -377,7 +377,7 @@ export function App() {
               barbershopsList={barbershopsList}
               services={services}
               barbers={barbers}
-              theme={theme}
+              themeOverride={themeOverride}
               onToggleTheme={toggleTheme}
               onNewBooking={handleNewBooking}
             />
@@ -423,7 +423,7 @@ export function App() {
               services={services}
               barbers={barbers}
               workingHours={workingHours}
-              theme={theme}
+              themeOverride={themeOverride}
               onToggleTheme={toggleTheme}
               onUpdateAppointments={setAppointments}
               onUpdateServices={setServices}
@@ -464,7 +464,7 @@ export function App() {
               barbershopsList={barbershopsList}
               services={services}
               barbers={barbers}
-              theme={theme}
+              themeOverride={themeOverride}
               onToggleTheme={toggleTheme}
               onNewBooking={handleNewBooking}
             />
@@ -480,7 +480,7 @@ export function App() {
               barbershopsList={barbershopsList}
               services={services}
               barbers={barbers}
-              theme={theme}
+              themeOverride={themeOverride}
               onToggleTheme={toggleTheme}
               onNewBooking={handleNewBooking}
             />

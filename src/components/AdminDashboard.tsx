@@ -35,10 +35,11 @@ import {
   Palette,
   UserPlus
 } from 'lucide-react'
-import type { Barbershop, Barber, Service, Appointment, WorkingHour, ShopStylePreset } from '../types'
+import type { Barbershop, Barber, Service, Appointment, WorkingHour } from '../types'
 import { PWAInstallPrompt } from './PWAInstallPrompt'
 import { DEFAULT_PIX_KEY, DEFAULT_PIX_NAME, DEFAULT_PIX_QRCODE } from '../lib/mockData'
-import { STYLE_PRESETS } from '../lib/stylePresets'
+import { STYLE_PRESETS, STYLE_PRESET_ORDER } from '../lib/stylePresets'
+import { buildShopTheme } from '../lib/shopTheme'
 
 const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -722,7 +723,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   ]
 
   return (
-    <div className={`min-h-screen select-none transition-colors ${isLight ? 'bg-slate-100 text-slate-900' : 'bg-[#090A0F] text-slate-100'}`}>
+    <div
+      style={buildShopTheme(barbershop.style_preset, isLight ? 'light' : 'dark', true)}
+      className={`min-h-screen select-none transition-colors ${isLight ? 'bg-slate-100 text-slate-900' : 'bg-[#090A0F] text-slate-100'}`}
+    >
       {/* ===================== BARRA LATERAL ESQUERDA (SIDEBAR RETRÁTIL) ===================== */}
       <aside
         className={`hidden sm:flex fixed top-0 bottom-0 left-0 z-50 flex-col justify-between transition-all duration-300 border-r shadow-2xl ${
@@ -2342,7 +2346,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {(Object.entries(STYLE_PRESETS) as [ShopStylePreset, typeof STYLE_PRESETS[ShopStylePreset]][]).map(([key, preset]) => {
+                {STYLE_PRESET_ORDER.map((key) => {
+                  const preset = STYLE_PRESETS[key]
                   const isSelected = (barbershop.style_preset || 'elegante') === key
 
                   return (

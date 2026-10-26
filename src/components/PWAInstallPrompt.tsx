@@ -107,7 +107,7 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
       {/* Banner de fixação flutuante no rodapé para clientes mobile */}
       {variant === 'banner' && !dismissed && (
         <div className="fixed bottom-4 left-4 right-4 z-50 max-w-md mx-auto animate-fade-in">
-          <div className="relative p-3.5 rounded-2xl bg-gradient-to-r from-[#171a26] to-[#1e2333] border border-amber-500/30 shadow-2xl shadow-black/80 flex items-center justify-between gap-3 backdrop-blur-xl">
+          <div className="relative p-3.5 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 border border-amber-500/30 shadow-2xl shadow-black/80 flex items-center justify-between gap-3 backdrop-blur-xl">
             <button
               onClick={() => setDismissed(true)}
               className="absolute -top-2 -right-2 p-1 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-full border border-slate-700 text-xs shadow-md"
@@ -139,7 +139,7 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
       {/* Modal Guiado para iPhone (iOS) e navegadores sem suporte direto */}
       {showIOSModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-[#12151f] border border-slate-800 rounded-3xl p-6 text-slate-100 shadow-2xl animate-in slide-in-from-bottom duration-300">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 text-slate-100 shadow-2xl animate-in slide-in-from-bottom duration-300">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">

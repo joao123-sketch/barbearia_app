@@ -17,6 +17,7 @@ import {
 import confetti from 'canvas-confetti'
 import type { Barbershop, Service, Barber } from '../types'
 import { getStylePreset } from '../lib/stylePresets'
+import { buildShopTheme, useShopChrome } from '../lib/shopTheme'
 import { PWAInstallPrompt } from './PWAInstallPrompt'
 
 const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
@@ -46,6 +47,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
 }) => {
   // Estilo visual configurado para a barbearia
   const preset = getStylePreset(barbershop.style_preset)
+  useShopChrome(preset.id, theme)
 
   // Equipe de barbeiros ativos
   const activeBarbers = useMemo(() => {
@@ -241,13 +243,18 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
     return `https://wa.me/${phoneClean}?text=${encodeURIComponent(msg)}`
   }, [confirmedBooking, formattedDate, barbershop.phone_whatsapp])
 
-  const isLight = theme === 'light'
+  // Claro/escuro e cores do estilo vêm das variáveis do tema (shopTheme), não de classes condicionais
+  const isLight = false
+  const isLightMode = theme === 'light'
   const googleMapsQuery = barbershop.street && barbershop.number
     ? `${barbershop.street}, ${barbershop.number}`
     : barbershop.address.split('-')[0].trim()
 
   return (
-    <div className={`min-h-screen pb-28 select-none transition-colors ${isLight ? 'bg-slate-100 text-slate-900' : 'bg-[#090A0F] text-slate-100'}`}>
+    <div
+      style={buildShopTheme(preset.id, theme)}
+      className="min-h-screen pb-28 select-none transition-colors bg-slate-950 text-slate-100"
+    >
       {/* ===================== TOPO / BANNER ===================== */}
       <div className="relative w-full h-48 sm:h-64 overflow-hidden bg-slate-900">
         <img
@@ -255,7 +262,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
           alt={barbershop.name}
           className="w-full h-full object-cover opacity-60"
         />
-        <div className={`absolute inset-0 bg-gradient-to-t ${isLight ? 'from-slate-100 via-slate-100/50' : 'from-[#090A0F] via-[#090A0F]/60'} to-transparent`} />
+        <div className={`absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent`} />
 
         {/* Botão de Instalação PWA no Topo & Alternador de Tema */}
         <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
@@ -263,10 +270,10 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
             <button
               onClick={onToggleTheme}
               aria-label="Alternar tema claro/escuro"
-              title={isLight ? 'Mudar para tema escuro' : 'Mudar para tema claro'}
+              title={isLightMode ? 'Mudar para tema escuro' : 'Mudar para tema claro'}
               className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-amber-400 border border-slate-700/80 backdrop-blur-md transition-all active:scale-95 cursor-pointer shadow-lg"
             >
-              {isLight ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+              {isLightMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
             </button>
           )}
           <PWAInstallPrompt variant="compact" />
@@ -807,7 +814,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
             </div>
 
             {/* Cartão de Confirmação */}
-            <div className="p-4 rounded-2xl bg-gradient-to-b from-slate-900 to-[#12151f] border border-amber-500/30 text-left text-xs space-y-2.5 shadow-2xl">
+            <div className="p-4 rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-amber-500/30 text-left text-xs space-y-2.5 shadow-2xl">
               <div className="flex justify-between items-center border-b border-slate-800 pb-2">
                 <span className="text-slate-400">Cliente:</span>
                 <span className="font-bold text-white">{confirmedBooking.client_name}</span>
@@ -879,7 +886,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
 
       {/* ===================== BARRA INFERIOR FLUTUANTE ===================== */}
       {step !== 'success' && selectedServices.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#0d0f17]/95 border-t border-slate-800/90 backdrop-blur-xl p-3.5">
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 border-t border-slate-800/90 backdrop-blur-xl p-3.5">
           <div className="max-w-md mx-auto flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] text-slate-400">

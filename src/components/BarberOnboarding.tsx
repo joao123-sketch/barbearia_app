@@ -21,7 +21,8 @@ import {
 import confetti from 'canvas-confetti'
 import type { Barbershop, Service, ShopStylePreset } from '../types'
 import { DEFAULT_PIX_KEY } from '../lib/mockData'
-import { STYLE_PRESETS } from '../lib/stylePresets'
+import { STYLE_PRESETS, STYLE_PRESET_ORDER } from '../lib/stylePresets'
+import { buildShopTheme, getModeFor, useShopChrome } from '../lib/shopTheme'
 
 const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -61,7 +62,8 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
   const [dueDay, setDueDay] = useState<number>(10)
 
   // Estilo Visual Escolhido
-  const [stylePreset, setStylePreset] = useState<ShopStylePreset>('elegante')
+  const [stylePreset, setStylePreset] = useState<ShopStylePreset>('neutro')
+  useShopChrome(stylePreset, getModeFor(stylePreset, null))
 
   // Equipe / Profissionais
   const [teamType, setTeamType] = useState<'solo' | 'team'>('solo')
@@ -302,7 +304,10 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-[#090A0F] text-slate-100 flex flex-col justify-center px-4 py-8 select-none">
+    <div
+      style={buildShopTheme(stylePreset, getModeFor(stylePreset, null))}
+      className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center px-4 py-8 select-none transition-colors"
+    >
       <div className="w-full max-w-lg mx-auto space-y-6">
         {/* Header com Logo e Título */}
         <div className="text-center space-y-2">
@@ -310,10 +315,10 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
             <Scissors className="w-7 h-7" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            Cadastrar Minha Barbearia
+            Cadastre seu negócio
           </h1>
           <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            Cadastre seu negócio em menos de 1 minuto e comece a receber agendamentos. Os serviços você adiciona direto no seu painel.
+            Barbearia, salão ou estúdio: cadastre em menos de 1 minuto e comece a receber agendamentos. Os serviços você adiciona direto no seu painel.
           </p>
         </div>
 
@@ -324,6 +329,85 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
               <Store className="w-4 h-4" />
               <span>Informações do seu Negócio</span>
             </div>
+
+              {/* ESTILO VISUAL DISPONÍVEL (PRESETS DE DESIGN) */}
+              <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-slate-200 font-semibold flex items-center gap-1.5 text-xs">
+                    <Palette className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Escolha o visual do seu negócio</span>
+                  </label>
+                  <span className="text-[10px] text-amber-400 font-bold uppercase">
+                    {STYLE_PRESETS[stylePreset].name}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300">
+                  Toque num estilo e veja a página inteira mudar na hora. Você pode trocar depois no painel.
+                </p>
+
+                {/* Grid dos estilos */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  {STYLE_PRESET_ORDER.map((pKey) => {
+                    const preset = STYLE_PRESETS[pKey]
+                    const isSelected = stylePreset === pKey
+                    return (
+                      <button
+                        key={pKey}
+                        type="button"
+                        onClick={() => setStylePreset(pKey)}
+                        className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-slate-900 border-amber-400 ring-2 ring-amber-400/30 shadow-lg'
+                            : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">{preset.icon}</span>
+                            <div>
+                              <p className={`font-bold text-xs ${isSelected ? 'text-white' : 'text-slate-200'}`}>
+                                {preset.name}
+                              </p>
+                              <p className="text-[10px] text-slate-400 leading-tight mt-0.5">
+                                {preset.subtitle}
+                              </p>
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <span className="w-4 h-4 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center text-[10px] font-bold shrink-0">
+                              ✓
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Amostras de cores */}
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/80">
+                          <div className="flex items-center gap-1.5">
+                            {preset.swatches.map((color, cIdx) => (
+                              <span
+                                key={cIdx}
+                                className="w-4 h-4 rounded-full border border-black/30 shadow-inner"
+                                style={{ backgroundColor: color }}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-[9px] text-slate-400 italic truncate max-w-[140px]">
+                            {preset.targetAudience.slice(0, 24)}...
+                          </span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Prévia do Botão e Estilo Escolhido */}
+                <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-center space-y-1 mt-1">
+                  <span className="text-[10px] text-slate-400 block">Prévia dos botões do seu cliente:</span>
+                  <div className={`py-2 px-3 rounded-xl text-center text-xs font-bold transition-all ${STYLE_PRESETS[stylePreset].primaryButton}`}>
+                    Agendar Horário • {STYLE_PRESETS[stylePreset].name}
+                  </div>
+                </div>
+              </div>
 
             {/* FOTO / LOGO DO NEGÓCIO */}
             <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/80 flex items-center gap-3.5">
@@ -597,85 +681,6 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
                       {d}
                     </button>
                   ))}
-                </div>
-              </div>
-
-              {/* ESTILO VISUAL DISPONÍVEL (PRESETS DE DESIGN) */}
-              <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/80 space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="block text-slate-200 font-semibold flex items-center gap-1.5 text-xs">
-                    <Palette className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Estilo Visual da Barbearia *</span>
-                  </label>
-                  <span className="text-[10px] text-amber-400 font-bold uppercase">
-                    {STYLE_PRESETS[stylePreset].name}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-300">
-                  Escolha as cores e a vibe que combinam com seu negócio:
-                </p>
-
-                {/* Grid dos 6 Presets */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                  {(Object.keys(STYLE_PRESETS) as ShopStylePreset[]).map((pKey) => {
-                    const preset = STYLE_PRESETS[pKey]
-                    const isSelected = stylePreset === pKey
-                    return (
-                      <button
-                        key={pKey}
-                        type="button"
-                        onClick={() => setStylePreset(pKey)}
-                        className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                          isSelected
-                            ? 'bg-slate-900 border-amber-400 ring-2 ring-amber-400/30 shadow-lg'
-                            : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl">{preset.icon}</span>
-                            <div>
-                              <p className={`font-bold text-xs ${isSelected ? 'text-white' : 'text-slate-200'}`}>
-                                {preset.name}
-                              </p>
-                              <p className="text-[10px] text-slate-400 leading-tight mt-0.5">
-                                {preset.subtitle}
-                              </p>
-                            </div>
-                          </div>
-                          {isSelected && (
-                            <span className="w-4 h-4 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center text-[10px] font-bold shrink-0">
-                              ✓
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Amostras de cores */}
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/80">
-                          <div className="flex items-center gap-1.5">
-                            {preset.swatches.map((color, cIdx) => (
-                              <span
-                                key={cIdx}
-                                className="w-4 h-4 rounded-full border border-black/30 shadow-inner"
-                                style={{ backgroundColor: color }}
-                              />
-                            ))}
-                          </div>
-                          <span className="text-[9px] text-slate-400 italic truncate max-w-[140px]">
-                            {preset.targetAudience.slice(0, 24)}...
-                          </span>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-
-                {/* Prévia do Botão e Estilo Escolhido */}
-                <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-center space-y-1 mt-1">
-                  <span className="text-[10px] text-slate-400 block">Prévia dos botões do seu cliente:</span>
-                  <div className={`py-2 px-3 rounded-xl text-center text-xs font-bold transition-all ${STYLE_PRESETS[stylePreset].primaryButton}`}>
-                    Agendar Horário • {STYLE_PRESETS[stylePreset].name}
-                  </div>
                 </div>
               </div>
 

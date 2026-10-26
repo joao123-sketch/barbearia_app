@@ -1,6 +1,6 @@
 export type SubscriptionStatus = 'active' | 'pending' | 'overdue' | 'blocked'
 
-export type ShopStylePreset = 'elegante' | 'moderno' | 'minimalista' | 'simples' | 'rosa' | 'azul'
+export type ShopStylePreset = 'elegante' | 'sofisticado' | 'moderno' | 'minimalista' | 'simples' | 'rosa' | 'azul' | 'neutro'
 
 export interface Barbershop {
   id: string
