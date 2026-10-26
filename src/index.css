@@ -46,3 +46,23 @@
 .animate-pulse-subtle {
   animation: pulseSubtle 3s infinite ease-in-out;
 }
+
+/* Tipografia e sombras do estilo escolhido (variáveis vêm de shopTheme.ts) */
+[data-shop-theme] {
+  font-family: var(--shop-font);
+}
+
+[data-shop-theme] h1,
+[data-shop-theme] h2,
+[data-shop-theme] h3 {
+  font-family: var(--shop-heading, var(--shop-font));
+}
+
+[data-shop-caps="true"] h1 {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+[data-shop-flat="true"] [class*="shadow-"] {
+  box-shadow: none;
+}

@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useNavigate, useParams, useLocation, Navigate } from 'react-router-dom'
 import { applyManifestForPath } from './lib/pwa'
+import { endSession, getSession } from './lib/auth'
 import { getModeFor, type ThemeMode } from './lib/shopTheme'
 import { BookingClientView } from './components/BookingClientView'
 import { AdminDashboard } from './components/AdminDashboard'
-import { BarberOnboarding } from './components/BarberOnboarding'
-import { BarberLogin } from './components/BarberLogin'
+import { BarberAuth } from './components/BarberAuth'
 import { MasterAdminDashboard } from './components/MasterAdminDashboard'
 import {
   demoBarbershop,
@@ -97,6 +97,9 @@ function AdminRouteWrapper({
 }) {
   const navigate = useNavigate()
 
+  // Painel só abre com sessão iniciada
+  if (!getSession()) return <Navigate to="/login" replace />
+
   // Isolamento estrito de agendamentos, serviços e equipe da barbearia atual
   const shopAppointments = appointments.filter((a) => a.barbershop_id === barbershop.id)
   const shopServices = services.filter((s) => s.barbershop_id === barbershop.id)
@@ -113,6 +116,10 @@ function AdminRouteWrapper({
         theme={themeOverride ?? 'dark'}
         onToggleTheme={() => onToggleTheme(themeOverride ?? 'dark')}
         onBackToClientView={() => navigate(`/${barbershop.slug}`)}
+        onLogout={() => {
+          endSession()
+          navigate('/login')
+        }}
         onUpdateAppointments={(updatedShopApts) => {
           const others = appointments.filter((a) => a.barbershop_id !== barbershop.id)
           onUpdateAppointments([...updatedShopApts, ...others])
@@ -282,8 +289,8 @@ export function App() {
       id: 'barber-' + Date.now(),
       barbershop_id: newShop.id,
       name: newShop.owner_name || 'Barbeiro Principal',
-      avatar_url: newShop.logo_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-      role: 'Master Barber / Responsável',
+      avatar_url: newShop.logo_url,
+      role: 'Responsável',
       bio: 'Profissional especialista.',
       active: true
     }
@@ -295,9 +302,8 @@ export function App() {
           id: `barber-${Date.now()}-${idx + 1}`,
           barbershop_id: newShop.id,
           name: name.trim(),
-          avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-          role: 'Barbeiro Especialista',
-          bio: 'Atendimento de alta qualidade e estilo.',
+          role: 'Profissional',
+          bio: '',
           active: true
         })
       }
@@ -347,7 +353,7 @@ export function App() {
     const remaining = barbershopsList.filter((s) => s.id !== shopId)
     setBarbershopsList(remaining)
     localStorage.removeItem('barber_current_shop_id')
-    localStorage.removeItem('barber_current_user')
+    endSession()
     if (remaining.length > 0) {
       setCurrentBarbershop(remaining[0])
     } else {
@@ -384,34 +390,20 @@ export function App() {
           }
         />
 
-        {/* Link que o João envia para o Barbeiro se cadastrar */}
-        <Route
-          path="/cadastrar"
-          element={
-            <BarberOnboarding
-              onRegisterBarbershop={handleRegisterBarbershop}
-            />
-          }
-        />
-        <Route
-          path="/cadastro"
-          element={
-            <BarberOnboarding
-              onRegisterBarbershop={handleRegisterBarbershop}
-            />
-          }
-        />
-
-        {/* Login com WhatsApp e Senha para Barbeiros */}
-        <Route
-          path="/login"
-          element={
-            <BarberLogin
-              barbershops={barbershopsList}
-              onSelectBarbershop={(shop) => setCurrentBarbershop(shop)}
-            />
-          }
-        />
+        {/* Link enviado ao dono do negócio: entrar ou cadastrar conta */}
+        {['/cadastrar', '/cadastro', '/login'].map((path) => (
+          <Route
+            key={path}
+            path={path}
+            element={
+              <BarberAuth
+                barbershops={barbershopsList}
+                onSelectBarbershop={(shop) => setCurrentBarbershop(shop)}
+                onRegisterBarbershop={handleRegisterBarbershop}
+              />
+            }
+          />
+        ))}
 
         {/* Painel Administrativo do Barbeiro */}
         <Route

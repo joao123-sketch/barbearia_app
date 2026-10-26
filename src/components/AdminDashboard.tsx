@@ -22,6 +22,7 @@ import {
   BellRing,
   MessageCircle,
   ChevronRight,
+  LogOut,
   ChevronLeft,
   Camera,
   History,
@@ -40,6 +41,7 @@ import { PWAInstallPrompt } from './PWAInstallPrompt'
 import { DEFAULT_PIX_KEY, DEFAULT_PIX_NAME, DEFAULT_PIX_QRCODE } from '../lib/mockData'
 import { STYLE_PRESETS, STYLE_PRESET_ORDER } from '../lib/stylePresets'
 import { buildShopTheme } from '../lib/shopTheme'
+import { fileToResizedDataUrl } from '../lib/image'
 
 const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -60,6 +62,7 @@ interface AdminDashboardProps {
   theme?: 'dark' | 'light'
   onToggleTheme?: () => void
   onBackToClientView?: () => void
+  onLogout?: () => void
   onUpdateAppointments?: (appointments: Appointment[]) => void
   onUpdateServices?: (services: Service[]) => void
   onUpdateBarbers?: (barbers: Barber[]) => void
@@ -77,6 +80,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   theme = 'dark',
   onToggleTheme,
   onBackToClientView,
+  onLogout,
   onUpdateAppointments,
   onUpdateServices,
   onUpdateBarbers,
@@ -101,7 +105,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Modais de Serviços
   const [showAddServiceModal, setShowAddServiceModal] = useState(false)
   const [editingService, setEditingService] = useState<Service | null>(null)
-  const [serviceCategory, setServiceCategory] = useState<'cabelo' | 'barba' | 'combo' | 'especial'>('cabelo')
+  const [serviceCategory, setServiceCategory] = useState('')
+  const [isCombo, setIsCombo] = useState(false)
   const [serviceName, setServiceName] = useState('')
   const [servicePrice, setServicePrice] = useState<number>(40)
   const [serviceDuration, setServiceDuration] = useState<number>(30)
@@ -123,7 +128,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [showBarberModal, setShowBarberModal] = useState(false)
   const [editingBarber, setEditingBarber] = useState<Barber | null>(null)
   const [barberModalName, setBarberModalName] = useState('')
-  const [barberModalRole, setBarberModalRole] = useState('Barbeiro Especialista')
+  const [barberModalRole, setBarberModalRole] = useState('Profissional')
   const [barberModalAvatar, setBarberModalAvatar] = useState('')
   const [barberModalPhone, setBarberModalPhone] = useState('')
   const [barberModalBio, setBarberModalBio] = useState('')
@@ -411,7 +416,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // ===================== CADASTRO E EDIÇÃO DE SERVIÇOS (COMBO INCLUSO) =====================
   const handleOpenAddService = () => {
     setEditingService(null)
-    setServiceCategory('cabelo')
+    setServiceCategory('')
+    setIsCombo(false)
     setServiceName('')
     setServicePrice(40)
     setServiceDuration(30)
@@ -423,7 +429,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleOpenEditService = (service: Service) => {
     setEditingService(service)
-    setServiceCategory(service.category || 'cabelo')
+    setServiceCategory(service.category || '')
+    setIsCombo(Boolean(service.combo_items?.length))
     setServiceName(service.name)
     setServicePrice(service.price)
     setServiceDuration(service.duration_minutes)
@@ -461,8 +468,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               name: serviceName,
               price: Number(servicePrice),
               duration_minutes: Number(serviceDuration),
-              category: serviceCategory,
-              combo_items: serviceCategory === 'combo' ? comboItems : undefined,
+              category: serviceCategory.trim() || undefined,
+              combo_items: isCombo && comboItems.length ? comboItems : undefined,
               description: serviceDesc
             }
           : s
@@ -477,8 +484,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         name: serviceName,
         price: Number(servicePrice),
         duration_minutes: Number(serviceDuration),
-        category: serviceCategory,
-        combo_items: serviceCategory === 'combo' ? comboItems : undefined,
+        category: serviceCategory.trim() || undefined,
+        combo_items: isCombo && comboItems.length ? comboItems : undefined,
         description: serviceDesc || 'Atendimento de alta precisão e qualidade.',
         active: true
       }
@@ -532,11 +539,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }
 
   // ===================== GESTÃO DE EQUIPE / BARBEIROS =====================
+  const handleBarberPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      setBarberModalAvatar(await fileToResizedDataUrl(file, 400))
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Não foi possível usar esta imagem.')
+    }
+  }
+
   const handleOpenAddBarber = () => {
     setEditingBarber(null)
     setBarberModalName('')
-    setBarberModalRole('Barbeiro Especialista')
-    setBarberModalAvatar('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80')
+    setBarberModalRole('Profissional')
+    setBarberModalAvatar('')
     setBarberModalPhone('')
     setBarberModalBio('')
     setShowBarberModal(true)
@@ -545,8 +562,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleOpenEditBarber = (barber: Barber) => {
     setEditingBarber(barber)
     setBarberModalName(barber.name)
-    setBarberModalRole(barber.role || 'Barbeiro')
-    setBarberModalAvatar(barber.avatar_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80')
+    setBarberModalRole(barber.role || 'Profissional')
+    setBarberModalAvatar(barber.avatar_url || '')
     setBarberModalPhone(barber.phone || '')
     setBarberModalBio(barber.bio || '')
     setShowBarberModal(true)
@@ -563,8 +580,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           ? {
               ...b,
               name: barberModalName.trim(),
-              role: barberModalRole.trim() || 'Barbeiro',
-              avatar_url: barberModalAvatar.trim() || b.avatar_url,
+              role: barberModalRole.trim() || 'Profissional',
+              avatar_url: barberModalAvatar || undefined,
               phone: barberModalPhone.trim() || undefined,
               bio: barberModalBio.trim() || undefined
             }
@@ -575,8 +592,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         id: 'barber-' + Date.now(),
         barbershop_id: barbershop.id,
         name: barberModalName.trim(),
-        role: barberModalRole.trim() || 'Barbeiro Especialista',
-        avatar_url: barberModalAvatar.trim() || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+        role: barberModalRole.trim() || 'Profissional',
+        avatar_url: barberModalAvatar || undefined,
         phone: barberModalPhone.trim() || undefined,
         bio: barberModalBio.trim() || undefined,
         active: true,
@@ -600,10 +617,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleDeleteBarber = (id: string) => {
     if (barbersList.length <= 1) {
-      alert('A barbearia precisa ter pelo menos um barbeiro na equipe.')
+      alert('Você precisa ter pelo menos um profissional na equipe.')
       return
     }
-    if (window.confirm('Tem certeza que deseja remover este barbeiro da equipe?')) {
+    if (window.confirm('Tem certeza que deseja remover este profissional da equipe?')) {
       const updated = barbersList.filter((b) => b.id !== id)
       setBarbersList(updated)
       if (onUpdateBarbers) onUpdateBarbers(updated)
@@ -675,16 +692,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setTimeout(() => setCopiedPixKey(false), 2000)
   }
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          setProfileLogo(reader.result)
-        }
-      }
-      reader.readAsDataURL(file)
+    if (!file) return
+    try {
+      setProfileLogo(await fileToResizedDataUrl(file))
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Não foi possível usar esta imagem.')
     }
   }
 
@@ -717,7 +731,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     { id: 'semana' as AdminTab, label: 'Semana', fullLabel: 'Calendário Semanal', icon: CalendarDays },
     { id: 'historico' as AdminTab, label: 'Histórico', fullLabel: 'Histórico de Cortes', icon: History },
     { id: 'servicos' as AdminTab, label: 'Serviços', fullLabel: 'Serviços & Preços', icon: Scissors, badge: services.length },
-    { id: 'equipe' as AdminTab, label: 'Equipe', fullLabel: 'Equipe & Barbeiros', icon: Users, badge: barbersList.length },
+    { id: 'equipe' as AdminTab, label: 'Equipe', fullLabel: 'Equipe & Profissionais', icon: Users, badge: barbersList.length },
     { id: 'horarios' as AdminTab, label: 'Horários', fullLabel: 'Horários & Pausas', icon: Clock },
     { id: 'config' as AdminTab, label: 'Config', fullLabel: 'Configurações', icon: Settings }
   ]
@@ -742,12 +756,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="p-2 sm:p-3 flex items-center justify-between border-b border-slate-800/60">
             <div className="flex items-center gap-2.5 overflow-hidden">
               <div className="w-9 h-9 rounded-xl overflow-hidden border border-amber-500/50 bg-slate-900 shrink-0">
-                <img src={barbershop.logo_url} alt={barbershop.name} className="w-full h-full object-cover" />
+                {barbershop.logo_url ? (
+                  <img src={barbershop.logo_url} alt={barbershop.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-amber-400 font-black text-sm">
+                    {barbershop.name.trim().charAt(0).toUpperCase()}
+                  </div>
+                )}
               </div>
               {sidebarExpanded && (
                 <div className="truncate min-w-0">
                   <h2 className="font-extrabold text-xs text-white truncate">{barbershop.name}</h2>
-                  <p className="text-[10px] text-amber-400 font-semibold truncate">Painel Barbeiro</p>
+                  <p className="text-[10px] text-amber-400 font-semibold truncate">Painel</p>
                 </div>
               )}
             </div>
@@ -868,7 +888,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="flex items-center gap-2 min-w-0">
               <div className="min-w-0">
                 <h1 className={`font-black text-sm sm:text-base leading-tight truncate ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                  {adminTabsList.find(t => t.id === activeTab)?.fullLabel || 'Painel do Barbeiro'}
+                  {adminTabsList.find(t => t.id === activeTab)?.fullLabel || 'Painel'}
                 </h1>
                 <p className="text-[11px] text-amber-400 font-semibold truncate sm:max-w-none">
                   {barbershop.name}
@@ -1760,9 +1780,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <h4 className="font-bold text-sm text-white">{s.name}</h4>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-amber-300 font-semibold uppercase">
-                            {s.category || 'geral'}
-                          </span>
+                          {s.category && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-amber-300 font-semibold uppercase">
+                              {s.category}
+                            </span>
+                          )}
                         </div>
                         {s.description && (
                           <p className="text-xs text-slate-400 mt-0.5">{s.description}</p>
@@ -1832,7 +1854,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <span>Equipe de Profissionais ({barbersList.length})</span>
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Gerencie os barbeiros que atendem no seu espaço. Seus clientes poderão escolher o profissional favorito ao agendar.
+                  Gerencie os profissionais que atendem no seu espaço. Seus clientes poderão escolher o profissional favorito ao agendar.
                 </p>
               </div>
 
@@ -1842,7 +1864,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer self-start sm:self-auto"
               >
                 <UserPlus className="w-4 h-4" />
-                <span>+ Adicionar Barbeiro</span>
+                <span>+ Adicionar Profissional</span>
               </button>
             </div>
 
@@ -1919,7 +1941,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
 
                         <p className="text-xs text-amber-400/90 font-medium truncate mt-0.5">
-                          {barber.role || 'Barbeiro'}
+                          {barber.role || 'Profissional'}
                         </p>
 
                         {barber.bio && (
@@ -1967,7 +1989,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <button
                         type="button"
                         onClick={() => handleDeleteBarber(barber.id)}
-                        title="Remover barbeiro"
+                        title="Remover profissional"
                         className="p-1.5 rounded-xl bg-rose-950/30 hover:bg-rose-900/40 text-rose-400 border border-rose-900/40 transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -1993,7 +2015,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <span>Dashboard de Carga Horária Semanal</span>
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Cálculo automático de horas trabalhadas e capacidade semanal da barbearia.
+                  Cálculo automático de horas trabalhadas e capacidade semanal do seu negócio.
                 </p>
               </div>
 
@@ -2149,7 +2171,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div>
                   <h3 className="font-bold text-sm text-white">Pausas Programadas, Viagens & Feriados</h3>
                   <p className="text-xs text-slate-400">
-                    Bloqueie dias em que a barbearia estará fechada.
+                    Bloqueie dias em que você estará fechado.
                   </p>
                 </div>
               </div>
@@ -2239,7 +2261,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <div>
                   <h3 className="font-bold text-base text-white">Sua Mensalidade & Assinatura</h3>
-                  <p className="text-xs text-slate-400">Gerenciamento do plano da sua barbearia no BarberApp</p>
+                  <p className="text-xs text-slate-400">Gerenciamento do plano do seu negócio no BarberApp</p>
                 </div>
               </div>
 
@@ -2252,7 +2274,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <p className="text-slate-300 mt-0.5">
                       Foi agendado um novo valor de mensalidade de{' '}
                       <strong className="text-white">R$ {barbershop.next_monthly_fee.toFixed(2).replace('.', ',')}</strong>{' '}
-                      para o próximo ciclo de pagamento da sua barbearia.
+                      para o próximo ciclo de pagamento do seu negócio.
                     </p>
                   </div>
                 </div>
@@ -2333,7 +2355,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div>
                   <h3 className="font-bold text-sm text-white flex items-center gap-2">
                     <Palette className="w-4 h-4 text-amber-400" />
-                    <span>Estilo Visual da Barbearia</span>
+                    <span>Estilo Visual</span>
                   </h3>
                   <p className="text-[11px] text-slate-400">
                     Escolha o estilo e as cores da tela de agendamento que seus clientes veem.
@@ -2423,16 +2445,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {/* FOTO / LOGO DA BARBEARIA */}
               <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/80 flex items-center gap-3.5">
                 <div className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-amber-500/60 bg-slate-900 shrink-0 shadow-md">
-                  <img
-                    src={profileLogo}
-                    alt={profileName}
-                    className="w-full h-full object-cover"
-                  />
+                  {profileLogo ? (
+                    <img src={profileLogo} alt={profileName} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-amber-400 bg-amber-500/10 font-black text-xl">
+                      {profileName.trim().charAt(0).toUpperCase() || <Camera className="w-6 h-6" />}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex-1 text-xs space-y-1">
                   <span className="font-bold text-white text-xs block">
-                    Logo / Foto da Barbearia
+                    Logo / Foto do negócio
                   </span>
                   <p className="text-[11px] text-slate-400">
                     Aparece no topo da página de agendamentos para seus clientes.
@@ -2458,7 +2482,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Nome da Barbearia *</label>
+                <label className="block text-slate-300 font-semibold mb-1">Nome do negócio *</label>
                 <input
                   type="text"
                   required
@@ -2472,7 +2496,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div>
                 <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
                   <InstagramIcon className="w-3.5 h-3.5 text-pink-400" />
-                  <span>Instagram da Barbearia</span>
+                  <span>Instagram</span>
                 </label>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 flex items-center px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 focus-within:border-amber-500">
@@ -2616,9 +2640,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
               >
                 <Check className="w-4 h-4" />
-                <span>Salvar Alterações da Barbearia</span>
+                <span>Salvar alterações</span>
               </button>
             </form>
+
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Sair da conta</span>
+              </button>
+            )}
 
             {/* ZONA DE PERIGO: EXCLUSÃO DE CONTA */}
             <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-500/30 space-y-3 text-xs">
@@ -2637,7 +2671,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Excluir Minha Barbearia</span>
+                <span>Excluir minha conta</span>
               </button>
             </div>
           </div>
@@ -2662,23 +2696,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             <form onSubmit={handleSaveService} className="space-y-3.5 text-xs">
-              {/* CATEGORIA EM PRIMEIRO LUGAR */}
+              {/* CATEGORIA (OPCIONAL, CRIADA PELO PRÓPRIO DONO) */}
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Categoria do Serviço *</label>
-                <select
+                <label className="block text-slate-300 font-semibold mb-1">Categoria (opcional)</label>
+                <input
+                  type="text"
+                  list="service-categories"
+                  placeholder="Ex: Cabelo, Unhas, Barba... ou deixe em branco"
                   value={serviceCategory}
-                  onChange={(e) => setServiceCategory(e.target.value as any)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-amber-300 font-bold focus:outline-none focus:border-amber-500"
-                >
-                  <option value="cabelo">Cabelo</option>
-                  <option value="barba">Barba</option>
-                  <option value="combo">Combo (múltiplos serviços)</option>
-                  <option value="especial">Especial / Químico</option>
-                </select>
+                  onChange={(e) => setServiceCategory(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-amber-500 text-xs"
+                />
+                <datalist id="service-categories">
+                  {Array.from(new Set(services.map((sv) => sv.category).filter(Boolean))).map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Com categorias, o cliente filtra os serviços por elas. Sem categoria, ele vê a lista completa.
+                </p>
               </div>
 
+              {/* COMBO / PACOTE (OPCIONAL) */}
+              <label className="flex items-center gap-2 text-slate-300 font-semibold cursor-pointer">
+                <input type="checkbox" checked={isCombo} onChange={(e) => setIsCombo(e.target.checked)} className="accent-amber-500 w-4 h-4" />
+                <span>Este serviço é um combo (inclui vários serviços)</span>
+              </label>
+
               {/* SE FOR COMBO: ADICIONAR OUTROS SERVIÇOS INCLUSOS */}
-              {serviceCategory === 'combo' && (
+              {isCombo && (
                 <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-amber-300 text-xs flex items-center gap-1.5">
@@ -2859,7 +2905,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               {barbersList.length > 1 && (
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Profissional / Barbeiro *</label>
+                  <label className="block text-slate-300 font-semibold mb-1">Profissional *</label>
                   <select
                     value={newBookingBarberId || (barbersList[0]?.id || '')}
                     onChange={(e) => setNewBookingBarberId(e.target.value)}
@@ -2867,7 +2913,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   >
                     {barbersList.map((b) => (
                       <option key={b.id} value={b.id}>
-                        {b.name} ({b.role || 'Barbeiro'}) {b.active === false ? '- [Pausado]' : ''}
+                        {b.name} ({b.role || 'Profissional'}) {b.active === false ? '- [Pausado]' : ''}
                       </option>
                     ))}
                   </select>
@@ -2911,7 +2957,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="flex justify-between items-center">
               <h3 className="font-bold text-base text-white flex items-center gap-2">
                 <Users className="w-4 h-4 text-amber-400" />
-                <span>{editingBarber ? 'Editar Barbeiro' : 'Novo Barbeiro na Equipe'}</span>
+                <span>{editingBarber ? 'Editar Profissional' : 'Novo Profissional na Equipe'}</span>
               </h3>
               <button
                 type="button"
@@ -2924,7 +2970,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             <form onSubmit={handleSaveBarber} className="space-y-3.5 text-xs">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Nome do Barbeiro *</label>
+                <label className="block text-slate-300 font-semibold mb-1">Nome do profissional *</label>
                 <input
                   type="text"
                   required
@@ -2939,7 +2985,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <label className="block text-slate-300 font-semibold mb-1">Cargo / Especialidade</label>
                 <input
                   type="text"
-                  placeholder="Ex: Barbeiro Master, Especialista em Degradê"
+                  placeholder="Ex: Especialista em coloração"
                   value={barberModalRole}
                   onChange={(e) => setBarberModalRole(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-amber-500 text-xs"
@@ -2958,34 +3004,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Foto / Avatar (URL)</label>
-                <input
-                  type="url"
-                  placeholder="https://..."
-                  value={barberModalAvatar}
-                  onChange={(e) => setBarberModalAvatar(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-amber-500 text-xs"
-                />
-                {/* Sugestões de Fotos Rápidas */}
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-[10px] text-slate-400">Modelos:</span>
-                  {[
-                    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
-                    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
-                    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-                    'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80'
-                  ].map((url, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setBarberModalAvatar(url)}
-                      className={`w-7 h-7 rounded-xl overflow-hidden border-2 transition-all ${
-                        barberModalAvatar === url ? 'border-amber-400 scale-110' : 'border-slate-700 opacity-60 hover:opacity-100'
-                      }`}
+                <label className="block text-slate-300 font-semibold mb-1">Foto (opcional)</label>
+                <div className="flex items-center gap-3">
+                  <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-amber-500/50 bg-slate-800 shrink-0 flex items-center justify-center text-amber-400">
+                    {barberModalAvatar ? (
+                      <img src={barberModalAvatar} alt="Foto" className="w-full h-full object-cover" />
+                    ) : (
+                      <Camera className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className="flex flex-col items-start gap-1.5">
+                    <input type="file" accept="image/*" onChange={handleBarberPhotoUpload} className="hidden" id="barber-photo-upload" />
+                    <label
+                      htmlFor="barber-photo-upload"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer active:scale-95 transition-all"
                     >
-                      <img src={url} alt={`Avatar ${idx}`} className="w-full h-full object-cover" />
-                    </button>
-                  ))}
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>{barberModalAvatar ? 'Trocar foto' : 'Enviar foto'}</span>
+                    </label>
+                    {barberModalAvatar && (
+                      <button type="button" onClick={() => setBarberModalAvatar('')} className="text-[11px] text-rose-400 hover:underline cursor-pointer">
+                        Remover foto
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -3029,7 +3071,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             <div className="text-center space-y-1">
-              <h3 className="font-black text-base text-white">Excluir Barbearia Definitivamente</h3>
+              <h3 className="font-black text-base text-white">Excluir Conta Definitivamente</h3>
               <p className="text-xs text-slate-400">
                 Esta ação é irreversível. Todos os seus agendamentos e seu link <strong>{barbershop.slug}</strong> serão excluídos.
               </p>

@@ -2,7 +2,10 @@ export type SubscriptionStatus = 'active' | 'pending' | 'overdue' | 'blocked'
 
 export type ShopStylePreset = 'elegante' | 'sofisticado' | 'moderno' | 'minimalista' | 'simples' | 'rosa' | 'azul' | 'neutro'
 
+export type BusinessType = 'barbearia' | 'salao'
+
 export interface Barbershop {
+  business_type?: BusinessType
   id: string
   name: string
   slug: string
@@ -55,7 +58,7 @@ export interface Service {
   description?: string
   duration_minutes: number
   price: number
-  category?: 'cabelo' | 'barba' | 'combo' | 'especial'
+  category?: string // livre e opcional: o dono cria as categorias que quiser
   combo_items?: string[]
   active: boolean
 }

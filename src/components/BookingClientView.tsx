@@ -17,7 +17,8 @@ import {
 import confetti from 'canvas-confetti'
 import type { Barbershop, Service, Barber } from '../types'
 import { getStylePreset } from '../lib/stylePresets'
-import { buildShopTheme, useShopChrome } from '../lib/shopTheme'
+import { buildShopTheme, getLook, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
+import { getTerms } from '../lib/terms'
 import { PWAInstallPrompt } from './PWAInstallPrompt'
 
 const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
@@ -48,6 +49,9 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
   // Estilo visual configurado para a barbearia
   const preset = getStylePreset(barbershop.style_preset)
   useShopChrome(preset.id, theme)
+  const look = getLook(preset.id)
+  const terms = getTerms(barbershop.business_type)
+  const centered = look.hero === 'center'
 
   // Equipe de barbeiros ativos
   const activeBarbers = useMemo(() => {
@@ -59,6 +63,10 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
   const [step, setStep] = useState<'service' | 'datetime' | 'customer' | 'success'>('service')
   const [selectedServices, setSelectedServices] = useState<string[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>('todos')
+  const serviceCategories = useMemo(
+    () => Array.from(new Set(services.map((sv) => sv.category).filter((c): c is string => Boolean(c)))),
+    [services]
+  )
 
   // Data selecionada (padrão: hoje)
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], [])
@@ -178,7 +186,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
     const assignedBarberName = chosenBarber
       ? chosenBarber.name
       : selectedBarberId === 'any' && activeBarbers.length > 0
-      ? 'Qualquer Barbeiro'
+      ? terms.anyProfessional
       : undefined
 
     const bookingData = {
@@ -252,17 +260,18 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
 
   return (
     <div
+      {...shopThemeAttrs(preset.id)}
       style={buildShopTheme(preset.id, theme)}
       className="min-h-screen pb-28 select-none transition-colors bg-slate-950 text-slate-100"
     >
       {/* ===================== TOPO / BANNER ===================== */}
-      <div className="relative w-full h-48 sm:h-64 overflow-hidden bg-slate-900">
-        <img
-          src={barbershop.banner_url || 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=1200&q=80'}
-          alt={barbershop.name}
-          className="w-full h-full object-cover opacity-60"
-        />
-        <div className={`absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent`} />
+      <div className={`relative w-full overflow-hidden bg-slate-900 ${centered ? 'h-36 sm:h-52' : 'h-48 sm:h-64'}`}>
+        {barbershop.banner_url ? (
+          <img src={barbershop.banner_url} alt={barbershop.name} className="w-full h-full object-cover opacity-60" />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-amber-500/40 via-slate-900 to-slate-950" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" />
 
         {/* Botão de Instalação PWA no Topo & Alternador de Tema */}
         <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
@@ -280,46 +289,55 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
         </div>
       </div>
 
-      {/* ===================== PERFIL DA BARBEARIA ===================== */}
+      {/* ===================== PERFIL DO NEGÓCIO ===================== */}
       <div className="max-w-md mx-auto px-4 -mt-16 relative z-10">
-        <div className="flex items-end gap-3.5 mb-3">
-          <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-amber-500/80 shadow-2xl bg-slate-900 shrink-0">
-            <img
-              src={barbershop.logo_url}
-              alt={barbershop.name}
-              className="w-full h-full object-cover"
-            />
+        <div className={centered ? 'flex flex-col items-center text-center gap-2.5 mb-4' : 'flex items-end gap-3.5 mb-4'}>
+          <div
+            className={`overflow-hidden border-2 border-amber-500/80 shadow-2xl bg-slate-900 shrink-0 ${
+              centered ? 'w-24 h-24 rounded-full' : 'w-20 h-20 rounded-2xl'
+            }`}
+          >
+            {barbershop.logo_url ? (
+              <img src={barbershop.logo_url} alt={barbershop.name} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-amber-400 font-black text-3xl">
+                {barbershop.name.trim().charAt(0).toUpperCase()}
+              </div>
+            )}
           </div>
-          <div className="flex-1 pb-1">
+          <div className={centered ? '' : 'flex-1 pb-1'}>
             <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold mb-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
               ABERTO HOJE
             </div>
-            <h1 className={`text-xl font-black tracking-tight leading-tight ${isLight ? 'text-slate-950' : 'text-white'}`}>
+            <h1 className="text-xl font-black tracking-tight leading-tight text-white">
               {barbershop.name}
             </h1>
-            <p className="text-xs text-amber-500 font-medium">
-              {barbershop.slogan}
-            </p>
+            {barbershop.slogan && (
+              <p className="text-xs text-amber-500 font-medium mt-0.5">
+                {barbershop.slogan}
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Atalhos Rápidos: Endereço & Redes */}
-        <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-1 text-xs text-slate-300">
+        {/* Contatos: um embaixo do outro */}
+        <div className="flex flex-col gap-2 mb-5 text-xs">
           <a
             href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(googleMapsQuery)}`}
             target="_blank"
             rel="noopener noreferrer"
-            title="Ver rota no Google Maps (Endereço e Número)"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border shrink-0 active:scale-95 transition-transform ${
-              isLight
-                ? 'bg-white border-slate-200 text-slate-700 hover:text-slate-950 shadow-sm'
-                : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white'
-            }`}
+            title="Ver rota no Google Maps"
+            className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white active:scale-[0.99] transition-transform"
           >
-            <MapPin className="w-3.5 h-3.5 text-amber-500" />
-            <span className="truncate max-w-[170px]">
-              {barbershop.street ? `${barbershop.street}, ${barbershop.number || 'S/N'}` : barbershop.address.split('-')[0]}
+            <MapPin className="w-4 h-4 text-amber-500 shrink-0" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[10px] uppercase tracking-wide text-slate-400">Endereço</span>
+              <span className="block truncate">
+                {barbershop.street
+                  ? `${barbershop.street}, ${barbershop.number || 'S/N'}${barbershop.neighborhood ? ` - ${barbershop.neighborhood}` : ''}`
+                  : barbershop.address}
+              </span>
             </span>
           </a>
 
@@ -328,10 +346,15 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               href={`https://instagram.com/${barbershop.instagram.replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/^@/, '')}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white shrink-0 active:scale-95 transition-transform"
+              className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white active:scale-[0.99] transition-transform"
             >
-              <InstagramIcon className="w-3.5 h-3.5 text-pink-400" />
-              <span>{barbershop.instagram.startsWith('@') ? barbershop.instagram : `@${barbershop.instagram}`}</span>
+              <InstagramIcon className="w-4 h-4 text-pink-400 shrink-0" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[10px] uppercase tracking-wide text-slate-400">Instagram</span>
+                <span className="block truncate">
+                  {barbershop.instagram.startsWith('@') ? barbershop.instagram : `@${barbershop.instagram}`}
+                </span>
+              </span>
             </a>
           )}
 
@@ -339,10 +362,13 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
             href={`https://wa.me/${barbershop.phone_whatsapp.replace(/\D/g, '')}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white shrink-0 active:scale-95 transition-transform"
+            className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white active:scale-[0.99] transition-transform"
           >
-            <Phone className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Contato</span>
+            <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[10px] uppercase tracking-wide text-slate-400">WhatsApp</span>
+              <span className="block truncate">Chamar no WhatsApp</span>
+            </span>
           </a>
         </div>
 
@@ -354,7 +380,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
             <div>
               <h3 className="font-bold text-base text-white">Agendamentos Online Pausados</h3>
               <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
-                Esta barbearia está temporariamente indisponível para novos agendamentos online. Entre em contato diretamente pelo WhatsApp.
+                Este espaço está temporariamente indisponível para novos agendamentos online. Entre em contato diretamente pelo WhatsApp.
               </p>
             </div>
             <a
@@ -364,7 +390,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition-transform"
             >
               <Phone className="w-4 h-4 fill-current" />
-              <span>Falar no WhatsApp da Barbearia</span>
+              <span>Falar no WhatsApp</span>
             </a>
           </div>
         ) : (
@@ -428,35 +454,31 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
         {/* ===================== PASSO 1: SERVIÇOS ===================== */}
         {step === 'service' && (
           <div className="space-y-4 animate-in fade-in duration-200">
-            {/* Categorias dos Serviços */}
-            <div className="flex gap-2 overflow-x-auto pb-1 text-xs">
-              {[
-                { id: 'todos', label: 'Todos' },
-                { id: 'combo', label: '🔥 Combos VIP' },
-                { id: 'cabelo', label: 'Cabelo' },
-                { id: 'barba', label: 'Barba' },
-                { id: 'especial', label: 'Química & Spa' }
-              ].map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`px-3 py-1.5 rounded-xl font-medium shrink-0 transition-all ${
-                    selectedCategory === cat.id
-                      ? 'bg-slate-200 text-slate-950 font-bold'
-                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
+            {/* Categorias criadas pelo dono (só aparecem se existirem) */}
+            {serviceCategories.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-1 text-xs">
+                {['todos', ...serviceCategories].map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-3 py-1.5 rounded-xl font-medium shrink-0 transition-all capitalize ${
+                      selectedCategory === cat
+                        ? 'bg-slate-200 text-slate-950 font-bold'
+                        : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                    }`}
+                  >
+                    {cat === 'todos' ? 'Todos' : cat}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Lista de Serviços */}
             <div className="space-y-3">
               {filteredServices.length === 0 ? (
                 <div className="p-8 rounded-3xl bg-slate-900/60 border border-dashed border-slate-800 text-center text-slate-400 text-xs space-y-1">
                   <p className="font-bold text-white text-sm">Nenhum serviço disponível no momento</p>
-                  <p className="text-slate-400 text-xs">A barbearia está organizando os horários e serviços. Volte em breve!</p>
+                  <p className="text-slate-400 text-xs">Estamos organizando os horários e serviços. Volte em breve!</p>
                 </div>
               ) : (
                 filteredServices.map((service) => {
@@ -477,7 +499,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                           <h3 className="font-bold text-sm text-white">
                             {service.name}
                           </h3>
-                          {service.category === 'combo' && (
+                          {Boolean(service.combo_items?.length) && (
                             <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-bold">
                               Destaque
                             </span>
@@ -542,7 +564,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                   </label>
                   <span className={`text-[11px] font-bold ${preset.accentText}`}>
                     {selectedBarberId === 'any'
-                      ? 'Qualquer Barbeiro'
+                      ? terms.anyProfessional
                       : activeBarbers.find((b) => b.id === selectedBarberId)?.name}
                   </span>
                 </div>
@@ -599,7 +621,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                             {barber.name}
                           </p>
                           <p className="text-[10px] text-slate-400 truncate">
-                            {barber.role || 'Barbeiro'}
+                            {barber.role || terms.Professional}
                           </p>
                         </div>
                       </button>
@@ -704,8 +726,8 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                   <span>Profissional:</span>
                   <span className={`font-bold ${preset.accentText}`}>
                     {selectedBarberId === 'any'
-                      ? 'Qualquer Barbeiro'
-                      : activeBarbers.find((b) => b.id === selectedBarberId)?.name || 'Barbeiro'}
+                      ? terms.anyProfessional
+                      : activeBarbers.find((b) => b.id === selectedBarberId)?.name || terms.Professional}
                   </span>
                 </div>
               )}
@@ -785,11 +807,11 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Observações para o Barbeiro (opcional)
+                  Observações para o {terms.professional} (opcional)
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="Ex: Primeira vez na barbearia, prefiro disfarçado na zero."
+                  placeholder="Ex: Primeira vez aqui, alguma preferência?"
                   value={clientNotes}
                   onChange={(e) => setClientNotes(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-amber-500 focus:outline-none text-white text-xs"
@@ -857,7 +879,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
             {/* Botão de Instalação do App */}
             <div className="pt-2 border-t border-slate-800/80">
               <p className="text-[11px] text-slate-400 mb-3">
-                Quer ter a barbearia na palma da mão para o próximo corte?
+                Quer ter este espaço na palma da mão para o próximo agendamento?
               </p>
               <PWAInstallPrompt
                 variant="button"
