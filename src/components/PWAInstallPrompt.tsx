@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Download, Share2, PlusSquare, X, Smartphone, Sparkles, CheckCircle2 } from 'lucide-react'
+import { Download, Share2, PlusSquare, X, Smartphone, Sparkles, CheckCircle2, Menu } from 'lucide-react'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -20,6 +20,7 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
 }) => {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isIOS, setIsIOS] = useState(false)
+  const [isSafari, setIsSafari] = useState(true)
   const [isStandalone, setIsStandalone] = useState(false)
   const [showIOSModal, setShowIOSModal] = useState(false)
   const [dismissed, setDismissed] = useState(false)
@@ -44,6 +45,8 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
     const userAgent = window.navigator.userAgent.toLowerCase()
     const isIosDevice = /iphone|ipad|ipod/.test(userAgent)
     setIsIOS(isIosDevice)
+    // No iPhone, Chrome/Firefox/Edge não instalam apps: só o Safari
+    setIsSafari(!/crios|fxios|edgios|opios/.test(userAgent))
 
     // Escuta evento do Android/Chrome
     const handleBeforeInstall = (e: Event) => {
@@ -148,7 +151,7 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
       {/* Modal Guiado para iPhone (iOS) e navegadores sem suporte direto */}
       {showIOSModal && portalTarget && createPortal(
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 text-slate-100 shadow-2xl animate-in slide-in-from-bottom duration-300">
+          <div className="w-full max-w-sm max-h-[90vh] overflow-y-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 text-slate-100 shadow-2xl animate-in slide-in-from-bottom duration-300">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
@@ -164,40 +167,79 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
               </button>
             </div>
 
-            <p className="text-xs text-slate-300 mb-5 leading-relaxed">
-              Siga os 2 passos rápidos para adicionar este aplicativo direto na tela de início do seu celular (não ocupa espaço de memória):
+            {isIOS && !isSafari && (
+              <p className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 leading-relaxed">
+                Atenção: no iPhone a instalação só funciona pelo <strong>Safari</strong>. Copie este link e abra no Safari para continuar.
+              </p>
+            )}
+
+            <p className="text-xs text-slate-300 mb-4 leading-relaxed">
+              {isIOS
+                ? 'Siga os passos abaixo no Safari. O app fica na tela inicial, com a logo e o nome do estabelecimento, e não ocupa espaço de memória:'
+                : 'Siga os passos abaixo para adicionar o app na tela inicial do seu celular:'}
             </p>
 
-            <div className="space-y-4">
-              {/* Passo 1 */}
-              <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-900/80 border border-slate-800/80">
-                <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-sm shrink-0">
-                  1
+            <div className="space-y-3">
+              {(isIOS
+                ? [
+                    {
+                      title: (
+                        <>
+                          Toque nas <Menu className="w-4 h-4 text-amber-400 inline" /> três barras horizontais
+                        </>
+                      ),
+                      text: 'Ficam ao lado da barra de endereço, na parte de baixo da tela do Safari.'
+                    },
+                    {
+                      title: (
+                        <>
+                          Toque em <Share2 className="w-4 h-4 text-amber-400 inline" /> Compartilhar
+                        </>
+                      ),
+                      text: 'Aparece no menu que abriu.'
+                    },
+                    {
+                      title: (
+                        <>
+                          Arraste para baixo e escolha <PlusSquare className="w-4 h-4 text-amber-400 inline" /> “Adicionar à Tela de Início”
+                        </>
+                      ),
+                      text: 'Role a lista com o dedo até encontrar a opção com o ícone de quadrado com um sinal de +.'
+                    },
+                    {
+                      title: <>Toque em “Adicionar”</>,
+                      text: 'No canto superior direito. Pronto: o ícone já está na sua tela inicial.'
+                    }
+                  ]
+                : [
+                    {
+                      title: (
+                        <>
+                          Toque no menu <span className="font-black">⋮</span> do navegador
+                        </>
+                      ),
+                      text: 'Fica no canto superior direito (Chrome) ou na barra de endereço.'
+                    },
+                    {
+                      title: (
+                        <>
+                          Escolha <PlusSquare className="w-4 h-4 text-amber-400 inline" /> “Instalar app” ou “Adicionar à tela inicial”
+                        </>
+                      ),
+                      text: 'Depois confirme em “Instalar” ou “Adicionar”.'
+                    }
+                  ]
+              ).map((step, idx) => (
+                <div key={idx} className="flex items-start gap-3 p-3 rounded-2xl bg-slate-900/80 border border-slate-800/80">
+                  <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-sm shrink-0">
+                    {idx + 1}
+                  </div>
+                  <div className="text-xs">
+                    <p className="font-semibold text-slate-200 mb-0.5 leading-snug">{step.title}</p>
+                    <p className="text-slate-400">{step.text}</p>
+                  </div>
                 </div>
-                <div className="text-xs">
-                  <p className="font-semibold text-slate-200 mb-0.5 flex items-center gap-1.5">
-                    Toque no botão <Share2 className="w-4 h-4 text-amber-400 inline" /> Compartilhar
-                  </p>
-                  <p className="text-slate-400">
-                    No Safari (iPhone) fica na barra inferior. No Chrome, fica no menu de 3 pontinhos.
-                  </p>
-                </div>
-              </div>
-
-              {/* Passo 2 */}
-              <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-900/80 border border-slate-800/80">
-                <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-sm shrink-0">
-                  2
-                </div>
-                <div className="text-xs">
-                  <p className="font-semibold text-slate-200 mb-0.5 flex items-center gap-1.5">
-                    Escolha <PlusSquare className="w-4 h-4 text-amber-400 inline" /> "Adicionar à Tela de Início"
-                  </p>
-                  <p className="text-slate-400">
-                    Role a lista para baixo até encontrar a opção com ícone quadrado e o sinal de mais (+).
-                  </p>
-                </div>
-              </div>
+              ))}
             </div>
 
             <button

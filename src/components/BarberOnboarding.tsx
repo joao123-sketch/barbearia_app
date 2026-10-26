@@ -143,7 +143,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
     const file = e.target.files?.[0]
     if (!file) return
     try {
-      setLogoUrl(await fileToResizedDataUrl(file))
+      setLogoUrl(await fileToResizedDataUrl(file, 512, 0.88, 'image/jpeg', true))
       setHasCustomLogo(true)
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Não foi possível usar esta imagem.')

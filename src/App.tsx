@@ -5,7 +5,7 @@ import { AdminDashboard } from './components/AdminDashboard'
 import { BarberAuth } from './components/BarberAuth'
 import { ResetPassword } from './components/ResetPassword'
 import { MasterAdminDashboard } from './components/MasterAdminDashboard'
-import { applyManifestForPath } from './lib/pwa'
+import { applyDefaultPwa, applyShopPwa } from './lib/pwa'
 import { signOut, useSession } from './lib/auth'
 import { getModeFor, type ThemeMode } from './lib/shopTheme'
 import { useOwnerData } from './lib/useOwnerData'
@@ -71,6 +71,12 @@ function BookingPage({
     }
   }, [slug])
 
+  // Quem instala a partir desta página leva o nome e a logo do negócio, e abre direto no agendamento
+  const readyShop = state.status === 'ready' ? state.shop : null
+  useEffect(() => {
+    if (readyShop) applyShopPwa(readyShop.slug, readyShop.name, 'client')
+  }, [readyShop])
+
   if (state.status === 'loading') return <FullScreenMessage title="Carregando..." />
   if (state.status === 'notfound')
     return <FullScreenMessage title="Página não encontrada" text="Confira se o link está correto com quem te enviou." />
@@ -112,6 +118,12 @@ function AdminRoute({
   const navigate = useNavigate()
   const { session, ready } = useSession()
 
+  // Dono que instala a partir do painel leva o nome e a logo do negócio, e abre direto no painel
+  const shopForPwa = owner.shop
+  useEffect(() => {
+    if (shopForPwa) applyShopPwa(shopForPwa.slug, shopForPwa.name, 'admin')
+  }, [shopForPwa])
+
   if (!ready || (session && owner.loading)) return <FullScreenMessage title="Carregando..." />
   if (!session) return <Navigate to="/login" replace />
   if (!owner.shop) return <Navigate to="/cadastrar" replace />
@@ -150,7 +162,7 @@ function AdminRoute({
 
 function ManifestSwitcher() {
   const { pathname } = useLocation()
-  useEffect(() => applyManifestForPath(pathname), [pathname])
+  useEffect(() => applyDefaultPwa(pathname), [pathname])
   return null
 }
 

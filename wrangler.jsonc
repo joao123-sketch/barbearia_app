@@ -1,11 +1,14 @@
 {
   "name": "barbearia-app",
+  "main": "worker/index.ts",
   "compatibility_date": "2024-09-23",
   "workers_dev": true,
   "preview_urls": true,
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "single-page-application"
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/manifest/*", "/icon/*"]
   },
   "vars": {
     "VITE_SUPABASE_ANON_KEY": "sb_publishable_Pp50y6WaFzFqr0yVUKSx3g_qi5nZQOi",

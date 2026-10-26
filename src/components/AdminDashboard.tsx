@@ -40,6 +40,7 @@ import type { Barbershop, Barber, Service, Appointment, WorkingHour } from '../t
 import { PWAInstallPrompt } from './PWAInstallPrompt'
 import { DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from '../lib/platform'
 import { newId } from '../lib/db'
+import { getTerms } from '../lib/terms'
 import { formatBR, formatMoney, getBillingState } from '../lib/billing'
 import { normalizePhone, toWaNumber } from '../lib/phone'
 import { BR_STATES } from '../lib/states'
@@ -700,7 +701,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const file = e.target.files?.[0]
     if (!file) return
     try {
-      setProfileLogo(await fileToResizedDataUrl(file))
+      setProfileLogo(await fileToResizedDataUrl(file, 512, 0.88, 'image/jpeg', true))
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Não foi possível usar esta imagem.')
     }
@@ -733,6 +734,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const isLight = false
   const isLightMode = theme === 'light'
   const platform = platformProp ?? DEFAULT_PLATFORM_SETTINGS
+  const existingCategories = Array.from(new Set(services.map((sv) => sv.category).filter((c): c is string => Boolean(c))))
   useShopChrome(barbershop.style_preset, isLightMode ? 'light' : 'dark')
 
   const adminTabsList = [
@@ -2713,168 +2715,231 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* ===================== MODAL DE NOVO/EDITAR SERVIÇO ===================== */}
       {showAddServiceModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-[#12151f] border border-slate-800 rounded-3xl p-5 text-slate-100 shadow-2xl space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="font-bold text-base text-white">
-                {editingService ? 'Editar Serviço' : 'Novo Serviço'}
-              </h3>
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4"
+          onClick={() => setShowAddServiceModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full sm:max-w-md max-h-[92vh] flex flex-col bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl text-slate-100 shadow-2xl"
+          >
+            {/* Cabeçalho */}
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
+              <h3 className="font-black text-lg text-white">{editingService ? 'Editar serviço' : 'Novo serviço'}</h3>
               <button
+                type="button"
                 onClick={() => setShowAddServiceModal(false)}
-                className="text-slate-400 hover:text-white"
+                aria-label="Fechar"
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSaveService} className="space-y-3.5 text-xs">
-              {/* CATEGORIA (OPCIONAL, CRIADA PELO PRÓPRIO DONO) */}
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Categoria (opcional)</label>
-                <input
-                  type="text"
-                  list="service-categories"
-                  placeholder="Ex: Cabelo, Unhas, Barba... ou deixe em branco"
-                  value={serviceCategory}
-                  onChange={(e) => setServiceCategory(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-amber-500 text-xs"
-                />
-                <datalist id="service-categories">
-                  {Array.from(new Set(services.map((sv) => sv.category).filter(Boolean))).map((c) => (
-                    <option key={c} value={c} />
-                  ))}
-                </datalist>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Com categorias, o cliente filtra os serviços por elas. Sem categoria, ele vê a lista completa.
-                </p>
-              </div>
+            <form onSubmit={handleSaveService} className="flex flex-col min-h-0 flex-1">
+              {/* Conteúdo (rola quando a tela é pequena) */}
+              <div className="px-5 pb-4 space-y-5 overflow-y-auto text-sm">
+                {/* Nome */}
+                <div>
+                  <label className="block text-slate-200 font-bold mb-1.5">Nome do serviço *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder={getTerms(barbershop.business_type).serviceExample}
+                    value={serviceName}
+                    onChange={(e) => setServiceName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
 
-              {/* COMBO / PACOTE (OPCIONAL) */}
-              <label className="flex items-center gap-2 text-slate-300 font-semibold cursor-pointer">
-                <input type="checkbox" checked={isCombo} onChange={(e) => setIsCombo(e.target.checked)} className="accent-amber-500 w-4 h-4" />
-                <span>Este serviço é um combo (inclui vários serviços)</span>
-              </label>
-
-              {/* SE FOR COMBO: ADICIONAR OUTROS SERVIÇOS INCLUSOS */}
-              {isCombo && (
-                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-amber-300 text-xs flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Serviços Inclusos no Combo</span>
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      {comboItems.length} adicionado(s)
-                    </span>
+                {/* Preço e duração */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-200 font-bold mb-1.5">Preço *</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        required
+                        value={servicePrice}
+                        onChange={(e) => setServicePrice(Number(e.target.value))}
+                        className="w-full pl-11 pr-3 py-3 rounded-xl bg-slate-950 border border-slate-800 text-amber-300 font-black focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
                   </div>
 
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Ex: Barba Terapia, Sobrancelha..."
-                      value={newComboSubService}
-                      onChange={(e) => setNewComboSubService(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault()
-                          handleAddComboItem()
-                        }
-                      }}
-                      className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 text-xs"
-                    />
+                  <div>
+                    <label className="block text-slate-200 font-bold mb-1.5">Duração *</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        step="5"
+                        min="5"
+                        required
+                        value={serviceDuration}
+                        onChange={(e) => setServiceDuration(Number(e.target.value))}
+                        className="w-full pl-4 pr-12 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white font-bold focus:outline-none focus:border-amber-500"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">min</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Atalhos de duração */}
+                <div className="flex flex-wrap gap-2 -mt-2">
+                  {[15, 30, 45, 60, 90, 120].map((m) => (
                     <button
+                      key={m}
                       type="button"
-                      onClick={handleAddComboItem}
-                      className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shrink-0 cursor-pointer transition-all active:scale-95"
+                      onClick={() => setServiceDuration(m)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-colors ${
+                        Number(serviceDuration) === m
+                          ? 'bg-amber-500 text-slate-950'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
                     >
-                      + Adicionar
+                      {m >= 60 ? `${m / 60 === Math.floor(m / 60) ? m / 60 : (m / 60).toFixed(1)}h` : `${m} min`}
                     </button>
-                  </div>
+                  ))}
+                </div>
 
-                  {comboItems.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {comboItems.map((item, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2.5 py-1 rounded-lg bg-slate-900 border border-amber-500/40 text-amber-200 text-xs flex items-center gap-1.5 font-medium"
+                {/* Descrição */}
+                <div>
+                  <label className="block text-slate-200 font-bold mb-1.5">
+                    Descrição <span className="text-slate-500 font-normal">(opcional)</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Ex: Inclui lavagem e finalização"
+                    value={serviceDesc}
+                    onChange={(e) => setServiceDesc(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 resize-none"
+                  />
+                </div>
+
+                {/* Categoria (criada pelo próprio dono) */}
+                <div>
+                  <label className="block text-slate-200 font-bold mb-1.5">
+                    Categoria <span className="text-slate-500 font-normal">(opcional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Cabelo, Unhas, Barba"
+                    value={serviceCategory}
+                    onChange={(e) => setServiceCategory(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                  {existingCategories.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {existingCategories.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setServiceCategory(c)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-bold capitalize cursor-pointer transition-colors ${
+                            serviceCategory.trim().toLowerCase() === c.toLowerCase()
+                              ? 'bg-amber-500 text-slate-950'
+                              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                          }`}
                         >
-                          <span>{item}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveComboItem(idx)}
-                            className="text-slate-400 hover:text-rose-400 text-xs font-bold leading-none cursor-pointer"
-                          >
-                            ✕
-                          </button>
-                        </span>
+                          {c}
+                        </button>
                       ))}
                     </div>
                   )}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Nome do Serviço *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: Corte Degradê + Barboterapia"
-                  value={serviceName}
-                  onChange={(e) => setServiceName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Preço Total (R$) *</label>
-                  <input
-                    type="number"
-                    step="0.50"
-                    required
-                    value={servicePrice}
-                    onChange={(e) => setServicePrice(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-amber-300 font-bold focus:outline-none focus:border-amber-500"
-                  />
+                  <p className="text-xs text-slate-500 mt-1.5">
+                    Com categorias, o cliente filtra os serviços. Sem categoria, ele vê a lista completa.
+                  </p>
                 </div>
 
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Duração Total (min) *</label>
-                  <input
-                    type="number"
-                    step="5"
-                    required
-                    value={serviceDuration}
-                    onChange={(e) => setServiceDuration(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-amber-500"
-                  />
+                {/* Combo / pacote */}
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/60">
+                  <button
+                    type="button"
+                    onClick={() => setIsCombo(!isCombo)}
+                    className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left cursor-pointer"
+                  >
+                    <span>
+                      <span className="block font-bold text-slate-200">É um combo ou pacote?</span>
+                      <span className="block text-xs text-slate-500">Quando o serviço inclui vários outros</span>
+                    </span>
+                    <span
+                      className={`relative w-11 h-6 rounded-full shrink-0 transition-colors ${isCombo ? 'bg-amber-500' : 'bg-slate-700'}`}
+                    >
+                      <span
+                        className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${isCombo ? 'left-[22px]' : 'left-0.5'}`}
+                      />
+                    </span>
+                  </button>
+
+                  {isCombo && (
+                    <div className="px-4 pb-4 space-y-3 border-t border-slate-800 pt-3">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Ex: Hidratação, Sobrancelha"
+                          value={newComboSubService}
+                          onChange={(e) => setNewComboSubService(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              handleAddComboItem()
+                            }
+                          }}
+                          className="flex-1 min-w-0 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddComboItem}
+                          className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shrink-0 cursor-pointer active:scale-95 transition-all"
+                        >
+                          Incluir
+                        </button>
+                      </div>
+
+                      {comboItems.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {comboItems.map((item, idx) => (
+                            <span
+                              key={idx}
+                              className="pl-3 pr-2 py-1.5 rounded-full bg-slate-800 text-slate-200 text-xs font-semibold flex items-center gap-1.5"
+                            >
+                              <span>{item}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveComboItem(idx)}
+                                aria-label={`Remover ${item}`}
+                                className="w-5 h-5 rounded-full hover:bg-slate-700 text-slate-400 hover:text-rose-400 leading-none cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Descrição Curta (Opcional)</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Inclui lavagem, esfoliação facial e finalização"
-                  value={serviceDesc}
-                  onChange={(e) => setServiceDesc(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div className="flex gap-2 pt-2">
+              {/* Rodapé fixo com os botões */}
+              <div className="flex gap-3 px-5 py-4 border-t border-slate-800 shrink-0 pb-[calc(1rem+env(safe-area-inset-bottom))]">
                 <button
                   type="button"
                   onClick={() => setShowAddServiceModal(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold cursor-pointer"
+                  className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-bold cursor-pointer"
+                  className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black cursor-pointer active:scale-95 transition-all"
                 >
-                  Salvar
+                  Salvar serviço
                 </button>
               </div>
             </form>
@@ -2885,7 +2950,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* ===================== MODAL DE AGENDAMENTO MANUAL BALCÃO ===================== */}
       {showAddBookingModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-[#12151f] border border-slate-800 rounded-3xl p-5 text-slate-100 shadow-2xl">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-5 text-slate-100 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-base text-white">Novo Agendamento Balcão</h3>
               <button
@@ -2985,7 +3050,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* ===================== MODAL DE ADICIONAR / EDITAR BARBEIRO ===================== */}
       {showBarberModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-[#12151f] border border-slate-800 rounded-3xl p-5 text-slate-100 shadow-2xl space-y-4">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-5 text-slate-100 shadow-2xl space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="font-bold text-base text-white flex items-center gap-2">
                 <Users className="w-4 h-4 text-amber-400" />
@@ -3097,7 +3162,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* ===================== MODAL DE CONFIRMAÇÃO DE EXCLUSÃO DE CONTA ===================== */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-[#12151f] border border-rose-500/50 rounded-3xl p-6 text-slate-100 shadow-2xl space-y-4">
+          <div className="w-full max-w-sm bg-slate-900 border border-rose-500/50 rounded-3xl p-6 text-slate-100 shadow-2xl space-y-4">
             <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
               <AlertTriangle className="w-6 h-6" />
             </div>

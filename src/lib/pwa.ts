@@ -1,11 +1,42 @@
-// Painel do barbeiro e página do cliente são apps instaláveis separados.
-export function applyManifestForPath(pathname: string) {
-  const isAdmin = pathname.startsWith('/admin') || pathname.startsWith('/login')
-  const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]')
-  if (manifest) manifest.href = isAdmin ? '/manifest-admin.json' : '/manifest.json'
-  const title = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]')
-  if (title) title.content = isAdmin ? 'Painel Barbeiro' : 'Barbearia'
-  if (isAdmin) document.title = 'Painel do Barbeiro | BarberApp'
+// Cada negócio tem o seu aplicativo instalável: o cliente abre direto no agendamento e o dono no painel.
+// O manifesto e o ícone (logo do estabelecimento) são gerados pelo worker em /manifest e /icon.
+
+function setLink(rel: string, href: string) {
+  let link = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`)
+  if (!link) {
+    link = document.createElement('link')
+    link.rel = rel
+    document.head.appendChild(link)
+  }
+  link.href = href
+}
+
+function setMeta(name: string, content: string) {
+  let meta = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`)
+  if (!meta) {
+    meta = document.createElement('meta')
+    meta.name = name
+    document.head.appendChild(meta)
+  }
+  meta.content = content
+}
+
+// Aponta o navegador para o app do negócio (nome e logo dele na tela inicial)
+export function applyShopPwa(slug: string, name: string, app: 'client' | 'admin') {
+  const query = app === 'admin' ? '?app=admin' : ''
+  setLink('manifest', `/manifest/${slug}.webmanifest${query}`)
+  setLink('apple-touch-icon', `/icon/${slug}`)
+  setMeta('apple-mobile-web-app-title', name.length > 14 ? name.slice(0, 14).trim() : name)
+  document.title = app === 'admin' ? `${name} · Painel` : name
+}
+
+// Telas sem negócio definido (entrar, cadastrar...): app genérico
+export function applyDefaultPwa(pathname: string) {
+  const isAdminArea = pathname.startsWith('/admin') || pathname.startsWith('/login') || pathname.startsWith('/cadastr')
+  setLink('manifest', isAdminArea ? '/manifest-admin.json' : '/manifest.json')
+  setLink('apple-touch-icon', '/apple-touch-icon.png')
+  setMeta('apple-mobile-web-app-title', isAdminArea ? 'Painel' : 'BarberApp')
+  document.title = isAdminArea ? 'Painel | BarberApp' : 'BarberApp | Agendamento Online'
 }
 
 export function registerServiceWorker() {
