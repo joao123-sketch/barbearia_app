@@ -13,12 +13,13 @@ import {
   demoAppointments,
   demoWorkingHours
 } from './lib/mockData'
-import type { Appointment, Service, Barbershop } from './types'
+import type { Appointment, Service, Barbershop, Barber } from './types'
 
 function BookingRouteWrapper({
   barbershop,
   barbershopsList,
   services,
+  barbers,
   theme,
   onToggleTheme,
   onNewBooking
@@ -26,6 +27,7 @@ function BookingRouteWrapper({
   barbershop: Barbershop
   barbershopsList: Barbershop[]
   services: Service[]
+  barbers: Barber[]
   theme: 'dark' | 'light'
   onToggleTheme: () => void
   onNewBooking: (b: any) => void
@@ -45,12 +47,14 @@ function BookingRouteWrapper({
 
   // Filtrar serviços específicos desta barbearia
   const shopServices = services.filter((s) => s.barbershop_id === currentShop.id)
+  const shopBarbers = barbers.filter((b) => b.barbershop_id === currentShop.id && b.active)
 
   return (
     <div className="relative">
       <BookingClientView
         barbershop={currentShop}
         services={shopServices}
+        barbers={shopBarbers}
         theme={theme}
         onToggleTheme={onToggleTheme}
         onNewBooking={onNewBooking}
@@ -63,11 +67,13 @@ function AdminRouteWrapper({
   barbershop,
   appointments,
   services,
+  barbers,
   workingHours,
   theme,
   onToggleTheme,
   onUpdateAppointments,
   onUpdateServices,
+  onUpdateBarbers,
   onUpdateBarbershop,
   onDeleteBarbershop,
   onUpdateWorkingHours
@@ -75,26 +81,29 @@ function AdminRouteWrapper({
   barbershop: Barbershop
   appointments: Appointment[]
   services: Service[]
+  barbers: Barber[]
   workingHours: import('./types').WorkingHour[]
   theme: 'dark' | 'light'
   onToggleTheme: () => void
   onUpdateAppointments: (a: Appointment[]) => void
   onUpdateServices: (s: Service[]) => void
+  onUpdateBarbers: (b: Barber[]) => void
   onUpdateBarbershop: (b: Barbershop) => void
   onDeleteBarbershop: (id: string) => void
   onUpdateWorkingHours: (wh: import('./types').WorkingHour[]) => void
 }) {
   const navigate = useNavigate()
 
-  // Isolamento estrito de agendamentos e serviços da barbearia atual (novas contas começam zeradas)
+  // Isolamento estrito de agendamentos, serviços e equipe da barbearia atual
   const shopAppointments = appointments.filter((a) => a.barbershop_id === barbershop.id)
   const shopServices = services.filter((s) => s.barbershop_id === barbershop.id)
+  const shopBarbers = barbers.filter((b) => b.barbershop_id === barbershop.id)
 
   return (
     <div className="relative">
       <AdminDashboard
         barbershop={barbershop}
-        barbers={demoBarbers}
+        barbers={shopBarbers}
         services={shopServices}
         appointments={shopAppointments}
         workingHours={workingHours}
@@ -108,6 +117,10 @@ function AdminRouteWrapper({
         onUpdateServices={(updatedShopServices) => {
           const others = services.filter((s) => s.barbershop_id !== barbershop.id)
           onUpdateServices([...updatedShopServices, ...others])
+        }}
+        onUpdateBarbers={(updatedShopBarbers) => {
+          const others = barbers.filter((b) => b.barbershop_id !== barbershop.id)
+          onUpdateBarbers([...updatedShopBarbers, ...others])
         }}
         onUpdateBarbershop={onUpdateBarbershop}
         onDeleteBarbershop={(id) => {
@@ -230,11 +243,60 @@ export function App() {
     setAppointments((prev) => [booking, ...prev])
   }
 
+  // Barbeiros da Plataforma (Equipes das Barbearias)
+  const [barbers, setBarbers] = useState<Barber[]>(() => {
+    const saved = localStorage.getItem('barber_team')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch {
+        return demoBarbers
+      }
+    }
+    return demoBarbers
+  })
+
+  useEffect(() => {
+    localStorage.setItem('barber_team', JSON.stringify(barbers))
+  }, [barbers])
+
   // Cadastro de nova barbearia (Barber Onboarding)
-  const handleRegisterBarbershop = (newShop: Barbershop, newServices: Service[]) => {
+  const handleRegisterBarbershop = (
+    newShop: Barbershop,
+    newServices: Service[],
+    initialTeamNames: string[] = []
+  ) => {
     setBarbershopsList((prev) => [newShop, ...prev])
     setCurrentBarbershop(newShop)
     setServices((prev) => [...newServices, ...prev])
+
+    // Cria barbeiro principal do proprietário automaticamente
+    const ownerBarber: Barber = {
+      id: 'barber-' + Date.now(),
+      barbershop_id: newShop.id,
+      name: newShop.owner_name || 'Barbeiro Principal',
+      avatar_url: newShop.logo_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+      role: 'Master Barber / Responsável',
+      bio: 'Profissional especialista.',
+      active: true
+    }
+
+    const teamList: Barber[] = [ownerBarber]
+    initialTeamNames.forEach((name, idx) => {
+      if (name.trim()) {
+        teamList.push({
+          id: `barber-${Date.now()}-${idx + 1}`,
+          barbershop_id: newShop.id,
+          name: name.trim(),
+          avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
+          role: 'Barbeiro Especialista',
+          bio: 'Atendimento de alta qualidade e estilo.',
+          active: true
+        })
+      }
+    })
+
+    setBarbers((prev) => [...teamList, ...prev])
   }
 
   // Atualização de dados da barbearia ativa (ex: pausas, endereço, etc.)
@@ -306,6 +368,7 @@ export function App() {
               barbershop={currentBarbershop}
               barbershopsList={barbershopsList}
               services={services}
+              barbers={barbers}
               theme={theme}
               onToggleTheme={toggleTheme}
               onNewBooking={handleNewBooking}
@@ -350,11 +413,13 @@ export function App() {
               barbershop={currentBarbershop}
               appointments={appointments}
               services={services}
+              barbers={barbers}
               workingHours={workingHours}
               theme={theme}
               onToggleTheme={toggleTheme}
               onUpdateAppointments={setAppointments}
               onUpdateServices={setServices}
+              onUpdateBarbers={setBarbers}
               onUpdateBarbershop={handleUpdateBarbershop}
               onDeleteBarbershop={handleDeleteBarbershop}
               onUpdateWorkingHours={setWorkingHours}
@@ -390,6 +455,7 @@ export function App() {
               barbershop={currentBarbershop}
               barbershopsList={barbershopsList}
               services={services}
+              barbers={barbers}
               theme={theme}
               onToggleTheme={toggleTheme}
               onNewBooking={handleNewBooking}

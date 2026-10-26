@@ -11,10 +11,12 @@ import {
   ArrowLeft,
   Bell,
   Sun,
-  Moon
+  Moon,
+  Users
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
-import type { Barbershop, Service } from '../types'
+import type { Barbershop, Service, Barber } from '../types'
+import { getStylePreset } from '../lib/stylePresets'
 import { PWAInstallPrompt } from './PWAInstallPrompt'
 
 const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
@@ -28,6 +30,7 @@ const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) =>
 interface BookingClientViewProps {
   barbershop: Barbershop
   services: Service[]
+  barbers?: Barber[]
   theme?: 'dark' | 'light'
   onToggleTheme?: () => void
   onNewBooking?: (booking: any) => void
@@ -36,10 +39,20 @@ interface BookingClientViewProps {
 export const BookingClientView: React.FC<BookingClientViewProps> = ({
   barbershop,
   services,
+  barbers = [],
   theme = 'dark',
   onToggleTheme,
   onNewBooking
 }) => {
+  // Estilo visual configurado para a barbearia
+  const preset = getStylePreset(barbershop.style_preset)
+
+  // Equipe de barbeiros ativos
+  const activeBarbers = useMemo(() => {
+    return barbers.filter((b) => b.active !== false)
+  }, [barbers])
+  const [selectedBarberId, setSelectedBarberId] = useState<string>('any')
+
   // Estados do fluxo de agendamento
   const [step, setStep] = useState<'service' | 'datetime' | 'customer' | 'success'>('service')
   const [selectedServices, setSelectedServices] = useState<string[]>([])
@@ -158,9 +171,19 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
       return
     }
 
+    const chosenBarber = activeBarbers.find((b) => b.id === selectedBarberId)
+    const assignedBarberId = selectedBarberId === 'any' ? (activeBarbers[0]?.id || undefined) : selectedBarberId
+    const assignedBarberName = chosenBarber
+      ? chosenBarber.name
+      : selectedBarberId === 'any' && activeBarbers.length > 0
+      ? 'Qualquer Barbeiro'
+      : undefined
+
     const bookingData = {
       id: 'apt-' + Date.now(),
       barbershop_id: barbershop.id,
+      barber_id: assignedBarberId,
+      barber_name: assignedBarberName,
       service_ids: selectedServices,
       service_names: selectedServicesObjects.map((s) => s.name).join(' + '),
       client_name: clientName,
@@ -202,9 +225,11 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
   // Link do WhatsApp com mensagem pronta
   const whatsappUrl = useMemo(() => {
     if (!confirmedBooking) return ''
+    const barberLine = confirmedBooking.barber_name ? `✂️ *Profissional:* ${confirmedBooking.barber_name}\n` : ''
     const msg = `💈 *NOVO AGENDAMENTO*\n\n` +
       `Olá! Acabei de agendar pelo aplicativo:\n` +
       `👤 *Cliente:* ${confirmedBooking.client_name}\n` +
+      barberLine +
       `✂️ *Serviço(s):* ${confirmedBooking.service_names}\n` +
       `📅 *Data:* ${formattedDate}\n` +
       `⏰ *Horário:* ${confirmedBooking.start_time}\n` +
@@ -339,54 +364,59 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
           <>
             {/* Indicador de Passos */}
             {step !== 'success' && (
-              <div className="flex items-center justify-between mb-5 bg-slate-900/60 p-2.5 rounded-2xl border border-slate-800/80">
-            <button
-              onClick={() => setStep('service')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                step === 'service'
-                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Scissors className="w-3.5 h-3.5" />
-              <span>1. Serviços</span>
-            </button>
+              <div className={`flex items-center justify-between mb-5 p-2 rounded-2xl border ${
+                isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900/60 border-slate-800/80'
+              }`}>
+                <button
+                  type="button"
+                  onClick={() => setStep('service')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    step === 'service'
+                      ? `${preset.primaryButton} shadow-md`
+                      : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Scissors className="w-3.5 h-3.5" />
+                  <span>1. Serviços</span>
+                </button>
 
-            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0 mx-1" />
+                <ChevronRight className="w-4 h-4 text-slate-500 shrink-0 mx-1" />
 
-            <button
-              onClick={() => selectedServices.length > 0 && setStep('datetime')}
-              disabled={selectedServices.length === 0}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                step === 'datetime'
-                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                  : selectedServices.length > 0
-                  ? 'text-slate-400 hover:text-white'
-                  : 'text-slate-600 cursor-not-allowed'
-              }`}
-            >
-              <CalendarIcon className="w-3.5 h-3.5" />
-              <span>2. Horário</span>
-            </button>
+                <button
+                  type="button"
+                  onClick={() => selectedServices.length > 0 && setStep('datetime')}
+                  disabled={selectedServices.length === 0}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    step === 'datetime'
+                      ? `${preset.primaryButton} shadow-md`
+                      : selectedServices.length > 0
+                      ? isLight ? 'text-slate-600 hover:text-slate-900 cursor-pointer' : 'text-slate-400 hover:text-white cursor-pointer'
+                      : 'text-slate-500 opacity-40 cursor-not-allowed'
+                  }`}
+                >
+                  <CalendarIcon className="w-3.5 h-3.5" />
+                  <span>2. Horário</span>
+                </button>
 
-            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0 mx-1" />
+                <ChevronRight className="w-4 h-4 text-slate-500 shrink-0 mx-1" />
 
-            <button
-              onClick={() => selectedServices.length > 0 && selectedTime && setStep('customer')}
-              disabled={selectedServices.length === 0 || !selectedTime}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                step === 'customer'
-                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                  : selectedServices.length > 0 && selectedTime
-                  ? 'text-slate-400 hover:text-white'
-                  : 'text-slate-600 cursor-not-allowed'
-              }`}
-            >
-              <Check className="w-3.5 h-3.5" />
-              <span>3. Confirmar</span>
-            </button>
-          </div>
-        )}
+                <button
+                  type="button"
+                  onClick={() => selectedServices.length > 0 && selectedTime && setStep('customer')}
+                  disabled={selectedServices.length === 0 || !selectedTime}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    step === 'customer'
+                      ? `${preset.primaryButton} shadow-md`
+                      : selectedServices.length > 0 && selectedTime
+                      ? isLight ? 'text-slate-600 hover:text-slate-900 cursor-pointer' : 'text-slate-400 hover:text-white cursor-pointer'
+                      : 'text-slate-500 opacity-40 cursor-not-allowed'
+                  }`}
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>3. Confirmar</span>
+                </button>
+              </div>
+            )}
 
         {/* ===================== PASSO 1: SERVIÇOS ===================== */}
         {step === 'service' && (
@@ -495,13 +525,90 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
         {/* ===================== PASSO 2: DATA & HORÁRIO ===================== */}
         {step === 'datetime' && (
           <div className="space-y-5 animate-in fade-in duration-200">
+            {/* Escolha do Barbeiro / Profissional (quando equipe > 1) */}
+            {activeBarbers.length > 1 && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Escolha o Profissional</span>
+                  </label>
+                  <span className={`text-[11px] font-bold ${preset.accentText}`}>
+                    {selectedBarberId === 'any'
+                      ? 'Qualquer Barbeiro'
+                      : activeBarbers.find((b) => b.id === selectedBarberId)?.name}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBarberId('any')}
+                    className={`p-2.5 rounded-2xl border flex items-center gap-2.5 transition-all cursor-pointer text-left ${
+                      selectedBarberId === 'any'
+                        ? `${preset.accentBorder} border-2 bg-slate-800/90 shadow-md ring-1 ring-amber-500/30`
+                        : isLight
+                        ? 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                        : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className={`font-bold text-xs truncate ${isLight && selectedBarberId !== 'any' ? 'text-slate-900' : 'text-white'}`}>
+                        Qualquer um
+                      </p>
+                      <p className="text-[10px] text-slate-400 truncate">1º disponível</p>
+                    </div>
+                  </button>
+
+                  {activeBarbers.map((barber) => {
+                    const isSelected = selectedBarberId === barber.id
+                    return (
+                      <button
+                        key={barber.id}
+                        type="button"
+                        onClick={() => setSelectedBarberId(barber.id)}
+                        className={`p-2.5 rounded-2xl border flex items-center gap-2.5 transition-all cursor-pointer text-left ${
+                          isSelected
+                            ? `${preset.accentBorder} border-2 bg-slate-800/90 shadow-md ring-1 ring-amber-500/30`
+                            : isLight
+                            ? 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                            : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="w-9 h-9 rounded-xl overflow-hidden border border-slate-700 shrink-0 bg-slate-800">
+                          {barber.avatar_url ? (
+                            <img src={barber.avatar_url} alt={barber.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-amber-400 bg-amber-500/10">
+                              <Scissors className="w-4 h-4" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className={`font-bold text-xs truncate ${isLight && !isSelected ? 'text-slate-900' : 'text-white'}`}>
+                            {barber.name}
+                          </p>
+                          <p className="text-[10px] text-slate-400 truncate">
+                            {barber.role || 'Barbeiro'}
+                          </p>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Seletor de Data Horizontal */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                   Escolha o Dia
                 </label>
-                <span className="text-xs text-amber-400 font-semibold">{formattedDate}</span>
+                <span className={`text-xs font-semibold ${preset.accentText}`}>{formattedDate}</span>
               </div>
 
               <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
@@ -512,11 +619,13 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                       key={d.date}
                       disabled={d.isBlocked}
                       onClick={() => !d.isBlocked && setSelectedDate(d.date)}
-                      className={`p-2.5 rounded-2xl flex flex-col items-center justify-center border transition-all ${
+                      className={`p-2.5 rounded-2xl flex flex-col items-center justify-center border transition-all cursor-pointer ${
                         d.isBlocked
                           ? 'bg-slate-950/80 border-slate-900 text-slate-600 opacity-50 cursor-not-allowed'
                           : isSelected
-                          ? 'bg-gradient-to-b from-amber-400 to-amber-500 border-amber-400 text-slate-950 font-bold shadow-lg shadow-amber-500/25 scale-[1.02]'
+                          ? `${preset.primaryButton} font-bold shadow-lg scale-[1.02]`
+                          : isLight
+                          ? 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
                           : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
                       }`}
                     >
@@ -547,11 +656,13 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                       key={item.time}
                       disabled={!item.available}
                       onClick={() => setSelectedTime(item.time)}
-                      className={`py-3 px-2 rounded-xl text-xs font-bold border transition-all ${
+                      className={`py-3 px-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-amber-400 border-amber-400 text-slate-950 shadow-md shadow-amber-500/20'
+                          ? `${preset.primaryButton} shadow-md`
                           : item.available
-                          ? 'bg-slate-900 border-slate-800 text-slate-200 hover:border-amber-500/50 hover:text-amber-400'
+                          ? isLight
+                            ? 'bg-white border-slate-200 text-slate-800 hover:border-slate-300'
+                            : 'bg-slate-900 border-slate-800 text-slate-200 hover:border-slate-700'
                           : 'bg-slate-950/60 border-slate-900 text-slate-600 line-through cursor-not-allowed opacity-50'
                       }`}
                     >
@@ -571,7 +682,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
             <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2 text-xs">
               <h4 className="font-bold text-white text-sm mb-2 flex items-center justify-between">
                 <span>Resumo do Agendamento</span>
-                <span className="text-amber-400 font-extrabold text-base">
+                <span className={`font-extrabold text-base ${preset.accentText}`}>
                   R$ {totalPrice.toFixed(2).replace('.', ',')}
                 </span>
               </h4>
@@ -581,9 +692,19 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                   {selectedServicesObjects.map((s) => s.name).join(', ')}
                 </span>
               </div>
+              {activeBarbers.length > 0 && (
+                <div className="flex justify-between text-slate-400">
+                  <span>Profissional:</span>
+                  <span className={`font-bold ${preset.accentText}`}>
+                    {selectedBarberId === 'any'
+                      ? 'Qualquer Barbeiro'
+                      : activeBarbers.find((b) => b.id === selectedBarberId)?.name || 'Barbeiro'}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between text-slate-400">
                 <span>Data e Horário:</span>
-                <span className="text-amber-300 font-bold">
+                <span className={`font-bold ${preset.accentText}`}>
                   {formattedDate} às {selectedTime}
                 </span>
               </div>
@@ -642,7 +763,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                       onClick={() => setReminderPreference(rem.id as any)}
                       className={`py-2 px-1.5 rounded-xl text-center text-xs font-bold border transition-all cursor-pointer ${
                         reminderPreference === rem.id
-                          ? 'bg-amber-500 border-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                          ? `${preset.primaryButton} shadow-md`
                           : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
                       }`}
                     >
@@ -691,9 +812,15 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                 <span className="text-slate-400">Cliente:</span>
                 <span className="font-bold text-white">{confirmedBooking.client_name}</span>
               </div>
+              {confirmedBooking.barber_name && (
+                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                  <span className="text-slate-400">Profissional:</span>
+                  <span className={`font-bold ${preset.accentText}`}>{confirmedBooking.barber_name}</span>
+                </div>
+              )}
               <div className="flex justify-between items-center border-b border-slate-800 pb-2">
                 <span className="text-slate-400">Data & Hora:</span>
-                <span className="font-bold text-amber-400">
+                <span className={`font-bold ${preset.accentText}`}>
                   {formattedDate} às {confirmedBooking.start_time}
                 </span>
               </div>
@@ -703,7 +830,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-400">Valor Total:</span>
-                <span className="font-extrabold text-base text-amber-400">
+                <span className={`font-extrabold text-base ${preset.accentText}`}>
                   R$ {confirmedBooking.total_price.toFixed(2).replace('.', ',')}
                 </span>
               </div>
@@ -737,9 +864,10 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                 setStep('service')
                 setSelectedServices([])
                 setSelectedTime('')
+                setSelectedBarberId('any')
                 setConfirmedBooking(null)
               }}
-              className="text-xs text-slate-500 hover:text-slate-300 underline pt-2 block mx-auto"
+              className="text-xs text-slate-500 hover:text-slate-300 underline pt-2 block mx-auto cursor-pointer"
             >
               Fazer outro agendamento
             </button>
@@ -757,7 +885,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               <p className="text-[11px] text-slate-400">
                 {selectedServices.length} {selectedServices.length === 1 ? 'serviço' : 'serviços'} • {totalDuration} min
               </p>
-              <p className="text-lg font-black text-amber-400 leading-tight">
+              <p className={`text-lg font-black leading-tight ${preset.accentText}`}>
                 R$ {totalPrice.toFixed(2).replace('.', ',')}
               </p>
             </div>
@@ -769,7 +897,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                     if (step === 'customer') setStep('datetime')
                     else if (step === 'datetime') setStep('service')
                   }}
-                  className="p-3 rounded-xl bg-slate-800 text-slate-300 hover:text-white border border-slate-700 active:scale-95 transition-transform"
+                  className="p-3 rounded-xl bg-slate-800 text-slate-300 hover:text-white border border-slate-700 active:scale-95 transition-transform cursor-pointer"
                 >
                   <ArrowLeft className="w-4 h-4" />
                 </button>
@@ -778,7 +906,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               {step === 'service' && (
                 <button
                   onClick={() => setStep('datetime')}
-                  className="px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm flex items-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-transform"
+                  className={`px-5 py-3 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg active:scale-95 transition-transform cursor-pointer ${preset.primaryButton}`}
                 >
                   <span>Escolher Horário</span>
                   <ChevronRight className="w-4 h-4" />
@@ -789,9 +917,9 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                 <button
                   onClick={() => setStep('customer')}
                   disabled={!selectedTime}
-                  className={`px-5 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all ${
+                  className={`px-5 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all cursor-pointer ${
                     selectedTime
-                      ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20 active:scale-95'
+                      ? `${preset.primaryButton} shadow-lg active:scale-95`
                       : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                   }`}
                 >
@@ -803,7 +931,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               {step === 'customer' && (
                 <button
                   onClick={handleFinishBooking}
-                  className="px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:brightness-105 text-slate-950 font-black text-sm flex items-center gap-2 shadow-lg shadow-amber-500/30 active:scale-95 transition-transform"
+                  className={`px-5 py-3 rounded-xl font-black text-sm flex items-center gap-2 shadow-lg active:scale-95 transition-transform cursor-pointer ${preset.primaryButton}`}
                 >
                   <span>Confirmar</span>
                   <Check className="w-4 h-4 stroke-[3]" />

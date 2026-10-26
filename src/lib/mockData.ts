@@ -25,6 +25,7 @@ export const demoBarbershop: Barbershop = {
   reference_point: 'Próximo ao MASP',
   instagram: '@nkbarbearia',
   theme_color: '#EAB308',
+  style_preset: 'elegante',
   created_at: new Date().toISOString(),
   monthly_fee: 50.00,
   subscription_status: 'active',

@@ -31,11 +31,15 @@ import {
   Sun,
   Moon,
   MapPin,
-  Sparkles
+  Sparkles,
+  Users,
+  Palette,
+  UserPlus
 } from 'lucide-react'
-import type { Barbershop, Barber, Service, Appointment, WorkingHour } from '../types'
+import type { Barbershop, Barber, Service, Appointment, WorkingHour, ShopStylePreset } from '../types'
 import { PWAInstallPrompt } from './PWAInstallPrompt'
 import { DEFAULT_PIX_KEY, DEFAULT_PIX_NAME, DEFAULT_PIX_QRCODE } from '../lib/mockData'
+import { STYLE_PRESETS } from '../lib/stylePresets'
 
 const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -45,7 +49,7 @@ const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) =>
   </svg>
 )
 
-type AdminTab = 'agenda' | 'semana' | 'historico' | 'servicos' | 'horarios' | 'config'
+type AdminTab = 'agenda' | 'semana' | 'historico' | 'servicos' | 'equipe' | 'horarios' | 'config'
 
 interface AdminDashboardProps {
   barbershop: Barbershop
@@ -58,6 +62,7 @@ interface AdminDashboardProps {
   onBackToClientView?: () => void
   onUpdateAppointments?: (appointments: Appointment[]) => void
   onUpdateServices?: (services: Service[]) => void
+  onUpdateBarbers?: (barbers: Barber[]) => void
   onUpdateBarbershop?: (barbershop: Barbershop) => void
   onDeleteBarbershop?: (id: string) => void
   onUpdateWorkingHours?: (workingHours: WorkingHour[]) => void
@@ -65,7 +70,7 @@ interface AdminDashboardProps {
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   barbershop,
-  barbers,
+  barbers: initialBarbers,
   services: initialServices,
   appointments: initialAppointments,
   workingHours: initialWorkingHours,
@@ -74,6 +79,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onBackToClientView,
   onUpdateAppointments,
   onUpdateServices,
+  onUpdateBarbers,
   onUpdateBarbershop,
   onDeleteBarbershop,
   onUpdateWorkingHours
@@ -109,6 +115,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newClientPhone, setNewClientPhone] = useState('')
   const [newServiceId, setNewServiceId] = useState(services[0]?.id || '')
   const [newTime, setNewTime] = useState('15:00')
+  const [newBookingBarberId, setNewBookingBarberId] = useState<string>('')
+
+  // Gestão de Equipe & Barbeiros
+  const [barbersList, setBarbersList] = useState<Barber[]>(initialBarbers || [])
+  const [selectedBarberFilter, setSelectedBarberFilter] = useState<string>('todos')
+  const [showBarberModal, setShowBarberModal] = useState(false)
+  const [editingBarber, setEditingBarber] = useState<Barber | null>(null)
+  const [barberModalName, setBarberModalName] = useState('')
+  const [barberModalRole, setBarberModalRole] = useState('Barbeiro Especialista')
+  const [barberModalAvatar, setBarberModalAvatar] = useState('')
+  const [barberModalPhone, setBarberModalPhone] = useState('')
+  const [barberModalBio, setBarberModalBio] = useState('')
 
   // Modal de Exclusão de Barbearia com trava estrita
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -486,10 +504,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!newClientName) return
 
     const selectedService = services.find((s) => s.id === newServiceId)
+    const assignedBarberId = newBookingBarberId || barbersList[0]?.id || initialBarbers[0]?.id
     const newApt: Appointment = {
       id: 'apt-' + Date.now(),
       barbershop_id: barbershop.id,
-      barber_id: barbers[0]?.id,
+      barber_id: assignedBarberId,
       service_ids: [newServiceId],
       client_name: newClientName,
       client_phone: newClientPhone || 'Cliente Balcão',
@@ -508,7 +527,87 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     setNewClientName('')
     setNewClientPhone('')
+    setNewBookingBarberId('')
     setShowAddBookingModal(false)
+  }
+
+  // ===================== GESTÃO DE EQUIPE / BARBEIROS =====================
+  const handleOpenAddBarber = () => {
+    setEditingBarber(null)
+    setBarberModalName('')
+    setBarberModalRole('Barbeiro Especialista')
+    setBarberModalAvatar('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80')
+    setBarberModalPhone('')
+    setBarberModalBio('')
+    setShowBarberModal(true)
+  }
+
+  const handleOpenEditBarber = (barber: Barber) => {
+    setEditingBarber(barber)
+    setBarberModalName(barber.name)
+    setBarberModalRole(barber.role || 'Barbeiro')
+    setBarberModalAvatar(barber.avatar_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80')
+    setBarberModalPhone(barber.phone || '')
+    setBarberModalBio(barber.bio || '')
+    setShowBarberModal(true)
+  }
+
+  const handleSaveBarber = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!barberModalName.trim()) return
+
+    let updated: Barber[]
+    if (editingBarber) {
+      updated = barbersList.map((b) =>
+        b.id === editingBarber.id
+          ? {
+              ...b,
+              name: barberModalName.trim(),
+              role: barberModalRole.trim() || 'Barbeiro',
+              avatar_url: barberModalAvatar.trim() || b.avatar_url,
+              phone: barberModalPhone.trim() || undefined,
+              bio: barberModalBio.trim() || undefined
+            }
+          : b
+      )
+    } else {
+      const newB: Barber = {
+        id: 'barber-' + Date.now(),
+        barbershop_id: barbershop.id,
+        name: barberModalName.trim(),
+        role: barberModalRole.trim() || 'Barbeiro Especialista',
+        avatar_url: barberModalAvatar.trim() || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+        phone: barberModalPhone.trim() || undefined,
+        bio: barberModalBio.trim() || undefined,
+        active: true,
+        is_active: true
+      }
+      updated = [...barbersList, newB]
+    }
+
+    setBarbersList(updated)
+    if (onUpdateBarbers) onUpdateBarbers(updated)
+    setShowBarberModal(false)
+  }
+
+  const handleToggleBarberActive = (id: string) => {
+    const updated = barbersList.map((b) =>
+      b.id === id ? { ...b, active: !b.active, is_active: !b.active } : b
+    )
+    setBarbersList(updated)
+    if (onUpdateBarbers) onUpdateBarbers(updated)
+  }
+
+  const handleDeleteBarber = (id: string) => {
+    if (barbersList.length <= 1) {
+      alert('A barbearia precisa ter pelo menos um barbeiro na equipe.')
+      return
+    }
+    if (window.confirm('Tem certeza que deseja remover este barbeiro da equipe?')) {
+      const updated = barbersList.filter((b) => b.id !== id)
+      setBarbersList(updated)
+      if (onUpdateBarbers) onUpdateBarbers(updated)
+    }
   }
 
   // ===================== GESTÃO DE PAUSAS / DIAS BLOQUEADOS =====================
@@ -618,6 +717,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     { id: 'semana' as AdminTab, label: 'Semana', fullLabel: 'Calendário Semanal', icon: CalendarDays },
     { id: 'historico' as AdminTab, label: 'Histórico', fullLabel: 'Histórico de Cortes', icon: History },
     { id: 'servicos' as AdminTab, label: 'Serviços', fullLabel: 'Serviços & Preços', icon: Scissors, badge: services.length },
+    { id: 'equipe' as AdminTab, label: 'Equipe', fullLabel: 'Equipe & Barbeiros', icon: Users, badge: barbersList.length },
     { id: 'horarios' as AdminTab, label: 'Horários', fullLabel: 'Horários & Pausas', icon: Clock },
     { id: 'config' as AdminTab, label: 'Config', fullLabel: 'Configurações', icon: Settings }
   ]
@@ -852,17 +952,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         )}
 
         {/* ===================== CARD DO LINK PÚBLICO (DIVULGAÇÃO) ===================== */}
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-slate-900 to-slate-900 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl">
+        <div
+          className={`p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors ${
+            isLight
+              ? 'bg-gradient-to-r from-amber-50 via-white to-amber-50/70 border border-amber-200/90 shadow-sm text-slate-900'
+              : 'bg-gradient-to-r from-amber-500/15 via-slate-900 to-slate-900 border border-amber-500/30 shadow-xl text-white'
+          }`}
+        >
           <div className="flex items-start gap-3">
-            <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+            <div
+              className={`p-2.5 rounded-xl shrink-0 mt-0.5 ${
+                isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/20 text-amber-400'
+              }`}
+            >
               <Share2 className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="font-bold text-sm text-white">Seu Link de Agendamento</h2>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <h2 className={`font-bold text-sm ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                Seu Link de Agendamento
+              </h2>
+              <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                 Coloque na bio do seu Instagram ou envie no WhatsApp dos clientes.
               </p>
-              <span className="text-xs font-mono text-amber-300 mt-1 block truncate max-w-[280px] sm:max-w-sm">
+              <span
+                className={`text-xs font-mono mt-1.5 inline-block px-2.5 py-0.5 rounded-lg max-w-[280px] sm:max-w-sm truncate border ${
+                  isLight
+                    ? 'bg-amber-100/80 text-amber-900 border-amber-300/80 font-bold'
+                    : 'bg-slate-950/60 text-amber-300 border-amber-500/20'
+                }`}
+              >
                 {publicUrl}
               </span>
             </div>
@@ -888,35 +1006,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </>
             )}
           </button>
-        </div>
-
-        {/* ===================== ABAS DO PAINEL (DESKTOP) ===================== */}
-        <div className="hidden sm:flex gap-2 border-b border-slate-800 pb-2 overflow-x-auto text-xs">
-          {[
-            { id: 'agenda', label: 'Agenda de Hoje', icon: Calendar },
-            { id: 'semana', label: 'Calendário Semanal', icon: CalendarDays },
-            { id: 'historico', label: 'Histórico de Cortes', icon: History },
-            { id: 'servicos', label: 'Serviços & Preços', icon: Scissors },
-            { id: 'horarios', label: 'Horários & Pausas', icon: Clock },
-            { id: 'config', label: 'Configurações', icon: Settings }
-          ].map((tab) => {
-            const Icon = tab.icon
-            const isActive = activeTab === tab.id
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as AdminTab)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold transition-all shrink-0 cursor-pointer ${
-                  isActive
-                    ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                    : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{tab.label}</span>
-              </button>
-            )
-          })}
         </div>
 
         {/* ========================================================================= */}
@@ -960,7 +1049,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
               <div>
                 <h3 className="font-bold text-sm text-white">
                   Horários Agendados de Hoje
@@ -972,12 +1061,51 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <button
                 onClick={() => setShowAddBookingModal(true)}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer self-start sm:self-auto"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Agendar Balcão</span>
               </button>
             </div>
+
+            {/* Filtro por Barbeiro (quando houver mais de 1 na equipe) */}
+            {barbersList.length > 1 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                <span className="text-[11px] text-slate-400 font-semibold mr-1 flex items-center gap-1 shrink-0">
+                  <Users className="w-3.5 h-3.5 text-amber-400" /> Profissional:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedBarberFilter('todos')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer ${
+                    selectedBarberFilter === 'todos'
+                      ? 'bg-amber-500 text-slate-950 shadow-sm'
+                      : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Todos ({todayAppointments.length})
+                </button>
+                {barbersList.map((b) => {
+                  const bCount = todayAppointments.filter((a) => a.barber_id === b.id).length
+                  const isSelected = selectedBarberFilter === b.id
+                  return (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => setSelectedBarberFilter(b.id)}
+                      className={`px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                        isSelected
+                          ? 'bg-amber-500 text-slate-950 shadow-sm'
+                          : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <span>{b.name}</span>
+                      <span className="text-[10px] opacity-80">({bCount})</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
 
             {todayAppointments.length === 0 ? (
               <div className="p-8 rounded-3xl bg-slate-900/60 border border-dashed border-slate-800 text-center text-slate-400 text-xs space-y-2">
@@ -988,7 +1116,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             ) : (
               <div className="space-y-2.5">
-                {todayAppointments.map((apt) => {
+                {todayAppointments
+                  .filter((apt) => selectedBarberFilter === 'todos' || apt.barber_id === selectedBarberFilter)
+                  .map((apt) => {
+                  const aptBarber = barbersList.find((b) => b.id === apt.barber_id)
                   const serviceNames = services
                     .filter((s) => apt.service_ids.includes(s.id))
                     .map((s) => s.name)
@@ -1036,6 +1167,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <span className="text-amber-400 font-bold">
                               R$ {apt.total_price.toFixed(2).replace('.', ',')}
                             </span>
+                            {aptBarber && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/25">
+                                <Users className="w-2.5 h-2.5" />
+                                <span>{aptBarber.name}</span>
+                              </span>
+                            )}
                             {hasPhone && (
                               <span className="text-slate-400">
                                 Tel: {apt.client_phone}
@@ -1296,6 +1433,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   <p className="text-[10px] text-slate-400 truncate mt-0.5">
                                     {serviceNames}
                                   </p>
+
+                                  {barbersList.find((b) => b.id === apt.barber_id) && (
+                                    <span className="text-[9px] text-amber-300 font-semibold truncate block mt-0.5">
+                                      ✂️ {barbersList.find((b) => b.id === apt.barber_id)?.name}
+                                    </span>
+                                  )}
 
                                   <div className="flex items-center justify-between gap-1 mt-1.5 pt-1 border-t border-slate-800/60">
                                     <span
@@ -1661,6 +1804,166 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         )}
 
         {/* ========================================================================= */}
+        {/* ===================== ABA: EQUIPE & BARBEIROS =========================== */}
+        {/* ========================================================================= */}
+        {activeTab === 'equipe' && (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                  <Users className="w-4 h-4 text-amber-400" />
+                  <span>Equipe de Profissionais ({barbersList.length})</span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Gerencie os barbeiros que atendem no seu espaço. Seus clientes poderão escolher o profissional favorito ao agendar.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleOpenAddBarber}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer self-start sm:self-auto"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>+ Adicionar Barbeiro</span>
+              </button>
+            </div>
+
+            {/* Cards de Resumo da Equipe */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800">
+                <span className="text-xs text-slate-400 font-medium">Total na Equipe</span>
+                <p className="text-2xl font-black text-white mt-1">{barbersList.length}</p>
+                <p className="text-[10px] text-amber-400 mt-0.5">profissionais cadastrados</p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800">
+                <span className="text-xs text-slate-400 font-medium">Ativos no Momento</span>
+                <p className="text-2xl font-black text-emerald-400 mt-1">
+                  {barbersList.filter((b) => b.active !== false).length}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-0.5">disponíveis para agendamento</p>
+              </div>
+
+              <div className="col-span-2 sm:col-span-1 p-3.5 rounded-2xl bg-slate-900 border border-slate-800">
+                <span className="text-xs text-slate-400 font-medium">Agendamentos Hoje</span>
+                <p className="text-2xl font-black text-white mt-1">{todayAppointments.length}</p>
+                <p className="text-[10px] text-blue-400 mt-0.5">distribuídos na equipe</p>
+              </div>
+            </div>
+
+            {/* Lista de Barbeiros */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {barbersList.map((barber) => {
+                const isActive = barber.active !== false
+                const barberAptsToday = todayAppointments.filter((a) => a.barber_id === barber.id).length
+
+                return (
+                  <div
+                    key={barber.id}
+                    className={`p-4 rounded-2xl border transition-all ${
+                      isActive
+                        ? 'bg-slate-900/90 border-slate-800 shadow-md'
+                        : 'bg-slate-950/60 border-slate-800/80 opacity-60'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3.5">
+                      <div className="relative w-14 h-14 rounded-2xl overflow-hidden border-2 border-amber-500/50 bg-slate-800 shrink-0 shadow-md">
+                        {barber.avatar_url ? (
+                          <img
+                            src={barber.avatar_url}
+                            alt={barber.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-amber-400 bg-amber-500/10">
+                            <Scissors className="w-6 h-6" />
+                          </div>
+                        )}
+                        <span
+                          className={`absolute bottom-1 right-1 w-3 h-3 rounded-full border-2 border-slate-900 ${
+                            isActive ? 'bg-emerald-400' : 'bg-slate-500'
+                          }`}
+                        />
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-1">
+                          <h4 className="font-bold text-sm text-white truncate">{barber.name}</h4>
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 ${
+                              isActive
+                                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                : 'bg-slate-800 text-slate-500 border border-slate-700'
+                            }`}
+                          >
+                            {isActive ? 'Ativo' : 'Pausado'}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-amber-400/90 font-medium truncate mt-0.5">
+                          {barber.role || 'Barbeiro'}
+                        </p>
+
+                        {barber.bio && (
+                          <p className="text-[11px] text-slate-400 line-clamp-1 mt-1">
+                            {barber.bio}
+                          </p>
+                        )}
+
+                        <div className="flex items-center gap-3 mt-2 text-[11px] text-slate-400">
+                          <span className="flex items-center gap-1 text-slate-300">
+                            <Clock className="w-3 h-3 text-amber-400" />
+                            <strong>{barberAptsToday}</strong> hoje
+                          </span>
+                          {barber.phone && (
+                            <span className="truncate max-w-[120px] text-slate-400">
+                              Tel: {barber.phone}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 mt-3.5 pt-3 border-t border-slate-800/80">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleBarberActive(barber.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                          isActive
+                            ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                            : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border-emerald-500/40'
+                        }`}
+                      >
+                        {isActive ? 'Pausar' : 'Ativar'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditBarber(barber)}
+                        title="Editar profissional"
+                        className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteBarber(barber.id)}
+                        title="Remover barbeiro"
+                        className="p-1.5 rounded-xl bg-rose-950/30 hover:bg-rose-900/40 text-rose-400 border border-rose-900/40 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
         {/* ===================== ABA 5: HORÁRIOS & PAUSAS ========================== */}
         {/* ========================================================================= */}
         {activeTab === 'horarios' && (
@@ -2004,6 +2307,82 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <Phone className="w-4 h-4 fill-current" />
                   <span>Enviar Comprovante via WhatsApp</span>
                 </a>
+              </div>
+            </div>
+
+            {/* SEÇÃO DE ESTILO VISUAL / PALETA DE CORES */}
+            <div className="p-5 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 text-xs shadow-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                    <Palette className="w-4 h-4 text-amber-400" />
+                    <span>Estilo Visual da Barbearia</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Escolha o estilo e as cores da tela de agendamento que seus clientes veem.
+                  </p>
+                </div>
+
+                <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 font-bold text-[10px] border border-amber-500/30">
+                  {STYLE_PRESETS[barbershop.style_preset || 'elegante']?.name || 'Elegante'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {(Object.entries(STYLE_PRESETS) as [ShopStylePreset, typeof STYLE_PRESETS[ShopStylePreset]][]).map(([key, preset]) => {
+                  const isSelected = (barbershop.style_preset || 'elegante') === key
+
+                  return (
+                    <div
+                      key={key}
+                      onClick={() => {
+                        const updated = { ...barbershop, style_preset: key }
+                        if (onUpdateBarbershop) onUpdateBarbershop(updated)
+                      }}
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-3 text-left ${
+                        isSelected
+                          ? 'bg-slate-800/90 border-amber-500 shadow-lg ring-1 ring-amber-500/50'
+                          : 'bg-slate-950/70 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">{preset.icon}</span>
+                            <h4 className="font-bold text-xs text-white">{preset.name}</h4>
+                          </div>
+                          {isSelected && (
+                            <span className="w-5 h-5 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center font-black text-[10px]">
+                              ✓
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1">{preset.subtitle}</p>
+
+                        {/* Paleta de Cores */}
+                        <div className="flex items-center gap-1.5 mt-2.5">
+                          {preset.swatches.map((color, sIdx) => (
+                            <span
+                              key={sIdx}
+                              className="w-4 h-4 rounded-full border border-white/20 shadow-sm"
+                              style={{ backgroundColor: color }}
+                            />
+                          ))}
+                          <span className="text-[10px] text-slate-400 ml-1 truncate max-w-[150px]">
+                            {preset.swatches.join(', ')}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Prévia do Botão */}
+                      <div className="pt-2 border-t border-slate-800">
+                        <div className={`w-full py-1.5 rounded-xl font-bold text-[10px] text-center shadow-sm ${preset.primaryButton}`}>
+                          Exemplo de Botão
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
@@ -2460,6 +2839,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </select>
               </div>
 
+              {barbersList.length > 1 && (
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Profissional / Barbeiro *</label>
+                  <select
+                    value={newBookingBarberId || (barbersList[0]?.id || '')}
+                    onChange={(e) => setNewBookingBarberId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-amber-300 font-bold"
+                  >
+                    {barbersList.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.role || 'Barbeiro'}) {b.active === false ? '- [Pausado]' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">Horário</label>
                 <input
@@ -2483,6 +2879,122 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   className="flex-1 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-bold cursor-pointer"
                 >
                   Salvar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== MODAL DE ADICIONAR / EDITAR BARBEIRO ===================== */}
+      {showBarberModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-[#12151f] border border-slate-800 rounded-3xl p-5 text-slate-100 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-base text-white flex items-center gap-2">
+                <Users className="w-4 h-4 text-amber-400" />
+                <span>{editingBarber ? 'Editar Barbeiro' : 'Novo Barbeiro na Equipe'}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowBarberModal(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBarber} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Nome do Barbeiro *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Carlos Oliveira"
+                  value={barberModalName}
+                  onChange={(e) => setBarberModalName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-amber-500 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Cargo / Especialidade</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Barbeiro Master, Especialista em Degradê"
+                  value={barberModalRole}
+                  onChange={(e) => setBarberModalRole(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-amber-500 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">WhatsApp do Profissional (Opcional)</label>
+                <input
+                  type="tel"
+                  placeholder="(11) 99999-9999"
+                  value={barberModalPhone}
+                  onChange={(e) => setBarberModalPhone(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-amber-500 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Foto / Avatar (URL)</label>
+                <input
+                  type="url"
+                  placeholder="https://..."
+                  value={barberModalAvatar}
+                  onChange={(e) => setBarberModalAvatar(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-amber-500 text-xs"
+                />
+                {/* Sugestões de Fotos Rápidas */}
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-[10px] text-slate-400">Modelos:</span>
+                  {[
+                    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+                    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
+                    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+                    'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80'
+                  ].map((url, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setBarberModalAvatar(url)}
+                      className={`w-7 h-7 rounded-xl overflow-hidden border-2 transition-all ${
+                        barberModalAvatar === url ? 'border-amber-400 scale-110' : 'border-slate-700 opacity-60 hover:opacity-100'
+                      }`}
+                    >
+                      <img src={url} alt={`Avatar ${idx}`} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Sobre / Bio (Opcional)</label>
+                <textarea
+                  rows={2}
+                  placeholder="Ex: Mais de 8 anos de experiência em cortes clássicos e modernos."
+                  value={barberModalBio}
+                  onChange={(e) => setBarberModalBio(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-amber-500 text-xs"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowBarberModal(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold cursor-pointer"
+                >
+                  {editingBarber ? 'Atualizar' : 'Adicionar'}
                 </button>
               </div>
             </form>

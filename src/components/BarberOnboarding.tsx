@@ -14,11 +14,14 @@ import {
   Camera,
   Trash2,
   Sparkles,
-  Calendar
+  Calendar,
+  Users,
+  Palette
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
-import type { Barbershop, Service } from '../types'
+import type { Barbershop, Service, ShopStylePreset } from '../types'
 import { DEFAULT_PIX_KEY } from '../lib/mockData'
+import { STYLE_PRESETS } from '../lib/stylePresets'
 
 const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -31,7 +34,7 @@ const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) =>
 const DEFAULT_SHOP_LOGO = 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=300&q=80'
 
 interface BarberOnboardingProps {
-  onRegisterBarbershop: (shop: Barbershop, services: Service[]) => void
+  onRegisterBarbershop: (shop: Barbershop, services: Service[], initialTeamNames?: string[]) => void
 }
 
 export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
@@ -56,6 +59,24 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
   const [slogan, setSlogan] = useState('Tradição, estilo e o melhor corte da região.')
   const [instagram, setInstagram] = useState('')
   const [dueDay, setDueDay] = useState<number>(10)
+
+  // Estilo Visual Escolhido
+  const [stylePreset, setStylePreset] = useState<ShopStylePreset>('elegante')
+
+  // Equipe / Profissionais
+  const [teamType, setTeamType] = useState<'solo' | 'team'>('solo')
+  const [teamMembers, setTeamMembers] = useState<string[]>([])
+  const [newMemberName, setNewMemberName] = useState('')
+
+  const handleAddTeamMember = () => {
+    if (!newMemberName.trim()) return
+    setTeamMembers([...teamMembers, newMemberName.trim()])
+    setNewMemberName('')
+  }
+
+  const handleRemoveTeamMember = (index: number) => {
+    setTeamMembers(teamMembers.filter((_, i) => i !== index))
+  }
 
   // Logo da Barbearia (se tiver)
   const [logoUrl, setLogoUrl] = useState<string>(DEFAULT_SHOP_LOGO)
@@ -235,6 +256,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       reference_point: referencePoint.trim() || undefined,
       instagram: cleanInstagram || undefined,
       theme_color: '#EAB308',
+      style_preset: stylePreset,
       created_at: new Date().toISOString(),
       monthly_fee: 50.00,
       subscription_status: initialStatus, // ATIVAÇÃO IMEDIATA (ou pending se já usou trial antes)
@@ -257,7 +279,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       shop_slug: finalSlug
     }))
 
-    onRegisterBarbershop(newBarbershop, createdServices)
+    onRegisterBarbershop(newBarbershop, createdServices, teamType === 'team' ? teamMembers : [])
     setStep(2)
 
     try {
@@ -576,6 +598,175 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* ESTILO VISUAL DISPONÍVEL (PRESETS DE DESIGN) */}
+              <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-slate-200 font-semibold flex items-center gap-1.5 text-xs">
+                    <Palette className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Estilo Visual da Barbearia *</span>
+                  </label>
+                  <span className="text-[10px] text-amber-400 font-bold uppercase">
+                    {STYLE_PRESETS[stylePreset].name}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300">
+                  Escolha as cores e a vibe que combinam com seu negócio:
+                </p>
+
+                {/* Grid dos 6 Presets */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  {(Object.keys(STYLE_PRESETS) as ShopStylePreset[]).map((pKey) => {
+                    const preset = STYLE_PRESETS[pKey]
+                    const isSelected = stylePreset === pKey
+                    return (
+                      <button
+                        key={pKey}
+                        type="button"
+                        onClick={() => setStylePreset(pKey)}
+                        className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-slate-900 border-amber-400 ring-2 ring-amber-400/30 shadow-lg'
+                            : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">{preset.icon}</span>
+                            <div>
+                              <p className={`font-bold text-xs ${isSelected ? 'text-white' : 'text-slate-200'}`}>
+                                {preset.name}
+                              </p>
+                              <p className="text-[10px] text-slate-400 leading-tight mt-0.5">
+                                {preset.subtitle}
+                              </p>
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <span className="w-4 h-4 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center text-[10px] font-bold shrink-0">
+                              ✓
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Amostras de cores */}
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/80">
+                          <div className="flex items-center gap-1.5">
+                            {preset.swatches.map((color, cIdx) => (
+                              <span
+                                key={cIdx}
+                                className="w-4 h-4 rounded-full border border-black/30 shadow-inner"
+                                style={{ backgroundColor: color }}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-[9px] text-slate-400 italic truncate max-w-[140px]">
+                            {preset.targetAudience.slice(0, 24)}...
+                          </span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Prévia do Botão e Estilo Escolhido */}
+                <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-center space-y-1 mt-1">
+                  <span className="text-[10px] text-slate-400 block">Prévia dos botões do seu cliente:</span>
+                  <div className={`py-2 px-3 rounded-xl text-center text-xs font-bold transition-all ${STYLE_PRESETS[stylePreset].primaryButton}`}>
+                    Agendar Horário • {STYLE_PRESETS[stylePreset].name}
+                  </div>
+                </div>
+              </div>
+
+              {/* EQUIPE / PROFISSIONAIS DA BARBEARIA */}
+              <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-slate-200 font-semibold flex items-center gap-1.5 text-xs">
+                    <Users className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Como será o atendimento? *</span>
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTeamType('solo')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      teamType === 'solo'
+                        ? 'bg-amber-500/15 border-amber-500/50 text-white shadow-md'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="font-bold text-xs text-white">Sou só eu</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Atendimento individual</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTeamType('team')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      teamType === 'team'
+                        ? 'bg-amber-500/15 border-amber-500/50 text-white shadow-md'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="font-bold text-xs text-white">Tenho Equipe</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Mais de 1 barbeiro</p>
+                  </button>
+                </div>
+
+                {teamType === 'team' && (
+                  <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2 animate-in fade-in">
+                    <p className="text-[11px] text-slate-300">
+                      Adicione os nomes dos outros profissionais da sua barbearia (você pode editar ou adicionar mais depois):
+                    </p>
+
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Nome do outro barbeiro (ex: Lucas, André)"
+                        value={newMemberName}
+                        onChange={(e) => setNewMemberName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            handleAddTeamMember()
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddTeamMember}
+                        className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shrink-0 cursor-pointer transition-all active:scale-95"
+                      >
+                        + Adicionar
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-300 text-[11px] font-bold">
+                        👑 {ownerName.trim() || 'Você (Principal)'}
+                      </span>
+                      {teamMembers.map((m, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-[11px] flex items-center gap-1.5"
+                        >
+                          <span>{m}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTeamMember(idx)}
+                            className="text-slate-400 hover:text-rose-400 text-xs font-bold leading-none cursor-pointer"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Slogan */}

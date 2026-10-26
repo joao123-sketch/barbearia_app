@@ -1,5 +1,7 @@
 export type SubscriptionStatus = 'active' | 'pending' | 'overdue' | 'blocked'
 
+export type ShopStylePreset = 'elegante' | 'moderno' | 'minimalista' | 'simples' | 'rosa' | 'azul'
+
 export interface Barbershop {
   id: string
   name: string
@@ -19,6 +21,7 @@ export interface Barbershop {
   reference_point?: string
   instagram?: string
   theme_color?: string
+  style_preset?: ShopStylePreset
   created_at?: string
   // Assinatura SaaS & Cobrança
   monthly_fee: number
@@ -40,7 +43,9 @@ export interface Barber {
   avatar_url?: string
   role?: string
   bio?: string
+  phone?: string
   active: boolean
+  is_active?: boolean
 }
 
 export interface Service {
