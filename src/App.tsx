@@ -7,6 +7,7 @@ import { ResetPassword } from './components/ResetPassword'
 import { MasterAdminDashboard } from './components/MasterAdminDashboard'
 import { applyDefaultPwa, applyShopPwa } from './lib/pwa'
 import { signOut, useSession } from './lib/auth'
+import { supabase } from './lib/supabase'
 import { getModeFor, type ThemeMode } from './lib/shopTheme'
 import { useOwnerData } from './lib/useOwnerData'
 import { createPublicAppointment, fetchBusySlots, fetchPublicShopBySlug, fetchShopCatalog } from './lib/db'
@@ -167,7 +168,16 @@ function ManifestSwitcher() {
 }
 
 function AppRoutes() {
+  const navigate = useNavigate()
   const { session, ready } = useSession()
+
+  // Link do e-mail de recuperação: o Supabase abre uma sessão temporária e avisa; levamos à tela da nova senha
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') navigate('/redefinir-senha', { replace: true })
+    })
+    return () => data.subscription.unsubscribe()
+  }, [navigate])
   const owner = useOwnerData(session?.user.id)
 
   // Tema: sem escolha do usuário, cada estilo usa o seu modo inicial

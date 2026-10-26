@@ -227,3 +227,196 @@
 [data-shop-theme="rosa"] textarea:focus {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-amber-500) 25%, transparent);
 }
+
+/* ===== Acabamento refinado dos demais estilos =====
+   Mesma estrutura do Rosa, ajustada à personalidade de cada estilo por variáveis:
+   --sh-card (cartões), --sh-pill (chips, passos, botões), --sh-day (dias), --sh-banner (topo),
+   --sh-glow (força do brilho/sombra), --sh-line (espessura das bordas), --sh-dash (estilo dos traços),
+   --sh-icon (formato dos ícones de contato). */
+[data-shop-theme="neutro"] { --sh-card: 1.5rem; --sh-pill: 9999px; --sh-day: 1.25rem; --sh-banner: 2.5rem; --sh-glow: 0%; --sh-line: 1px; --sh-dash: dotted; --sh-icon: 9999px; }
+[data-shop-theme="simples"] { --sh-card: 1rem; --sh-pill: 9999px; --sh-day: 1rem; --sh-banner: 1.5rem; --sh-glow: 0%; --sh-line: 1px; --sh-dash: solid; --sh-icon: 9999px; }
+[data-shop-theme="sofisticado"] { --sh-card: 1.25rem; --sh-pill: 9999px; --sh-day: 1rem; --sh-banner: 1.75rem; --sh-glow: 22%; --sh-line: 1px; --sh-dash: solid; --sh-icon: 9999px; }
+[data-shop-theme="elegante"] { --sh-card: 0.5rem; --sh-pill: 0.375rem; --sh-day: 0.5rem; --sh-banner: 0; --sh-glow: 10%; --sh-line: 1px; --sh-dash: solid; --sh-icon: 0.375rem; }
+[data-shop-theme="moderno"] { --sh-card: 0.25rem; --sh-pill: 0.25rem; --sh-day: 0.25rem; --sh-banner: 0; --sh-glow: 26%; --sh-line: 1px; --sh-dash: solid; --sh-icon: 0.25rem; }
+[data-shop-theme="azul"] { --sh-card: 0.5rem; --sh-pill: 0.5rem; --sh-day: 0.5rem; --sh-banner: 0.75rem; --sh-glow: 14%; --sh-line: 1px; --sh-dash: solid; --sh-icon: 0.5rem; }
+[data-shop-theme="minimalista"] { --sh-card: 0.125rem; --sh-pill: 0.125rem; --sh-day: 0.125rem; --sh-banner: 0; --sh-glow: 0%; --sh-line: 1px; --sh-dash: solid; --sh-icon: 0.125rem; }
+
+[data-shop-theme]:not([data-shop-theme="rosa"]) {
+  --sh-edge: color-mix(in srgb, var(--color-amber-500) 28%, var(--color-slate-700));
+  --sh-shadow: 0 10px 30px color-mix(in srgb, var(--color-amber-500) var(--sh-glow), transparent);
+}
+
+/* Brilho suave no fundo para os estilos com glow */
+[data-shop-theme="sofisticado"],
+[data-shop-theme="moderno"],
+[data-shop-theme="elegante"],
+[data-shop-theme="azul"] {
+  background-image:
+    radial-gradient(520px 320px at 100% 0%, color-mix(in srgb, var(--color-amber-400) 14%, transparent), transparent 70%),
+    radial-gradient(480px 300px at 0% 60%, color-mix(in srgb, var(--color-amber-500) 9%, transparent), transparent 70%);
+  background-attachment: fixed;
+}
+
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-banner {
+  border-radius: 0 0 var(--sh-banner) var(--sh-banner);
+}
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-banner-fill {
+  background:
+    radial-gradient(circle at 18% 35%, color-mix(in srgb, var(--color-amber-300) 22%, transparent) 0, transparent 42%),
+    linear-gradient(135deg, color-mix(in srgb, var(--color-amber-400) 38%, var(--color-slate-900)), color-mix(in srgb, var(--color-amber-500) 18%, var(--color-slate-900)));
+}
+
+/* Logo: arredondamento do estilo e borda do fundo */
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-logo {
+  border: 3px solid var(--color-slate-900) !important;
+  box-shadow: var(--sh-shadow);
+}
+[data-shop-theme="elegante"] .shop-logo,
+[data-shop-theme="moderno"] .shop-logo,
+[data-shop-theme="azul"] .shop-logo,
+[data-shop-theme="minimalista"] .shop-logo {
+  border-radius: var(--sh-card) !important;
+}
+
+/* Contatos num único cartão */
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-contacts {
+  background: var(--color-slate-900);
+  border: var(--sh-line) solid var(--sh-edge);
+  border-radius: var(--sh-card);
+  padding: 0.3rem 0.5rem;
+  gap: 0;
+  box-shadow: var(--sh-shadow);
+}
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-contact {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0.8rem 0.75rem !important;
+}
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-contact + .shop-contact {
+  border-top: 1px var(--sh-dash) var(--sh-edge) !important;
+}
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-contact > svg {
+  box-sizing: content-box;
+  width: 1rem;
+  height: 1rem;
+  padding: 0.5rem;
+  border-radius: var(--sh-icon);
+  background: color-mix(in srgb, var(--color-amber-500) 14%, transparent);
+  color: var(--color-amber-500) !important;
+}
+[data-shop-theme="minimalista"] .shop-contact > svg {
+  background: transparent;
+  border: 1px solid var(--sh-edge);
+}
+
+/* Passos */
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-steps {
+  background: var(--color-slate-900) !important;
+  border: var(--sh-line) solid var(--sh-edge) !important;
+  border-radius: var(--sh-pill) !important;
+  box-shadow: var(--sh-shadow);
+}
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-steps button {
+  border-radius: var(--sh-pill) !important;
+}
+
+/* Categorias */
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-chip {
+  background: var(--color-slate-900) !important;
+  border: var(--sh-line) solid var(--sh-edge) !important;
+  border-radius: var(--sh-pill) !important;
+  padding: 0.5rem 1rem !important;
+  color: var(--color-slate-300) !important;
+}
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-chip-active {
+  background: linear-gradient(135deg, var(--color-amber-500), var(--color-amber-400)) !important;
+  border-color: transparent !important;
+  color: var(--color-slate-950) !important;
+  box-shadow: var(--sh-shadow);
+}
+
+/* Cartões de serviço */
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-service {
+  background: var(--color-slate-900) !important;
+  border: var(--sh-line) solid var(--sh-edge) !important;
+  border-radius: var(--sh-card) !important;
+  padding: 1.1rem 1.15rem !important;
+  box-shadow: var(--sh-shadow);
+}
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-service h3 {
+  font-size: 1rem;
+}
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-service-selected {
+  background: linear-gradient(160deg, var(--color-slate-900), color-mix(in srgb, var(--color-amber-500) 10%, var(--color-slate-900))) !important;
+  border: 2px solid var(--color-amber-500) !important;
+}
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-check {
+  width: 1.75rem;
+  height: 1.75rem;
+  background: transparent !important;
+  border: 2px solid color-mix(in srgb, var(--color-amber-500) 45%, transparent) !important;
+}
+[data-shop-theme="elegante"] .shop-check,
+[data-shop-theme="moderno"] .shop-check,
+[data-shop-theme="azul"] .shop-check,
+[data-shop-theme="minimalista"] .shop-check {
+  border-radius: 0.375rem !important;
+}
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-service-selected .shop-check {
+  background: linear-gradient(135deg, var(--color-amber-500), var(--color-amber-400)) !important;
+  border-color: transparent !important;
+  color: var(--color-slate-950) !important;
+}
+
+/* Dias e horários */
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-day {
+  border-radius: var(--sh-day) !important;
+}
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-day:not(.shop-day-selected) {
+  background: var(--color-slate-900) !important;
+  border-color: var(--sh-edge) !important;
+}
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-time {
+  border-radius: var(--sh-pill) !important;
+}
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-time:not(.shop-time-selected):not(:disabled) {
+  background: var(--color-slate-900) !important;
+  border-color: var(--sh-edge) !important;
+}
+
+/* Resumo, comprovante e barra inferior */
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-summary {
+  background: var(--color-slate-900) !important;
+  border: var(--sh-line) solid var(--sh-edge) !important;
+  border-radius: var(--sh-card) !important;
+  padding: 1.1rem !important;
+  box-shadow: var(--sh-shadow);
+}
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-ticket {
+  background: linear-gradient(180deg, var(--color-slate-900), color-mix(in srgb, var(--color-amber-500) 8%, var(--color-slate-900))) !important;
+  border: 2px var(--sh-dash) var(--sh-edge) !important;
+  border-radius: var(--sh-card) !important;
+}
+[data-shop-theme="elegante"] .shop-ticket {
+  border: 4px double var(--sh-edge) !important;
+}
+[data-shop-theme]:not([data-shop-theme="rosa"]) .shop-bar {
+  background: color-mix(in srgb, var(--color-slate-900) 90%, transparent) !important;
+  border-top: var(--sh-line) solid var(--sh-edge) !important;
+  border-radius: var(--sh-card) var(--sh-card) 0 0;
+  box-shadow: 0 -10px 30px color-mix(in srgb, var(--color-amber-500) var(--sh-glow), transparent);
+}
+
+/* Botões principais e campos no formato do estilo */
+[data-shop-theme]:not([data-shop-theme="rosa"]) .from-amber-500.to-amber-400 {
+  border-radius: var(--sh-pill);
+}
+[data-shop-theme]:not([data-shop-theme="rosa"]) input,
+[data-shop-theme]:not([data-shop-theme="rosa"]) textarea {
+  border-radius: var(--sh-day);
+}
+[data-shop-theme]:not([data-shop-theme="rosa"]) input:focus,
+[data-shop-theme]:not([data-shop-theme="rosa"]) textarea:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-amber-500) 22%, transparent);
+}
