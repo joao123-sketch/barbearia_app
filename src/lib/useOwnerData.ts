@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Appointment, Barber, Barbershop, Service, WorkingHour } from '../types'
 import {
   deleteShop,
@@ -14,23 +14,27 @@ import {
   updateMyShop
 } from './db'
 import { supabase } from './supabase'
+import { readOwnerCache, writeOwnerCache } from './ownerCache'
 import { DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from './platform'
 
 // Dados do dono logado: o negócio, serviços, equipe, horários e agendamentos, sempre em sincronia com o banco.
 export function useOwnerData(userId: string | undefined) {
-  const [loading, setLoading] = useState(true)
-  const [shop, setShop] = useState<Barbershop | null>(null)
-  const [services, setServices] = useState<Service[]>([])
-  const [barbers, setBarbers] = useState<Barber[]>([])
-  const [workingHours, setWorkingHours] = useState<WorkingHour[]>([])
-  const [appointments, setAppointments] = useState<Appointment[]>([])
+  // Com cópia local o painel abre na hora; sem ela (primeiro acesso) mostra o carregamento
+  const cached = useMemo(() => readOwnerCache(userId), [userId])
+  const [loading, setLoading] = useState(() => !cached)
+  const [shop, setShop] = useState<Barbershop | null>(() => cached?.shop ?? null)
+  const [services, setServices] = useState<Service[]>(() => cached?.services ?? [])
+  const [barbers, setBarbers] = useState<Barber[]>(() => cached?.barbers ?? [])
+  const [workingHours, setWorkingHours] = useState<WorkingHour[]>(() => cached?.workingHours ?? [])
+  const [appointments, setAppointments] = useState<Appointment[]>(() => cached?.appointments ?? [])
   const [platform, setPlatform] = useState<PlatformSettings>(DEFAULT_PLATFORM_SETTINGS)
 
   // Cópias para comparar "antes e depois" ao gravar só o que mudou
-  const servicesRef = useRef<Service[]>([])
-  const barbersRef = useRef<Barber[]>([])
-  const appointmentsRef = useRef<Appointment[]>([])
+  const servicesRef = useRef<Service[]>(cached?.services ?? [])
+  const barbersRef = useRef<Barber[]>(cached?.barbers ?? [])
+  const appointmentsRef = useRef<Appointment[]>(cached?.appointments ?? [])
   const hoursTimer = useRef<number | undefined>(undefined)
+  const shopRef = useRef<Barbershop | null>(cached?.shop ?? null)
 
   const loadFor = useCallback(async (uid: string | undefined) => {
     if (!uid) {
@@ -38,9 +42,11 @@ export function useOwnerData(userId: string | undefined) {
       setLoading(false)
       return
     }
-    setLoading(true)
+    // Se já há dados na tela, atualiza em silêncio (sem voltar para o carregamento)
+    if (!shopRef.current) setLoading(true)
     try {
       const mine = await fetchMyShop(uid)
+      shopRef.current = mine
       setShop(mine)
       if (mine) {
         const [catalog, apts, settings] = await Promise.all([
@@ -73,6 +79,11 @@ export function useOwnerData(userId: string | undefined) {
   useEffect(() => {
     loadFor(userId)
   }, [loadFor, userId])
+
+  // Guarda a cópia local sempre que os dados mudam
+  useEffect(() => {
+    if (userId && shop) writeOwnerCache(userId, { shop, services, barbers, workingHours, appointments })
+  }, [userId, shop, services, barbers, workingHours, appointments])
 
   // Agendamentos novos feitos pelos clientes aparecem sem precisar recarregar
   useEffect(() => {

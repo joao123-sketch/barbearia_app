@@ -172,6 +172,11 @@ export function useShopChrome(presetId: string | undefined, mode: ThemeMode) {
     const color = shopBackground(presetId, mode)
     const prevBody = document.body.style.backgroundColor
     document.body.style.backgroundColor = color
+    try {
+      localStorage.setItem('barber_last_bg', color)
+    } catch {
+      // ignora
+    }
     const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
     const prevMeta = meta?.content
     if (meta) meta.content = color

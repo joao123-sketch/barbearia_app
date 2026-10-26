@@ -4,11 +4,10 @@ import {
   currentPushKeys,
   notificationPermission,
   pushSupport,
-  showTestNotification,
   subscribePush,
   unsubscribePush
 } from '../lib/push'
-import { hasOwnerPush, removeOwnerPush, saveOwnerPush } from '../lib/db'
+import { hasOwnerPush, removeOwnerPush, saveOwnerPush, sendOwnerTestPush } from '../lib/db'
 
 interface OwnerNotificationsProps {
   shopId: string
@@ -44,13 +43,29 @@ export const OwnerNotifications: React.FC<OwnerNotificationsProps> = ({ shopId, 
       const keys = await subscribePush()
       await saveOwnerPush(shopId, keys)
       setEnabled(true)
-      await showTestNotification().catch(() => {})
+      setMessage('Avisos ativados! Toque em "Enviar aviso de teste" para conferir.')
     } catch (err) {
       setMessage(
         err instanceof Error && err.message === 'permission_denied'
           ? 'As notificações estão bloqueadas. Libere nas configurações do navegador ou do aparelho e tente de novo.'
           : 'Não foi possível ativar agora. Tente de novo.'
       )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Teste de verdade: o servidor manda a notificação, como será com um agendamento novo
+  const sendTest = async () => {
+    setBusy(true)
+    setMessage('')
+    try {
+      await sendOwnerTestPush(shopId)
+      setMessage(
+        'Aviso enviado! Ele deve aparecer em alguns segundos. Se não aparecer, confira se este app tem permissão para notificar nas configurações do celular.'
+      )
+    } catch {
+      setMessage('Não foi possível enviar o teste agora. Tente de novo.')
     } finally {
       setBusy(false)
     }
@@ -101,7 +116,7 @@ export const OwnerNotifications: React.FC<OwnerNotificationsProps> = ({ shopId, 
       {support === 'unsupported' && (
         <p className="text-slate-400">Este navegador não permite notificações. Tente pelo Chrome ou pelo Safari.</p>
       )}
-      {message && <p className="text-rose-400">{message}</p>}
+      {message && <p className={enabled && !message.startsWith('Não') ? 'text-slate-300' : 'text-rose-400'}>{message}</p>}
 
       {support === 'ok' && (
         <div className="flex flex-wrap gap-2">
@@ -109,8 +124,9 @@ export const OwnerNotifications: React.FC<OwnerNotificationsProps> = ({ shopId, 
             <>
               <button
                 type="button"
-                onClick={() => showTestNotification()}
-                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold cursor-pointer"
+                onClick={sendTest}
+                disabled={busy}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold cursor-pointer disabled:opacity-60"
               >
                 Enviar aviso de teste
               </button>

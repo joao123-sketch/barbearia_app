@@ -1,6 +1,7 @@
 // Edge Function: envia as notificações push que estão vencidas na fila.
 //  - owner_new: avisa o dono de um agendamento novo
 //  - client_reminder: lembra o cliente antes do horário
+//  - owner_test: aviso de teste pedido pelo dono em Configurações
 // Quem chama é o próprio banco (gatilho do agendamento e agendador de 1 minuto), com o segredo no cabeçalho.
 // Segredos usados (definidos no painel do Supabase): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, NOTIFY_SECRET.
 import webpush from 'npm:web-push@3.6.7'
@@ -49,7 +50,7 @@ Deno.serve(async (req) => {
 
   const { data: due } = await supabase
     .from('notification_queue')
-    .select('id, kind, appointment_id')
+    .select('id, kind, appointment_id, barbershop_id')
     .is('sent_at', null)
     .lte('send_at', new Date().toISOString())
     .order('send_at')
@@ -68,6 +69,22 @@ Deno.serve(async (req) => {
       .select('id')
     if (!claimed || claimed.length === 0) continue
     processed++
+
+    // Aviso de teste do dono: não depende de agendamento
+    if (item.kind === 'owner_test') {
+      const { data: subs } = await supabase
+        .from('push_subscriptions')
+        .select('id, endpoint, p256dh, auth')
+        .eq('kind', 'owner')
+        .eq('barbershop_id', item.barbershop_id)
+      delivered += await sendTo(subs ?? [], {
+        title: 'Aviso de teste',
+        body: 'Tudo certo! Você vai receber um aviso a cada agendamento novo.',
+        url: '/admin',
+        tag: 'teste'
+      })
+      continue
+    }
 
     const { data: apt } = await supabase
       .from('appointments')
@@ -92,9 +109,9 @@ Deno.serve(async (req) => {
         .eq('barbershop_id', apt.barbershop_id)
       delivered += await sendTo(subs ?? [], {
         title: 'Novo agendamento',
-        body: `${apt.client_name} · ${serviceNames} · ${formatDate(apt.appointment_date)} às ${formatTime(apt.start_time)}`,
+        body: apt.client_name + ' · ' + serviceNames + ' · ' + formatDate(apt.appointment_date) + ' às ' + formatTime(apt.start_time),
         url: '/admin',
-        tag: `novo-${apt.id}`
+        tag: 'novo-' + apt.id
       })
     } else {
       const { data: subs } = await supabase
@@ -103,10 +120,10 @@ Deno.serve(async (req) => {
         .eq('kind', 'client')
         .eq('appointment_id', apt.id)
       delivered += await sendTo(subs ?? [], {
-        title: `Lembrete: ${shop?.name ?? 'seu horário'}`,
-        body: `Seu horário é às ${formatTime(apt.start_time)} (${serviceNames}). Até já!`,
-        url: shop?.slug ? `/b/${shop.slug}` : '/',
-        tag: `lembrete-${apt.id}`
+        title: 'Lembrete: ' + (shop?.name ?? 'seu horário'),
+        body: 'Seu horário é às ' + formatTime(apt.start_time) + ' (' + serviceNames + '). Até já!',
+        url: shop?.slug ? '/b/' + shop.slug : '/',
+        tag: 'lembrete-' + apt.id
       })
     }
   }

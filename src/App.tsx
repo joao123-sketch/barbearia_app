@@ -17,8 +17,12 @@ type OwnerData = ReturnType<typeof useOwnerData>
 
 function FullScreenMessage({ title, text }: { title: string; text?: string }) {
   return (
-    <div className="min-h-screen bg-[#090A0F] text-slate-100 flex flex-col items-center justify-center gap-2 px-6 text-center">
-      <p className="font-bold">{title}</p>
+    <div
+      style={{ backgroundColor: (() => { try { return localStorage.getItem('barber_last_bg') || undefined } catch { return undefined } })() }}
+      className="min-h-screen bg-[#090A0F] text-slate-100 flex flex-col items-center justify-center gap-2 px-6 text-center"
+    >
+      {/* Durante o carregamento fica só o fundo (sem texto), para não piscar */}
+      {title !== 'Carregando...' && <p className="font-bold">{title}</p>}
       {text && <p className="text-sm text-slate-400 max-w-xs">{text}</p>}
     </div>
   )

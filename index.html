@@ -26,6 +26,13 @@
     </style>
   </head>
   <body class="bg-[#090A0F] text-slate-100 min-h-screen">
+    <script>
+      // Pinta o fundo com a cor usada da última vez, antes do app carregar (evita piscar)
+      try {
+        var c = localStorage.getItem("barber_last_bg");
+        if (c) { document.body.style.backgroundColor = c; document.documentElement.style.backgroundColor = c; }
+      } catch (e) {}
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

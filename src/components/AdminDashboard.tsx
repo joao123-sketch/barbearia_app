@@ -104,6 +104,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   useEffect(() => {
     setAppointments(initialAppointments)
   }, [initialAppointments])
+  // Dados que chegam do servidor em segundo plano (o painel abre antes, com a cópia local)
+  useEffect(() => {
+    setServices(initialServices)
+  }, [initialServices])
+  useEffect(() => {
+    setBarbersList(initialBarbers || [])
+  }, [initialBarbers])
+  useEffect(() => {
+    setLocalWorkingHours(initialWorkingHours)
+  }, [initialWorkingHours])
   const [localWorkingHours, setLocalWorkingHours] = useState<WorkingHour[]>(initialWorkingHours)
   const [workingHoursSaved, setWorkingHoursSaved] = useState(false)
   const [services, setServices] = useState<Service[]>(initialServices)
@@ -434,6 +444,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setComboItems([])
     setNewComboSubService('')
     setShowAddServiceModal(true)
+  }
+
+  const handleDeleteService = (service: Service) => {
+    if (!window.confirm(`Excluir o serviço "${service.name}"? Os agendamentos que já existem continuam no histórico.`)) return
+    const updated = services.filter((sv) => sv.id !== service.id)
+    setServices(updated)
+    if (onUpdateServices) onUpdateServices(updated)
   }
 
   const handleOpenEditService = (service: Service) => {
@@ -1878,6 +1895,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Botão de Excluir */}
+                      <button
+                        onClick={() => handleDeleteService(s)}
+                        title="Excluir serviço"
+                        aria-label={`Excluir ${s.name}`}
+                        className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
 
                       {/* Botão de Pausar / Ativar */}

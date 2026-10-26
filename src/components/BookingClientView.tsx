@@ -21,7 +21,7 @@ import { buildShopTheme, getLook, shopThemeAttrs, useShopChrome } from '../lib/s
 import { getTerms } from '../lib/terms'
 import { toWaNumber } from '../lib/phone'
 import { normalizeInstagram } from '../lib/instagram'
-import { pushSupport, subscribePush } from '../lib/push'
+import { currentPushKeys, notificationPermission, pushSupport, subscribePush } from '../lib/push'
 import { registerClientPush } from '../lib/db'
 import { isServiceActive, toDateStr } from '../lib/billing'
 import { buildSlots } from '../lib/slots'
@@ -143,6 +143,27 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
   const [busySlots, setBusySlots] = useState<BusySlot[]>([])
   const [bookingError, setBookingError] = useState('')
   const [reminderState, setReminderState] = useState<'idle' | 'busy' | 'on' | 'denied' | 'error'>('idle')
+
+  // Notificações deste aparelho: pedidas assim que o cliente abre o link (navegador ou app instalado).
+  // O aparelho fica cadastrado e, ao agendar, o lembrete é ligado automaticamente.
+  const [pushOn, setPushOn] = useState(false)
+  const [pushAsking, setPushAsking] = useState(false)
+  useEffect(() => {
+    if (pushSupport() === 'ok' && notificationPermission() === 'granted') {
+      currentPushKeys().then((k) => setPushOn(Boolean(k))).catch(() => {})
+    }
+  }, [])
+  const enablePush = async () => {
+    setPushAsking(true)
+    try {
+      await subscribePush()
+      setPushOn(true)
+    } catch {
+      // permissão negada: o cartão some e o botão da tela final continua disponível
+    } finally {
+      setPushAsking(false)
+    }
+  }
   const [submitting, setSubmitting] = useState(false)
 
   const refreshBusy = useCallback(() => {
@@ -258,6 +279,12 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
     setSubmitting(false)
 
     setReminderState('idle')
+    // Aparelho já cadastrado: liga o lembrete deste agendamento sem pedir nada de novo
+    if (appointmentId) {
+      currentPushKeys()
+        .then((keys) => (keys ? registerClientPush(appointmentId as string, keys).then(() => setReminderState('on')) : undefined))
+        .catch(() => {})
+    }
     setConfirmedBooking({
       id: appointmentId,
       barbershop_id: barbershop.id,
@@ -448,6 +475,27 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
             </span>
           </a>
         </div>
+
+        {/* Convite para receber notificações (aparece logo que o cliente abre o link) */}
+        {serviceOn && step !== 'success' && !pushOn && pushSupport() === 'ok' && notificationPermission() !== 'denied' && (
+          <div className="shop-summary mb-4 p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center gap-3 text-xs">
+            <div className="w-10 h-10 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0">
+              <Bell className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-bold text-white">Receba o lembrete do seu horário</p>
+              <p className="text-slate-400 leading-snug">Ative as notificações neste aparelho.</p>
+            </div>
+            <button
+              type="button"
+              onClick={enablePush}
+              disabled={pushAsking}
+              className={`px-3.5 py-2 rounded-xl font-bold shrink-0 cursor-pointer active:scale-95 transition-transform disabled:opacity-60 ${preset.primaryButton}`}
+            >
+              {pushAsking ? '...' : 'Ativar'}
+            </button>
+          </div>
+        )}
 
         {!serviceOn ? (
           <div className="shop-summary p-6 rounded-3xl bg-slate-900 border border-slate-800 text-center space-y-4 my-6">

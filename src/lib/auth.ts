@@ -1,13 +1,31 @@
 import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
+import { clearOwnerCache } from './ownerCache'
 
 // Sessão do Supabase Auth (fica guardada no navegador e renova sozinha)
+// Lê a sessão guardada no aparelho de forma imediata: quem já estava logado não vê tela de carregamento
+function readStoredSession(): Session | null {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && /^sb-.+-auth-token$/.test(key)) {
+        const value = JSON.parse(localStorage.getItem(key) || 'null')
+        if (value?.user) return value as Session
+      }
+    }
+  } catch {
+    // armazenamento bloqueado
+  }
+  return null
+}
+
 export function useSession() {
-  const [session, setSession] = useState<Session | null>(null)
-  const [ready, setReady] = useState(false)
+  const [session, setSession] = useState<Session | null>(() => readStoredSession())
+  const [ready, setReady] = useState(true)
 
   useEffect(() => {
+    // Confirma com o servidor em segundo plano (renova o acesso se precisar)
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
       setReady(true)
@@ -35,6 +53,7 @@ export async function signUp(email: string, password: string) {
 }
 
 export async function signOut() {
+  clearOwnerCache()
   await supabase.auth.signOut()
 }
 

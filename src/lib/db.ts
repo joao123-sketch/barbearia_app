@@ -254,6 +254,11 @@ export async function removeOwnerPush(shopId: string, endpoint: string) {
   check(await supabase.from('push_subscriptions').delete().eq('kind', 'owner').eq('barbershop_id', shopId).eq('endpoint', endpoint))
 }
 
+// Pede ao servidor para mandar uma notificação de teste a todos os aparelhos do dono
+export async function sendOwnerTestPush(shopId: string) {
+  check(await supabase.rpc('send_owner_test_push', { p_shop: shopId }))
+}
+
 export async function registerClientPush(appointmentId: string, keys: PushKeys) {
   check(
     await supabase.rpc('register_client_push', {
