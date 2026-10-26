@@ -772,56 +772,77 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
             </div>
 
-            <div className="space-y-2.5">
-              {services.map((s) => (
-                <div
-                  key={s.id}
-                  className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3 shadow-lg"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-bold text-sm text-white">{s.name}</h4>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-amber-300 font-semibold uppercase">
-                        {s.category || 'geral'}
-                      </span>
-                    </div>
-                    {s.description && (
-                      <p className="text-xs text-slate-400 mt-0.5">{s.description}</p>
-                    )}
-                    <div className="flex items-center gap-3 mt-1.5 text-xs">
-                      <span className="text-amber-400 font-extrabold text-sm">
-                        R$ {s.price.toFixed(2).replace('.', ',')}
-                      </span>
-                      <span className="text-slate-500">•</span>
-                      <span className="text-slate-400">{s.duration_minutes} minutos</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {/* Botão de Edição */}
-                    <button
-                      onClick={() => handleOpenEditService(s)}
-                      title="Editar preço e duração"
-                      className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-
-                    {/* Botão de Pausar / Ativar */}
-                    <button
-                      onClick={() => toggleServiceActive(s.id)}
-                      className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                        s.active
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
-                          : 'bg-slate-800 text-slate-500 border-slate-700'
-                      }`}
-                    >
-                      {s.active ? 'Ativo' : 'Pausado'}
-                    </button>
-                  </div>
+            {services.length === 0 ? (
+              <div className="p-8 rounded-3xl bg-slate-900/60 border border-dashed border-amber-500/30 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto">
+                  <Scissors className="w-6 h-6" />
                 </div>
-              ))}
-            </div>
+                <div>
+                  <h4 className="font-bold text-sm text-white">Nenhum serviço cadastrado ainda</h4>
+                  <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+                    Adicione os serviços que você realiza (ex: Corte, Barba, Sobrancelha) com preços e tempos de duração para seus clientes agendarem.
+                  </p>
+                </div>
+                <button
+                  onClick={handleOpenAddService}
+                  className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs inline-flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Cadastrar Primeiro Serviço</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {services.map((s) => (
+                  <div
+                    key={s.id}
+                    className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3 shadow-lg"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-sm text-white">{s.name}</h4>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-amber-300 font-semibold uppercase">
+                          {s.category || 'geral'}
+                        </span>
+                      </div>
+                      {s.description && (
+                        <p className="text-xs text-slate-400 mt-0.5">{s.description}</p>
+                      )}
+                      <div className="flex items-center gap-3 mt-1.5 text-xs">
+                        <span className="text-amber-400 font-extrabold text-sm">
+                          R$ {s.price.toFixed(2).replace('.', ',')}
+                        </span>
+                        <span className="text-slate-500">•</span>
+                        <span className="text-slate-400">{s.duration_minutes} minutos</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {/* Botão de Edição */}
+                      <button
+                        onClick={() => handleOpenEditService(s)}
+                        title="Editar preço e duração"
+                        className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Botão de Pausar / Ativar */}
+                      <button
+                        onClick={() => toggleServiceActive(s.id)}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                          s.active
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
+                            : 'bg-slate-800 text-slate-500 border-slate-700'
+                        }`}
+                      >
+                        {s.active ? 'Ativo' : 'Pausado'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

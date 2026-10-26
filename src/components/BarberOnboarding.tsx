@@ -3,11 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Scissors,
   CheckCircle2,
-  Sparkles,
-  ArrowRight,
-  ArrowLeft,
   Store,
-  DollarSign,
   User,
   Mail,
   Lock,
@@ -16,7 +12,8 @@ import {
   Check,
   Copy,
   Camera,
-  Trash2
+  Trash2,
+  Sparkles
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import type { Barbershop, Service } from '../types'
@@ -40,7 +37,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
   onRegisterBarbershop
 }) => {
   const navigate = useNavigate()
-  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [step, setStep] = useState<1 | 2>(1)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Dados do Barbeiro e Estabelecimento
@@ -59,13 +56,6 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
   const [hasCustomLogo, setHasCustomLogo] = useState(false)
 
   const [copiedLink, setCopiedLink] = useState(false)
-
-  // Serviços Iniciais
-  const [servicesList, setServicesList] = useState<Array<{ name: string; price: number; duration: number }>>([
-    { name: 'Corte Tradicional / Degradê', price: 40, duration: 35 },
-    { name: 'Barba Completa com Toalha Quente', price: 30, duration: 30 },
-    { name: 'Combo Cabelo + Barba', price: 65, duration: 60 }
-  ])
 
   // Gerar slug automaticamente ao digitar o nome da barbearia
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -120,15 +110,10 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
     }
   }
 
-  const handlePriceChange = (index: number, newPrice: number) => {
-    const updated = [...servicesList]
-    updated[index].price = newPrice
-    setServicesList(updated)
-  }
-
-  // Validação do Passo 1
-  const handleStep1Submit = (e: React.FormEvent) => {
+  // Conclusão e ativação imediata (cadastro direto sem serviços obrigatórios)
+  const handleFinishRegistration = (e: React.FormEvent) => {
     e.preventDefault()
+
     if (!ownerName.trim()) {
       alert('Por favor, informe o seu nome completo.')
       return
@@ -141,25 +126,20 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       alert('Por favor, informe um WhatsApp válido com DDD.')
       return
     }
-    if (!address.trim()) {
-      alert('Por favor, informe o endereço da barbearia.')
-      return
-    }
-    // E-mail é opcional: se preenchido, valida o formato
-    if (email.trim() && !email.includes('@')) {
-      alert('Por favor, informe um e-mail válido ou deixe o campo em branco.')
-      return
-    }
     if (!password.trim() || password.length < 4) {
       alert('Por favor, crie uma senha de acesso com no mínimo 4 dígitos.')
       return
     }
+    if (!address.trim()) {
+      alert('Por favor, informe o endereço da barbearia.')
+      return
+    }
+    // E-mail opcional
+    if (email.trim() && !email.includes('@')) {
+      alert('Por favor, informe um e-mail válido ou deixe o campo em branco.')
+      return
+    }
 
-    setStep(2)
-  }
-
-  // Conclusão e ativação imediata
-  const handleFinish = () => {
     const newShopId = 'shop-' + Date.now()
     const nextDate = new Date()
     nextDate.setDate(nextDate.getDate() + 30)
@@ -196,20 +176,8 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       blocked_dates: []
     }
 
-    const createdServices: Service[] = servicesList.map((s, idx) => ({
-      id: `serv-new-${idx}`,
-      barbershop_id: newShopId,
-      name: s.name,
-      description: 'Serviço profissional de alta precisão e qualidade.',
-      duration_minutes: s.duration,
-      price: s.price,
-      category: s.name.toLowerCase().includes('barba') && !s.name.toLowerCase().includes('combo')
-        ? 'barba'
-        : s.name.toLowerCase().includes('combo')
-        ? 'combo'
-        : 'cabelo',
-      active: true
-    }))
+    // Não cadastra serviços iniciais agora; o barbeiro cadastra diretamente no painel
+    const createdServices: Service[] = []
 
     // Salvar sessão do barbeiro (login com WhatsApp e Senha)
     localStorage.setItem('barber_current_user', JSON.stringify({
@@ -222,7 +190,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
     }))
 
     onRegisterBarbershop(newBarbershop, createdServices)
-    setStep(3)
+    setStep(2)
 
     try {
       confetti({
@@ -255,23 +223,16 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
             Cadastrar Minha Barbearia
           </h1>
           <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            Preencha as informações obrigatórias para ativar seu sistema instantaneamente. Zero burocracia.
+            Cadastre seu negócio em menos de 1 minuto e comece a receber agendamentos. Os serviços você adiciona direto no seu painel.
           </p>
         </div>
 
-        {/* Indicador de Passos */}
-        <div className="flex items-center justify-center gap-2">
-          <div className={`h-1.5 rounded-full transition-all ${step >= 1 ? 'w-10 bg-amber-400' : 'w-4 bg-slate-800'}`} />
-          <div className={`h-1.5 rounded-full transition-all ${step >= 2 ? 'w-10 bg-amber-400' : 'w-4 bg-slate-800'}`} />
-          <div className={`h-1.5 rounded-full transition-all ${step === 3 ? 'w-10 bg-emerald-400' : 'w-4 bg-slate-800'}`} />
-        </div>
-
-        {/* ===================== PASSO 1: DADOS OBRIGATÓRIOS E LOGO ===================== */}
+        {/* ===================== PASSO 1: FORMULÁRIO COMPLETO & RÁPIDO ===================== */}
         {step === 1 && (
-          <form onSubmit={handleStep1Submit} className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-4 shadow-2xl">
+          <form onSubmit={handleFinishRegistration} className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-4 shadow-2xl">
             <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider">
               <Store className="w-4 h-4" />
-              <span>Passo 1: Informações da Barbearia</span>
+              <span>Informações do seu Negócio</span>
             </div>
 
             {/* FOTO / LOGO DO NEGÓCIO */}
@@ -287,7 +248,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
               <div className="flex-1 text-xs space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-white text-xs">
-                    Logo / Foto do Negócio
+                    Logo / Foto da Barbearia
                   </span>
                   {hasCustomLogo && (
                     <button
@@ -358,25 +319,93 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
                 />
               </div>
 
-              {/* Instagram da Barbearia */}
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
-                  <InstagramIcon className="w-3.5 h-3.5 text-pink-400" />
-                  <span>Instagram da Barbearia (Opcional)</span>
-                </label>
-                <div className="flex items-center px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 focus-within:border-amber-500">
-                  <span className="text-pink-400 font-bold mr-1">@</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* WhatsApp */}
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>WhatsApp com DDD *</span>
+                  </label>
                   <input
-                    type="text"
-                    placeholder="barbearia_exemplo"
-                    value={instagram.replace('@', '')}
-                    onChange={(e) => setInstagram(e.target.value)}
-                    className="w-full bg-transparent text-white text-xs focus:outline-none placeholder-slate-500"
+                    type="tel"
+                    required
+                    placeholder="(11) 99999-9999"
+                    value={phone}
+                    onChange={handlePhoneChange}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-sm font-mono"
                   />
                 </div>
-                <span className="text-[10px] text-slate-500 mt-0.5 block">
-                  Aparecerá com botão direto na página de agendamento dos seus clientes.
-                </span>
+
+                {/* Senha de Acesso */}
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Criar Senha de Acesso *</span>
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Mínimo 4 dígitos"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-sm"
+                  />
+                  <span className="text-[10px] text-amber-300/80 mt-1 block">
+                    Usada junto com seu WhatsApp para login.
+                  </span>
+                </div>
+              </div>
+
+              {/* Endereço */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Endereço Completo & Bairro/Cidade *</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Av. Brasil, 450 - Centro"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-sm"
+                />
+              </div>
+
+              {/* Instagram & E-mail (Opcionais) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Instagram */}
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                    <InstagramIcon className="w-3.5 h-3.5 text-pink-400" />
+                    <span>Instagram (Opcional)</span>
+                  </label>
+                  <div className="flex items-center px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 focus-within:border-amber-500">
+                    <span className="text-pink-400 font-bold mr-1">@</span>
+                    <input
+                      type="text"
+                      placeholder="seunegocio"
+                      value={instagram.replace('@', '')}
+                      onChange={(e) => setInstagram(e.target.value)}
+                      className="w-full bg-transparent text-white text-xs focus:outline-none placeholder-slate-500"
+                    />
+                  </div>
+                </div>
+
+                {/* E-mail (Opcional) */}
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-blue-400" />
+                    <span>E-mail (Opcional)</span>
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="seuemail@gmail.com (opcional)"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-xs"
+                  />
+                </div>
               </div>
 
               {/* Slug / Link personalizado */}
@@ -396,82 +425,10 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* WhatsApp */}
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>WhatsApp com DDD *</span>
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="(11) 99999-9999"
-                    value={phone}
-                    onChange={handlePhoneChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-sm font-mono"
-                  />
-                </div>
-
-                {/* Endereço */}
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Endereço & Bairro *</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ex: Av. Brasil, 450 - Centro"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Senha e E-mail de Acesso */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
-                    <Lock className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Criar Senha de Acesso *</span>
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="Mínimo 4 dígitos"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-xs"
-                  />
-                  <span className="text-[10px] text-amber-300/80 mt-1 block">
-                    Você entrará no painel com seu <strong>WhatsApp</strong> e esta senha.
-                  </span>
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-blue-400" />
-                    <span>E-mail (Opcional)</span>
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="seuemail@gmail.com (opcional)"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-xs"
-                  />
-                  <span className="text-[10px] text-slate-500 mt-1 block">
-                    Não é obrigatório. Se não tiver, pode deixar em branco.
-                  </span>
-                </div>
-              </div>
-
               {/* Slogan */}
               <div>
                 <label className="block text-slate-400 mb-1">
-                  Frase de Destaque / Slogan da Barbearia:
+                  Frase de Destaque / Slogan da Barbearia (Opcional):
                 </label>
                 <input
                   type="text"
@@ -482,12 +439,19 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
               </div>
             </div>
 
+            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200/90">
+              <p className="font-bold text-amber-300">⚡ Ativação Imediata</p>
+              <p className="text-[11px] mt-0.5">
+                Sua barbearia será criada na hora. Você poderá cadastrar seus cortes e preços com calma diretamente no seu painel.
+              </p>
+            </div>
+
             <button
               type="submit"
-              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 active:scale-95 transition-all cursor-pointer"
             >
-              <span>Continuar para Serviços</span>
-              <ArrowRight className="w-4 h-4" />
+              <Sparkles className="w-4 h-4" />
+              <span>Concluir Cadastro & Acessar Painel</span>
             </button>
 
             <div className="text-center pt-1">
@@ -502,80 +466,20 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
           </form>
         )}
 
-        {/* ===================== PASSO 2: SERVIÇOS E PREÇOS ===================== */}
+        {/* ===================== PASSO 2: SUCESSO E LINK PRONTO ===================== */}
         {step === 2 && (
-          <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider">
-                <DollarSign className="w-4 h-4" />
-                <span>Passo 2: Defina seus Valores Iniciais</span>
-              </div>
-              <button
-                onClick={() => setStep(1)}
-                className="text-slate-400 hover:text-white text-xs flex items-center gap-1 cursor-pointer"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Voltar</span>
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-400">
-              Ajuste os valores dos serviços mais comuns. Você poderá adicionar mais serviços e alterar preços a qualquer momento no seu painel.
-            </p>
-
-            <div className="space-y-3">
-              {servicesList.map((serv, index) => (
-                <div
-                  key={index}
-                  className="p-3.5 rounded-2xl bg-slate-800/90 border border-slate-700 flex items-center justify-between gap-3 text-xs"
-                >
-                  <div className="flex-1">
-                    <p className="font-bold text-white text-xs">{serv.name}</p>
-                    <p className="text-slate-400 text-[11px]">{serv.duration} minutos</p>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-slate-400 font-bold">R$</span>
-                    <input
-                      type="number"
-                      step="1"
-                      value={serv.price}
-                      onChange={(e) => handlePriceChange(index, Number(e.target.value))}
-                      className="w-20 px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-amber-300 font-black text-sm text-right focus:border-amber-500 focus:outline-none"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200/90">
-              <p className="font-bold text-amber-300">✅ Ativação Instantânea</p>
-              <p className="text-[11px] mt-0.5">
-                Ao clicar abaixo, sua barbearia é criada imediatamente e seu link já estará disponível para seus clientes agendarem.
-              </p>
-            </div>
-
-            <button
-              onClick={handleFinish}
-              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 active:scale-95 transition-all cursor-pointer"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>Concluir Cadastro & Acessar Sistema</span>
-            </button>
-          </div>
-        )}
-
-        {/* ===================== PASSO 3: SUCESSO E LINK PRONTO ===================== */}
-        {step === 3 && (
           <div className="p-6 rounded-3xl bg-slate-900/90 border border-emerald-500/40 text-center space-y-5 shadow-2xl">
             <div className="w-16 h-16 rounded-3xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center mx-auto shadow-2xl shadow-emerald-500/30">
               <CheckCircle2 className="w-10 h-10" />
             </div>
 
             <div>
-              <h2 className="text-xl font-black text-white">Barbearia Ativada com Sucesso!</h2>
+              <h2 className="text-xl font-black text-white">Barbearia Criada com Sucesso!</h2>
               <p className="text-xs text-slate-300 mt-1">
-                Parabéns, <strong>{ownerName}</strong>! A <strong>{shopName}</strong> já está cadastrada e o seu link público está no ar.
+                Parabéns, <strong>{ownerName}</strong>! A <strong>{shopName}</strong> já está ativa.
+              </p>
+              <p className="text-xs text-amber-400 font-semibold mt-1">
+                Agora acesse seu painel para cadastrar seus serviços e preços!
               </p>
             </div>
 
@@ -594,9 +498,6 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
                   <span>{copiedLink ? 'Copiado!' : 'Copiar'}</span>
                 </button>
               </div>
-              <p className="text-[10px] text-slate-500">
-                Divulgue esse link no seu WhatsApp, Instagram e cartões de visita.
-              </p>
             </div>
 
             <div className="space-y-2.5 pt-2">
@@ -604,14 +505,14 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
                 onClick={() => navigate('/admin')}
                 className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
               >
-                Acessar Meu Painel Administrativo
+                Ir para o Painel e Cadastrar Serviços
               </button>
 
               <button
                 onClick={() => navigate(`/${slug}`)}
                 className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 cursor-pointer"
               >
-                Testar Visualização do Cliente
+                Ver Página do Cliente
               </button>
             </div>
           </div>

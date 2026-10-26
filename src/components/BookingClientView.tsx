@@ -388,18 +388,24 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
 
             {/* Lista de Serviços */}
             <div className="space-y-3">
-              {filteredServices.map((service) => {
-                const isSelected = selectedServices.includes(service.id)
-                return (
-                  <div
-                    key={service.id}
-                    onClick={() => toggleService(service.id)}
-                    className={`p-4 rounded-2xl border transition-all cursor-pointer active:scale-[0.99] ${
-                      isSelected
-                        ? 'bg-gradient-to-r from-amber-500/15 to-transparent border-amber-500 shadow-lg shadow-amber-500/10'
-                        : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
-                    }`}
-                  >
+              {filteredServices.length === 0 ? (
+                <div className="p-8 rounded-3xl bg-slate-900/60 border border-dashed border-slate-800 text-center text-slate-400 text-xs space-y-1">
+                  <p className="font-bold text-white text-sm">Nenhum serviço disponível no momento</p>
+                  <p className="text-slate-400 text-xs">A barbearia está organizando os horários e serviços. Volte em breve!</p>
+                </div>
+              ) : (
+                filteredServices.map((service) => {
+                  const isSelected = selectedServices.includes(service.id)
+                  return (
+                    <div
+                      key={service.id}
+                      onClick={() => toggleService(service.id)}
+                      className={`p-4 rounded-2xl border transition-all cursor-pointer active:scale-[0.99] ${
+                        isSelected
+                          ? 'bg-gradient-to-r from-amber-500/15 to-transparent border-amber-500 shadow-lg shadow-amber-500/10'
+                          : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
@@ -440,7 +446,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                     </div>
                   </div>
                 )
-              })}
+              }))}
             </div>
           </div>
         )}
