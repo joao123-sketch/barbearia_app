@@ -22,11 +22,16 @@ import {
   BellRing,
   MessageCircle,
   ChevronRight,
+  ChevronLeft,
+  Menu,
   Camera,
   History,
   CheckCircle2,
-  Save,
-  Search
+  Search,
+  Sun,
+  Moon,
+  MapPin,
+  Sparkles
 } from 'lucide-react'
 import type { Barbershop, Barber, Service, Appointment, WorkingHour } from '../types'
 import { PWAInstallPrompt } from './PWAInstallPrompt'
@@ -48,6 +53,8 @@ interface AdminDashboardProps {
   services: Service[]
   appointments: Appointment[]
   workingHours: WorkingHour[]
+  theme?: 'dark' | 'light'
+  onToggleTheme?: () => void
   onBackToClientView?: () => void
   onUpdateAppointments?: (appointments: Appointment[]) => void
   onUpdateServices?: (services: Service[]) => void
@@ -62,6 +69,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   services: initialServices,
   appointments: initialAppointments,
   workingHours: initialWorkingHours,
+  theme = 'dark',
+  onToggleTheme,
   onBackToClientView,
   onUpdateAppointments,
   onUpdateServices,
@@ -70,6 +79,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onUpdateWorkingHours
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('agenda')
+  const [sidebarExpanded, setSidebarExpanded] = useState(false)
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments)
   const [localWorkingHours, setLocalWorkingHours] = useState<WorkingHour[]>(initialWorkingHours)
   const [workingHoursSaved, setWorkingHoursSaved] = useState(false)
@@ -77,18 +87,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [copiedLink, setCopiedLink] = useState(false)
   const [copiedPixKey, setCopiedPixKey] = useState(false)
 
-  // Filtro de Histórico de Cortes: Todos | Concluídos | Cancelados
+  // Filtro de Histórico de Cortes: Todos | Concluídos | Cancelados + Filtro de Mês
   const [historyStatusFilter, setHistoryStatusFilter] = useState<'todos' | 'concluidos' | 'cancelados'>('todos')
+  const [historyMonthFilter, setHistoryMonthFilter] = useState<string>('todos')
   const [historySearch, setHistorySearch] = useState('')
 
   // Modais de Serviços
   const [showAddServiceModal, setShowAddServiceModal] = useState(false)
   const [editingService, setEditingService] = useState<Service | null>(null)
+  const [serviceCategory, setServiceCategory] = useState<'cabelo' | 'barba' | 'combo' | 'especial'>('cabelo')
   const [serviceName, setServiceName] = useState('')
   const [servicePrice, setServicePrice] = useState<number>(40)
   const [serviceDuration, setServiceDuration] = useState<number>(30)
-  const [serviceCategory, setServiceCategory] = useState<'cabelo' | 'barba' | 'combo' | 'especial'>('cabelo')
   const [serviceDesc, setServiceDesc] = useState('')
+  const [comboItems, setComboItems] = useState<string[]>([])
+  const [newComboSubService, setNewComboSubService] = useState('')
 
   // Modal de Agendamento Manual Balcão
   const [showAddBookingModal, setShowAddBookingModal] = useState(false)
@@ -110,7 +123,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [profileLogo, setProfileLogo] = useState(barbershop.logo_url)
   const [profileInstagram, setProfileInstagram] = useState(barbershop.instagram || '')
   const [profilePhone, setProfilePhone] = useState(barbershop.phone_whatsapp)
-  const [profileAddress, setProfileAddress] = useState(barbershop.address)
+  const [profileStreet, setProfileStreet] = useState(barbershop.street || (barbershop.address ? barbershop.address.split(',')[0] : ''))
+  const [profileNumber, setProfileNumber] = useState(barbershop.number || '')
+  const [profileNeighborhood, setProfileNeighborhood] = useState(barbershop.neighborhood || '')
+  const [profileCity, setProfileCity] = useState(barbershop.city || '')
+  const [profileReferencePoint, setProfileReferencePoint] = useState(barbershop.reference_point || '')
   const [profileSlogan, setProfileSlogan] = useState(barbershop.slogan || '')
   const [profileSaved, setProfileSaved] = useState(false)
   const logoFileInputRef = useRef<HTMLInputElement>(null)
@@ -208,12 +225,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return days
   }, [appointments, localWorkingHours, barbershop.blocked_dates, todayStr])
 
-  const [selectedWeekDate, setSelectedWeekDate] = useState<string>(todayStr)
-
-  const selectedDayInfo = useMemo(() => {
-    return weekDays.find((d) => d.dateStr === selectedWeekDate) || weekDays[0]
-  }, [weekDays, selectedWeekDate])
-
   const weekTotalRevenue = useMemo(() => {
     return weekDays.reduce((acc, d) => acc + d.dayRevenue, 0)
   }, [weekDays])
@@ -226,6 +237,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return weekDays.reduce((acc, d) => acc + d.freeSlots, 0)
   }, [weekDays])
 
+  // ===================== GRADE SEMANAL (HORÁRIOS NAS LINHAS E DIAS NAS COLUNAS) =====================
+  const timetableSlots = useMemo(() => {
+    const slots: string[] = []
+    for (let h = 8; h <= 20; h++) {
+      slots.push(`${String(h).padStart(2, '0')}:00`)
+      slots.push(`${String(h).padStart(2, '0')}:30`)
+    }
+    return slots
+  }, [])
+
+  // Meses disponíveis no histórico
+  const availableHistoryMonths = useMemo(() => {
+    const monthSet = new Set<string>()
+    appointments.forEach((apt) => {
+      if (apt.appointment_date && apt.appointment_date.length >= 7) {
+        monthSet.add(apt.appointment_date.slice(0, 7))
+      }
+    })
+    monthSet.add(todayStr.slice(0, 7))
+    return Array.from(monthSet).sort().reverse()
+  }, [appointments, todayStr])
+
   // ===================== HISTÓRICO GERAL DE CORTES =====================
   const filteredHistoryAppointments = useMemo(() => {
     return appointments
@@ -234,6 +267,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           if (apt.status === 'cancelled') return false
         } else if (historyStatusFilter === 'cancelados') {
           if (apt.status !== 'cancelled') return false
+        }
+
+        if (historyMonthFilter !== 'todos') {
+          if (!apt.appointment_date.startsWith(historyMonthFilter)) return false
         }
 
         if (historySearch.trim()) {
@@ -250,21 +287,72 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const dateB = `${b.appointment_date} ${b.start_time}`
         return dateB.localeCompare(dateA)
       })
-  }, [appointments, historyStatusFilter, historySearch])
+  }, [appointments, historyStatusFilter, historyMonthFilter, historySearch])
 
   const historyTotalRevenue = useMemo(() => {
-    return appointments
+    return filteredHistoryAppointments
       .filter((a) => a.status !== 'cancelled')
       .reduce((sum, a) => sum + a.total_price, 0)
-  }, [appointments])
+  }, [filteredHistoryAppointments])
 
   const historyCompletedCount = useMemo(() => {
-    return appointments.filter((a) => a.status !== 'cancelled').length
-  }, [appointments])
+    return filteredHistoryAppointments.filter((a) => a.status !== 'cancelled').length
+  }, [filteredHistoryAppointments])
 
   const historyCancelledCount = useMemo(() => {
-    return appointments.filter((a) => a.status === 'cancelled').length
-  }, [appointments])
+    return filteredHistoryAppointments.filter((a) => a.status === 'cancelled').length
+  }, [filteredHistoryAppointments])
+
+  // ===================== DASHBOARD DE HORAS TRABALHADAS (DIÁRIAS & AGREGADO SEMANAL) =====================
+  const workingHoursStats = useMemo(() => {
+    const toMins = (t: string) => {
+      if (!t || !t.includes(':')) return 0
+      const [h, m] = t.split(':').map(Number)
+      return h * 60 + m
+    }
+
+    let totalWeeklyMins = 0
+    let openDaysCount = 0
+
+    const dayStats = localWorkingHours.map((wh) => {
+      if (!wh.is_open) {
+        return {
+          day_name: wh.day_name,
+          day_of_week: wh.day_of_week,
+          is_open: false,
+          hoursFormatted: 'Folga',
+          hoursDec: 0
+        }
+      }
+      openDaysCount++
+      const openM = toMins(wh.open_time)
+      const closeM = toMins(wh.close_time)
+      let dailyM = Math.max(0, closeM - openM)
+      if (wh.lunch_start && wh.lunch_end) {
+        const lunchM = Math.max(0, toMins(wh.lunch_end) - toMins(wh.lunch_start))
+        dailyM = Math.max(0, dailyM - lunchM)
+      }
+      totalWeeklyMins += dailyM
+      const hoursDec = dailyM / 60
+      return {
+        day_name: wh.day_name,
+        day_of_week: wh.day_of_week,
+        is_open: true,
+        hoursFormatted: `${hoursDec.toFixed(1).replace('.0', '')}h`,
+        hoursDec
+      }
+    })
+
+    const totalWeeklyHours = (totalWeeklyMins / 60).toFixed(1).replace('.0', '')
+    const avgDailyHours = openDaysCount > 0 ? (totalWeeklyMins / openDaysCount / 60).toFixed(1).replace('.0', '') : '0'
+
+    return {
+      totalWeeklyHours,
+      avgDailyHours,
+      openDaysCount,
+      dayStats
+    }
+  }, [localWorkingHours])
 
   // ===================== AÇÕES DE CANCELAMENTO / REATIVAÇÃO =====================
   const handleCancelAppointment = (id: string) => {
@@ -285,45 +373,61 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (onUpdateAppointments) onUpdateAppointments(updated)
   }
 
-  // ===================== CONFIGURAÇÃO DE HORÁRIOS SEMANAIS =====================
+  // ===================== CONFIGURAÇÃO DE HORÁRIOS SEMANAIS (SALVAMENTO AUTOMÁTICO) =====================
   const handleUpdateDaySchedule = (
     dayIndex: number,
     field: keyof WorkingHour,
     value: any
   ) => {
-    setLocalWorkingHours((prev) =>
-      prev.map((wh) => (wh.day_of_week === dayIndex ? { ...wh, [field]: value } : wh))
-    )
-  }
-
-  const handleSaveWorkingHours = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (onUpdateWorkingHours) {
-      onUpdateWorkingHours(localWorkingHours)
-    }
+    setLocalWorkingHours((prev) => {
+      const updated = prev.map((wh) => (wh.day_of_week === dayIndex ? { ...wh, [field]: value } : wh))
+      if (onUpdateWorkingHours) {
+        onUpdateWorkingHours(updated)
+      }
+      return updated
+    })
     setWorkingHoursSaved(true)
-    setTimeout(() => setWorkingHoursSaved(false), 3000)
+    setTimeout(() => setWorkingHoursSaved(false), 2000)
   }
 
-  // ===================== CADASTRO E EDIÇÃO DE SERVIÇOS =====================
+  // ===================== CADASTRO E EDIÇÃO DE SERVIÇOS (COMBO INCLUSO) =====================
   const handleOpenAddService = () => {
     setEditingService(null)
+    setServiceCategory('cabelo')
     setServiceName('')
     setServicePrice(40)
     setServiceDuration(30)
-    setServiceCategory('cabelo')
     setServiceDesc('')
+    setComboItems([])
+    setNewComboSubService('')
     setShowAddServiceModal(true)
   }
 
   const handleOpenEditService = (service: Service) => {
     setEditingService(service)
+    setServiceCategory(service.category || 'cabelo')
     setServiceName(service.name)
     setServicePrice(service.price)
     setServiceDuration(service.duration_minutes)
-    setServiceCategory(service.category || 'cabelo')
     setServiceDesc(service.description || '')
+    setComboItems(service.combo_items || [])
+    setNewComboSubService('')
     setShowAddServiceModal(true)
+  }
+
+  const handleAddComboItem = () => {
+    if (!newComboSubService.trim()) return
+    const updated = [...comboItems, newComboSubService.trim()]
+    setComboItems(updated)
+    setNewComboSubService('')
+    if (!serviceName.trim() || serviceName.startsWith('Combo:')) {
+      setServiceName(`Combo: ${updated.join(' + ')}`)
+    }
+  }
+
+  const handleRemoveComboItem = (index: number) => {
+    const updated = comboItems.filter((_, i) => i !== index)
+    setComboItems(updated)
   }
 
   const handleSaveService = (e: React.FormEvent) => {
@@ -340,6 +444,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               price: Number(servicePrice),
               duration_minutes: Number(serviceDuration),
               category: serviceCategory,
+              combo_items: serviceCategory === 'combo' ? comboItems : undefined,
               description: serviceDesc
             }
           : s
@@ -355,6 +460,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         price: Number(servicePrice),
         duration_minutes: Number(serviceDuration),
         category: serviceCategory,
+        combo_items: serviceCategory === 'combo' ? comboItems : undefined,
         description: serviceDesc || 'Atendimento de alta precisão e qualidade.',
         active: true
       }
@@ -485,13 +591,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault()
+    const fullAddress = `${profileStreet.trim()}, ${profileNumber.trim()} - ${profileNeighborhood.trim()}, ${profileCity.trim()}${profileReferencePoint.trim() ? ` (${profileReferencePoint.trim()})` : ''}`
     const updatedShop: Barbershop = {
       ...barbershop,
       name: profileName,
       logo_url: profileLogo,
       instagram: profileInstagram ? (profileInstagram.startsWith('@') ? profileInstagram : `@${profileInstagram}`) : '',
       phone_whatsapp: profilePhone,
-      address: profileAddress,
+      address: fullAddress,
+      street: profileStreet.trim(),
+      number: profileNumber.trim(),
+      neighborhood: profileNeighborhood.trim(),
+      city: profileCity.trim(),
+      reference_point: profileReferencePoint.trim() || undefined,
       slogan: profileSlogan
     }
     if (onUpdateBarbershop) onUpdateBarbershop(updatedShop)
@@ -499,47 +611,183 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setTimeout(() => setProfileSaved(false), 3000)
   }
 
+  const isLight = theme === 'light'
+
+  const adminTabsList = [
+    { id: 'agenda' as AdminTab, label: 'Hoje', fullLabel: 'Agenda de Hoje', icon: Calendar, badge: todayAppointments.length },
+    { id: 'semana' as AdminTab, label: 'Semana', fullLabel: 'Calendário Semanal', icon: CalendarDays },
+    { id: 'historico' as AdminTab, label: 'Histórico', fullLabel: 'Histórico de Cortes', icon: History },
+    { id: 'servicos' as AdminTab, label: 'Serviços', fullLabel: 'Serviços & Preços', icon: Scissors, badge: services.length },
+    { id: 'horarios' as AdminTab, label: 'Horários', fullLabel: 'Horários & Pausas', icon: Clock },
+    { id: 'config' as AdminTab, label: 'Config', fullLabel: 'Configurações', icon: Settings }
+  ]
+
   return (
-    <div className="min-h-screen bg-[#090A0F] text-slate-100 pb-32 sm:pb-20 select-none">
-      {/* ===================== TOPO ADMINISTRATIVO ===================== */}
-      <header className="sticky top-0 z-30 bg-[#0d0f17]/95 border-b border-slate-800/80 backdrop-blur-md px-4 py-3">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl overflow-hidden border border-amber-500/40 bg-slate-900 shrink-0">
-              <img
-                src={barbershop.logo_url}
-                alt={barbershop.name}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                <h1 className="font-extrabold text-sm text-white truncate max-w-[150px] sm:max-w-none">
-                  {barbershop.name}
-                </h1>
+    <div className={`min-h-screen select-none transition-colors ${isLight ? 'bg-slate-100 text-slate-900' : 'bg-[#090A0F] text-slate-100'}`}>
+      {/* ===================== OVERLAY PARA MOBILE QUANDO SIDEBAR EXPANDIDA ===================== */}
+      {sidebarExpanded && (
+        <div
+          onClick={() => setSidebarExpanded(false)}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 sm:hidden transition-opacity"
+        />
+      )}
+
+      {/* ===================== BARRA LATERAL ESQUERDA (SIDEBAR RETRÁTIL) ===================== */}
+      <aside
+        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col justify-between transition-all duration-300 border-r shadow-2xl ${
+          sidebarExpanded ? 'w-56 sm:w-64' : 'w-14 sm:w-16'
+        } ${
+          isLight
+            ? 'bg-white/95 border-slate-200 backdrop-blur-xl'
+            : 'bg-[#0d0f17]/95 border-slate-800/90 backdrop-blur-xl'
+        }`}
+      >
+        {/* Topo da Sidebar: Logo + Botão Minimizar/Expandir */}
+        <div>
+          <div className="p-2 sm:p-3 flex items-center justify-between border-b border-slate-800/60">
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <div className="w-9 h-9 rounded-xl overflow-hidden border border-amber-500/50 bg-slate-900 shrink-0">
+                <img src={barbershop.logo_url} alt={barbershop.name} className="w-full h-full object-cover" />
               </div>
-              <p className="text-[11px] text-amber-400 font-medium">Painel do Barbeiro</p>
+              {sidebarExpanded && (
+                <div className="truncate min-w-0">
+                  <h2 className="font-extrabold text-xs text-white truncate">{barbershop.name}</h2>
+                  <p className="text-[10px] text-amber-400 font-semibold truncate">Painel Barbeiro</p>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setSidebarExpanded(!sidebarExpanded)}
+              title={sidebarExpanded ? 'Recolher menu' : 'Expandir menu'}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors cursor-pointer shrink-0"
+            >
+              {sidebarExpanded ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            </button>
+          </div>
+
+          {/* Lista de Abas */}
+          <nav className="p-1.5 space-y-1">
+            {adminTabsList.map((tab) => {
+              const Icon = tab.icon
+              const isActive = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id)
+                    if (window.innerWidth < 640) setSidebarExpanded(false)
+                  }}
+                  title={tab.fullLabel}
+                  className={`w-full flex items-center gap-3 p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                      : isLight
+                      ? 'text-slate-600 hover:text-slate-950 hover:bg-slate-100'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                  }`}
+                >
+                  <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'stroke-[2.5]' : ''}`} />
+                  {sidebarExpanded && (
+                    <span className="truncate flex-1 text-left">{tab.label}</span>
+                  )}
+                  {sidebarExpanded && typeof tab.badge === 'number' && tab.badge > 0 && (
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                      isActive ? 'bg-slate-950 text-amber-300' : 'bg-slate-800 text-amber-400'
+                    }`}>
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </nav>
+        </div>
+
+        {/* Rodapé da Sidebar: Tema Claro/Escuro & Ver Cliente */}
+        <div className="p-2 border-t border-slate-800/60 space-y-1">
+          {onToggleTheme && (
+            <button
+              onClick={onToggleTheme}
+              title={isLight ? 'Modo Escuro' : 'Modo Claro'}
+              className={`w-full flex items-center gap-3 p-2 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+                isLight ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              {isLight ? <Moon className="w-5 h-5 text-indigo-500 shrink-0" /> : <Sun className="w-5 h-5 text-amber-400 shrink-0" />}
+              {sidebarExpanded && <span>{isLight ? 'Modo Escuro' : 'Modo Claro'}</span>}
+            </button>
+          )}
+
+          {onBackToClientView && (
+            <button
+              onClick={onBackToClientView}
+              title="Ver como Cliente"
+              className={`w-full flex items-center gap-3 p-2 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+                isLight ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <ExternalLink className="w-5 h-5 text-amber-400 shrink-0" />
+              {sidebarExpanded && <span>Ver Cliente</span>}
+            </button>
+          )}
+        </div>
+      </aside>
+
+      {/* ===================== ÁREA PRINCIPAL COM PADDING DA SIDEBAR ===================== */}
+      <div className="pl-14 sm:pl-16 min-h-screen flex flex-col">
+        {/* Topo Administrativo */}
+        <header className={`sticky top-0 z-30 border-b backdrop-blur-md px-4 py-3 transition-colors ${
+          isLight ? 'bg-white/90 border-slate-200' : 'bg-[#0d0f17]/95 border-slate-800/80'
+        }`}>
+          <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSidebarExpanded(!sidebarExpanded)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer sm:hidden"
+                title="Abrir menu"
+              >
+                <Menu className="w-5 h-5 text-amber-400" />
+              </button>
+              <div>
+                <h1 className={`font-black text-sm sm:text-base leading-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                  {adminTabsList.find(t => t.id === activeTab)?.fullLabel || 'Painel do Barbeiro'}
+                </h1>
+                <p className="text-[11px] text-amber-400 font-semibold truncate max-w-[180px] sm:max-w-none">
+                  {barbershop.name}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {onToggleTheme && (
+                <button
+                  onClick={onToggleTheme}
+                  title={isLight ? 'Modo Escuro' : 'Modo Claro'}
+                  className={`p-2 rounded-xl border text-xs cursor-pointer active:scale-95 transition-all ${
+                    isLight ? 'bg-slate-100 border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-amber-400'
+                  }`}
+                >
+                  {isLight ? <Moon className="w-4 h-4 text-indigo-500" /> : <Sun className="w-4 h-4" />}
+                </button>
+              )}
+              {onBackToClientView && (
+                <button
+                  onClick={onBackToClientView}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold border active:scale-95 transition-all cursor-pointer ${
+                    isLight ? 'bg-slate-100 border-slate-200 text-slate-800 hover:bg-slate-200' : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                  }`}
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="hidden sm:inline">Ver como</span> Cliente
+                </button>
+              )}
+              <PWAInstallPrompt variant="compact" buttonText="App" />
             </div>
           </div>
+        </header>
 
-          <div className="flex items-center gap-2">
-            {onBackToClientView && (
-              <button
-                onClick={onBackToClientView}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 active:scale-95 transition-all cursor-pointer"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Ver como</span> Cliente
-              </button>
-            )}
-
-            <PWAInstallPrompt variant="compact" buttonText="App Barbeiro" />
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-4xl mx-auto px-4 py-5 space-y-5">
+        <main className="max-w-4xl mx-auto px-3 sm:px-4 py-5 space-y-5 flex-1 w-full">
         {/* ===================== ALERTA DE VENCIMENTO DA MENSALIDADE (5, 4, 3, 2, 1 DIAS) ===================== */}
         {daysUntilDue <= 5 && daysUntilDue >= 0 && barbershop.subscription_status !== 'blocked' && (
           <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/20 via-slate-900 to-slate-900 border border-amber-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl">
@@ -844,14 +1092,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* ========================================================================= */}
         {/* ===================== ABA 2: CALENDÁRIO SEMANAL ========================= */}
         {/* ========================================================================= */}
+        {/* ========================================================================= */}
+        {/* ===================== ABA 2: CALENDÁRIO SEMANAL ========================= */}
+        {/* ========================================================================= */}
         {activeTab === 'semana' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h3 className="font-bold text-sm text-white">Previsão e Agendamentos da Semana</h3>
+                <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                  <CalendarDays className="w-4 h-4 text-amber-400" />
+                  <span>Calendário Semanal de Atendimentos</span>
+                </h3>
                 <p className="text-xs text-slate-400">
-                  Acompanhe os horários marcados, vagas livres e estimativa de faturamento diário.
+                  Grade completa da semana com horários nas linhas e dias nas colunas.
                 </p>
+              </div>
+
+              {/* Legenda rápida */}
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                <span className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded bg-emerald-500/20 border border-emerald-500/40 inline-block" />
+                  <span>Livre</span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded bg-amber-500/30 border border-amber-500 inline-block" />
+                  <span>Marcado</span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded bg-slate-800 border border-slate-700 inline-block" />
+                  <span>Fechado/Almoço</span>
+                </span>
               </div>
             </div>
 
@@ -887,145 +1157,219 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
 
-            {/* Grid dos 7 Dias da Semana (Cards clicáveis) */}
-            <div className="grid grid-cols-2 sm:grid-cols-7 gap-2">
-              {weekDays.map((d) => {
-                const isSelected = d.dateStr === selectedWeekDate
-
-                return (
-                  <button
-                    key={d.dateStr}
-                    type="button"
-                    onClick={() => setSelectedWeekDate(d.dateStr)}
-                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                      isSelected
-                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/25 scale-[1.02]'
-                        : d.isToday
-                        ? 'bg-slate-900/90 border-amber-500/50 text-white'
-                        : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className={`text-[11px] font-bold uppercase truncate ${isSelected ? 'text-slate-900' : 'text-slate-400'}`}>
-                          {d.dayName}
-                        </span>
-                        {d.isToday && (
-                          <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${isSelected ? 'bg-slate-950 text-amber-400' : 'bg-amber-500/20 text-amber-300'}`}>
-                            Hoje
-                          </span>
-                        )}
-                      </div>
-
-                      <p className={`text-base font-black mt-1 ${isSelected ? 'text-slate-950' : 'text-white'}`}>
-                        {d.displayDate}
-                      </p>
-                    </div>
-
-                    <div className="pt-2 text-[10px] space-y-0.5">
-                      {!d.isOpen ? (
-                        <span className={`inline-block px-1.5 py-0.5 rounded font-bold ${isSelected ? 'bg-slate-950/20 text-slate-900' : 'bg-slate-800 text-slate-500'}`}>
-                          {d.isBlocked ? 'Pausa' : 'Fechado'}
-                        </span>
-                      ) : (
-                        <>
-                          <p className={`font-bold ${isSelected ? 'text-slate-950' : 'text-emerald-400'}`}>
-                            {d.bookedCount} marcados
-                          </p>
-                          <p className={`text-[9px] ${isSelected ? 'text-slate-800' : 'text-slate-400'}`}>
-                            {d.freeSlots} livres
-                          </p>
-                          <p className={`font-mono font-bold pt-0.5 ${isSelected ? 'text-slate-950 font-black' : 'text-amber-300'}`}>
-                            R$ {d.dayRevenue.toFixed(0)}
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Detalhe do Dia Selecionado */}
-            <div className="p-4 rounded-3xl bg-slate-900 border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div>
-                  <h4 className="font-bold text-sm text-white">
-                    Agendamentos de {selectedDayInfo.dayName} ({selectedDayInfo.displayDate})
-                  </h4>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {selectedDayInfo.isOpen
-                      ? `${selectedDayInfo.bookedCount} agendamento(s) • ${selectedDayInfo.freeSlots} vaga(s) livre(s) • R$ ${selectedDayInfo.dayRevenue.toFixed(2).replace('.', ',')} previsto`
-                      : 'Barbearia fechada neste dia'}
-                  </p>
-                </div>
-              </div>
-
-              {selectedDayInfo.allAppointments.length === 0 ? (
-                <p className="text-xs text-slate-400 italic py-3 text-center">
-                  Nenhum corte agendado para este dia da semana.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {selectedDayInfo.allAppointments.map((apt) => {
-                    const isCancelled = apt.status === 'cancelled'
-                    const serviceNames = services
-                      .filter((s) => apt.service_ids.includes(s.id))
-                      .map((s) => s.name)
-                      .join(' + ') || 'Corte Padrão'
-
-                    return (
-                      <div
-                        key={apt.id}
-                        className={`p-3 rounded-2xl border flex items-center justify-between gap-3 text-xs ${
-                          isCancelled
-                            ? 'bg-rose-950/20 border-rose-900/40 opacity-70'
-                            : 'bg-slate-800/80 border-slate-700'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="font-mono font-bold text-amber-400 text-sm">
-                            {apt.start_time}
-                          </span>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className={`font-bold text-white ${isCancelled ? 'line-through text-slate-400' : ''}`}>
-                                {apt.client_name}
+            {/* GRADE SEMANAL: HORÁRIOS NAS LINHAS E DIAS NAS COLUNAS */}
+            <div className="rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl overflow-hidden">
+              <div className="overflow-x-auto max-h-[640px] overflow-y-auto">
+                <table className="w-full border-collapse text-left min-w-[760px]">
+                  <thead className="sticky top-0 z-20 bg-slate-950 shadow-md">
+                    <tr>
+                      <th className="sticky left-0 z-30 bg-slate-950 w-20 py-3.5 px-3 text-center text-xs font-mono font-bold text-amber-400 border-b border-r border-slate-800">
+                        Horário
+                      </th>
+                      {weekDays.map((d) => (
+                        <th
+                          key={d.dateStr}
+                          className={`py-3 px-3 text-center text-xs border-b border-r border-slate-800 min-w-[100px] ${
+                            d.isToday ? 'bg-amber-500/10' : 'bg-slate-950'
+                          }`}
+                        >
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className={`font-bold text-[11px] uppercase ${d.isToday ? 'text-amber-400' : 'text-slate-300'}`}>
+                              {d.dayName}
+                            </span>
+                            <span className="font-mono text-xs font-black text-white">
+                              {d.displayDate}
+                            </span>
+                            {d.isToday && (
+                              <span className="text-[9px] px-1.5 py-0.2 rounded-full font-bold bg-amber-500 text-slate-950 mt-0.5">
+                                Hoje
                               </span>
-                              <span
-                                className={`text-[9px] px-2 py-0.2 rounded-full font-bold ${
-                                  isCancelled
-                                    ? 'bg-rose-500/20 text-rose-400'
-                                    : 'bg-emerald-500/20 text-emerald-400'
-                                }`}
-                              >
-                                {isCancelled ? 'Cancelado' : 'Concluído'}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-slate-400">{serviceNames}</p>
+                            )}
+                            <span className="text-[9px] text-slate-400 mt-0.5">
+                              {d.isOpen ? `${d.bookedCount} marcados` : 'Fechado'}
+                            </span>
                           </div>
-                        </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {timetableSlots.map((slot) => (
+                      <tr key={slot} className="border-b border-slate-800/60 hover:bg-slate-800/20 transition-colors">
+                        {/* Coluna Horário Fixa na Esquerda */}
+                        <td className="sticky left-0 z-10 bg-slate-950 w-20 py-2.5 px-2 text-center font-mono font-bold text-xs text-amber-400/90 border-r border-slate-800">
+                          {slot}
+                        </td>
 
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-amber-300">
-                            R$ {apt.total_price.toFixed(2).replace('.', ',')}
-                          </span>
+                        {/* 7 Colunas para os dias da semana */}
+                        {weekDays.map((d) => {
+                          const wh = d.wh
+                          const isDayClosed = !d.isOpen || d.isBlocked
+                          const isLunch =
+                            wh &&
+                            wh.lunch_start &&
+                            wh.lunch_end &&
+                            slot >= wh.lunch_start &&
+                            slot < wh.lunch_end
+                          const isOutside = wh && (slot < wh.open_time || slot >= wh.close_time)
 
-                          {!isCancelled && (
-                            <button
-                              onClick={() => handleCancelAppointment(apt.id)}
-                              className="text-slate-400 hover:text-rose-400 p-1 cursor-pointer"
-                              title="Cancelar corte"
-                            >
-                              <XCircle className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+                          // Agendamento iniciando exatamente neste slot
+                          const apt = d.allAppointments.find((a) => a.start_time === slot)
+
+                          // Agendamento anterior que ainda está ocorrendo
+                          const isCovered =
+                            !apt &&
+                            d.allAppointments.some((a) => {
+                              if (a.status === 'cancelled') return false
+                              const [sh, sm] = a.start_time.split(':').map(Number)
+                              const [th, tm] = slot.split(':').map(Number)
+                              const startM = sh * 60 + sm
+                              const targetM = th * 60 + tm
+                              return targetM > startM && targetM < startM + a.total_duration
+                            })
+
+                          if (isDayClosed) {
+                            return (
+                              <td
+                                key={d.dateStr}
+                                className="p-2 border-r border-slate-800/40 bg-slate-950/40 text-center text-[10px] text-slate-400 select-none"
+                              >
+                                {d.isBlocked ? 'Pausa' : 'Fechado'}
+                              </td>
+                            )
+                          }
+
+                          if (isOutside) {
+                            return (
+                              <td
+                                key={d.dateStr}
+                                className="p-2 border-r border-slate-800/40 bg-slate-950/50 text-center text-xs text-slate-400 select-none"
+                              >
+                                —
+                              </td>
+                            )
+                          }
+
+                          if (isLunch) {
+                            return (
+                              <td
+                                key={d.dateStr}
+                                className="p-2 border-r border-slate-800/40 bg-slate-950/30 text-center text-[10px] text-amber-500/70 font-semibold select-none"
+                              >
+                                Almoço
+                              </td>
+                            )
+                          }
+
+                          if (apt) {
+                            const isCancelled = apt.status === 'cancelled'
+                            const serviceNames =
+                              services
+                                .filter((s) => apt.service_ids.includes(s.id))
+                                .map((s) => s.name)
+                                .join(' + ') || 'Corte'
+                            const hasPhone =
+                              apt.client_phone && apt.client_phone !== 'Cliente Balcão'
+
+                            return (
+                              <td key={d.dateStr} className="p-1.5 border-r border-slate-800/40 align-top">
+                                <div
+                                  className={`p-2 rounded-xl text-left transition-all ${
+                                    isCancelled
+                                      ? 'bg-rose-950/30 border border-rose-900/50 text-slate-400 opacity-70'
+                                      : 'bg-amber-500/15 border border-amber-500/35 text-white shadow-sm'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span
+                                      className={`font-bold text-xs truncate max-w-[80px] ${
+                                        isCancelled ? 'line-through text-slate-400' : 'text-amber-300'
+                                      }`}
+                                    >
+                                      {apt.client_name}
+                                    </span>
+                                    <span className="font-mono text-[10px] font-bold text-slate-300 shrink-0">
+                                      R$ {apt.total_price.toFixed(0)}
+                                    </span>
+                                  </div>
+
+                                  <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                                    {serviceNames}
+                                  </p>
+
+                                  <div className="flex items-center justify-between gap-1 mt-1.5 pt-1 border-t border-slate-800/60">
+                                    <span
+                                      className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
+                                        isCancelled
+                                          ? 'bg-rose-500/20 text-rose-300'
+                                          : 'bg-emerald-500/20 text-emerald-300'
+                                      }`}
+                                    >
+                                      {isCancelled ? 'Canc.' : `${apt.total_duration}m`}
+                                    </span>
+
+                                    <div className="flex items-center gap-1">
+                                      {hasPhone && !isCancelled && (
+                                        <a
+                                          href={getClientWhatsappUrl(apt)}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          title="Enviar WhatsApp"
+                                          className="p-1 rounded bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors"
+                                        >
+                                          <MessageCircle className="w-3 h-3 fill-current" />
+                                        </a>
+                                      )}
+                                      {!isCancelled && (
+                                        <button
+                                          onClick={() => handleCancelAppointment(apt.id)}
+                                          title="Cancelar corte"
+                                          className="p-1 rounded text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+                                        >
+                                          <XCircle className="w-3 h-3" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                            )
+                          }
+
+                          if (isCovered) {
+                            return (
+                              <td key={d.dateStr} className="p-1.5 border-r border-slate-800/40 align-middle">
+                                <div className="py-2 px-1 rounded-xl bg-amber-500/5 border border-amber-500/15 text-center">
+                                  <span className="text-[10px] font-medium text-amber-400/80">
+                                    Em corte
+                                  </span>
+                                </div>
+                              </td>
+                            )
+                          }
+
+                          // Slot Livre
+                          return (
+                            <td key={d.dateStr} className="p-1.5 border-r border-slate-800/40 align-middle">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setNewTime(slot)
+                                  setShowAddBookingModal(true)
+                                }}
+                                title={`Agendar corte manual para ${d.dayName} às ${slot}`}
+                                className="w-full py-2 px-1 rounded-xl border border-dashed border-emerald-500/20 hover:border-emerald-500/60 hover:bg-emerald-500/10 text-emerald-400/60 hover:text-emerald-300 text-[10px] font-semibold text-center transition-all cursor-pointer flex items-center justify-center gap-0.5"
+                              >
+                                <span>+ Livre</span>
+                              </button>
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -1043,25 +1387,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </p>
               </div>
 
-              {/* Filtro de Status: Todos | Concluídos | Cancelados */}
-              <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-2xl border border-slate-800 text-xs self-start sm:self-auto">
-                {[
-                  { id: 'todos', label: 'Todos' },
-                  { id: 'concluidos', label: `Concluídos (${historyCompletedCount})` },
-                  { id: 'cancelados', label: `Cancelados (${historyCancelledCount})` }
-                ].map((f) => (
-                  <button
-                    key={f.id}
-                    onClick={() => setHistoryStatusFilter(f.id as any)}
-                    className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
-                      historyStatusFilter === f.id
-                        ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                ))}
+              {/* Filtros: Mês + Status */}
+              <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                {/* Seletor de Mês */}
+                <select
+                  value={historyMonthFilter}
+                  onChange={(e) => setHistoryMonthFilter(e.target.value)}
+                  className="bg-slate-900 border border-slate-800 text-xs text-amber-300 font-bold rounded-2xl px-3 py-2 focus:border-amber-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="todos">Todos os Meses</option>
+                  {availableHistoryMonths.map((m) => {
+                    const [y, mon] = m.split('-')
+                    const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+                    const label = `${monthNames[parseInt(mon, 10) - 1]} / ${y}`
+                    return (
+                      <option key={m} value={m} className="bg-slate-900 text-white">
+                        {label}
+                      </option>
+                    )
+                  })}
+                </select>
+
+                {/* Filtro de Status: Todos | Concluídos | Cancelados */}
+                <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-2xl border border-slate-800 text-xs">
+                  {[
+                    { id: 'todos', label: 'Todos' },
+                    { id: 'concluidos', label: `Concluídos (${historyCompletedCount})` },
+                    { id: 'cancelados', label: `Cancelados (${historyCancelledCount})` }
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => setHistoryStatusFilter(f.id as any)}
+                      className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+                        historyStatusFilter === f.id
+                          ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -1238,17 +1604,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             {s.category || 'geral'}
                           </span>
                         </div>
-                      {s.description && (
-                        <p className="text-xs text-slate-400 mt-0.5">{s.description}</p>
-                      )}
-                      <div className="flex items-center gap-3 mt-1.5 text-xs">
-                        <span className="text-amber-400 font-extrabold text-sm">
-                          R$ {s.price.toFixed(2).replace('.', ',')}
-                        </span>
-                        <span className="text-slate-500">•</span>
-                        <span className="text-slate-400">{s.duration_minutes} minutos</span>
+                        {s.description && (
+                          <p className="text-xs text-slate-400 mt-0.5">{s.description}</p>
+                        )}
+                        {/* Tags de Serviços Inclusos no Combo */}
+                        {s.combo_items && s.combo_items.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                            <span className="text-[10px] text-slate-400">Inclui:</span>
+                            {s.combo_items.map((item, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[10px] font-semibold"
+                              >
+                                ✓ {item}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-3 mt-1.5 text-xs">
+                          <span className="text-amber-400 font-extrabold text-sm">
+                            R$ {s.price.toFixed(2).replace('.', ',')}
+                          </span>
+                          <span className="text-slate-500">•</span>
+                          <span className="text-slate-400">{s.duration_minutes} minutos</span>
+                        </div>
                       </div>
-                    </div>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -1285,8 +1665,66 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* ========================================================================= */}
         {activeTab === 'horarios' && (
           <div className="space-y-6">
-            {/* SEÇÃO 1: HORÁRIOS REGULARES DE ATENDIMENTO SEMANAL (TOTALMENTE EDITÁVEL) */}
-            <form onSubmit={handleSaveWorkingHours} className="p-5 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
+            {/* DASHBOARD DE CARGA HORÁRIA E HORAS TRABALHADAS */}
+            <div className="p-5 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
+              <div>
+                <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-amber-400" />
+                  <span>Dashboard de Carga Horária Semanal</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Cálculo automático de horas trabalhadas e capacidade semanal da barbearia.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700">
+                  <span className="text-xs text-slate-400 font-medium">Carga Horária Semanal</span>
+                  <p className="text-2xl font-black text-amber-400 mt-1">
+                    {workingHoursStats.totalWeeklyHours}h
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">horas úteis de expediente por semana</p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700">
+                  <span className="text-xs text-slate-400 font-medium">Média por Dia Aberto</span>
+                  <p className="text-2xl font-black text-emerald-400 mt-1">
+                    {workingHoursStats.avgDailyHours}h
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">média diária trabalhada</p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700">
+                  <span className="text-xs text-slate-400 font-medium">Dias de Atendimento</span>
+                  <p className="text-2xl font-black text-white mt-1">
+                    {workingHoursStats.openDaysCount} de 7 dias
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">dias em funcionamento regular</p>
+                </div>
+              </div>
+
+              {/* Pílulas de Horas por Dia */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-800">
+                {workingHoursStats.dayStats.map((ds) => (
+                  <div
+                    key={ds.day_of_week}
+                    className={`px-3 py-1.5 rounded-xl border text-xs flex items-center gap-2 ${
+                      ds.is_open
+                        ? 'bg-slate-800 border-amber-500/30 text-slate-200'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 opacity-60'
+                    }`}
+                  >
+                    <span className="font-bold">{ds.day_name.slice(0, 3)}:</span>
+                    <span className={ds.is_open ? 'text-amber-400 font-bold' : 'text-slate-400'}>
+                      {ds.hoursFormatted}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* SEÇÃO 1: HORÁRIOS REGULARES DE ATENDIMENTO SEMANAL COM AUTO-SAVE */}
+            <div className="p-5 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
                 <div>
                   <h3 className="font-bold text-sm text-white flex items-center gap-2">
@@ -1294,16 +1732,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <span>Horários Regulares de Atendimento Semanal</span>
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Configure os dias abertos, horários de início e término e intervalo de almoço.
+                    Defina seus horários de expediente e almoço. Salvo automaticamente a cada mudança.
                   </p>
                 </div>
 
-                {workingHoursSaved && (
-                  <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-xs flex items-center gap-1 border border-emerald-500/30 animate-in fade-in">
-                    <Check className="w-3.5 h-3.5" />
-                    <span>Horários salvos!</span>
-                  </span>
-                )}
+                <span className="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-400 font-bold text-xs flex items-center gap-1.5 border border-emerald-500/30 self-start sm:self-auto">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{workingHoursSaved ? 'Salvo!' : 'Salvamento Automático'}</span>
+                </span>
               </div>
 
               <div className="space-y-3">
@@ -1384,15 +1820,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                 ))}
               </div>
-
-              <button
-                type="submit"
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
-              >
-                <Save className="w-4 h-4" />
-                <span>Salvar Horários Semanais</span>
-              </button>
-            </form>
+            </div>
 
             {/* SEÇÃO 2: PAUSAS PROGRAMADAS, VIAGENS E FERIADOS */}
             <div className="p-5 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
@@ -1401,9 +1829,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div>
                   <h3 className="font-bold text-sm text-white">Pausas Programadas, Viagens & Feriados</h3>
                   <p className="text-xs text-slate-400">
-                    Bloqueie dias em que a barbearia estará fechada. Os clientes não poderão marcar horários nessas datas.
+                    Bloqueie dias em que a barbearia estará fechada.
                   </p>
                 </div>
+              </div>
+
+              {/* Nota explicativa de expiração das pausas pontuais */}
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-slate-300 space-y-1">
+                <p className="font-bold text-amber-300 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Pausas pontuais são temporárias</span>
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Ao bloquear um dia específico, ele expira automaticamente após a data e <strong>não altera nem afeta</strong> seus horários normais das próximas semanas.
+                </p>
               </div>
 
               {/* Formulário para Bloquear Data */}
@@ -1483,6 +1922,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <p className="text-xs text-slate-400">Gerenciamento do plano da sua barbearia no BarberApp</p>
                 </div>
               </div>
+
+              {/* AVISO DE REAJUSTE DE MENSALIDADE AGENDADO */}
+              {barbershop.next_monthly_fee && barbershop.next_monthly_fee !== barbershop.monthly_fee && (
+                <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-xs flex items-start gap-2.5">
+                  <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <h5 className="font-bold text-amber-300">Reajuste de Mensalidade Agendado</h5>
+                    <p className="text-slate-300 mt-0.5">
+                      Foi agendado um novo valor de mensalidade de{' '}
+                      <strong className="text-white">R$ {barbershop.next_monthly_fee.toFixed(2).replace('.', ',')}</strong>{' '}
+                      para o próximo ciclo de pagamento da sua barbearia.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Informações de Status e Valor */}
               <div className="grid grid-cols-2 gap-3 text-xs">
@@ -1671,15 +2125,78 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 />
               </div>
 
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Endereço Completo & Bairro/Cidade *</label>
-                <input
-                  type="text"
-                  required
-                  value={profileAddress}
-                  onChange={(e) => setProfileAddress(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-amber-500"
-                />
+              {/* ENDEREÇO ESTRUTURADO EM CAMPOS SEPARADOS */}
+              <div className="space-y-3 p-4 rounded-2xl bg-slate-800/50 border border-slate-700/80">
+                <div className="flex items-center gap-2 text-slate-200 font-bold text-xs">
+                  <MapPin className="w-4 h-4 text-amber-400" />
+                  <span>Endereço do Estabelecimento</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="sm:col-span-2">
+                    <label className="block text-slate-400 mb-1">Rua / Logradouro *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Av. Paulista"
+                      value={profileStreet}
+                      onChange={(e) => setProfileStreet(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 mb-1">Número *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: 1500"
+                      value={profileNumber}
+                      onChange={(e) => setProfileNumber(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-slate-400 mb-1">Bairro *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Bela Vista"
+                      value={profileNeighborhood}
+                      onChange={(e) => setProfileNeighborhood(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 mb-1">Cidade / UF *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: São Paulo - SP"
+                      value={profileCity}
+                      onChange={(e) => setProfileCity(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 mb-1">Ponto de Referência (Opcional)</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Próximo à estação do metrô, em frente ao supermercado"
+                    value={profileReferencePoint}
+                    onChange={(e) => setProfileReferencePoint(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-500"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    * No Google Maps dos clientes, a rota é buscada precisamente com Rua e Número para máxima exatidão.
+                  </p>
+                </div>
               </div>
 
               <div>
@@ -1729,6 +2246,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         )}
       </main>
+      </div>
 
       {/* ===================== MODAL DE NOVO/EDITAR SERVIÇO ===================== */}
       {showAddServiceModal && (
@@ -1746,13 +2264,86 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveService} className="space-y-3 text-xs">
+            <form onSubmit={handleSaveService} className="space-y-3.5 text-xs">
+              {/* CATEGORIA EM PRIMEIRO LUGAR */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Categoria do Serviço *</label>
+                <select
+                  value={serviceCategory}
+                  onChange={(e) => setServiceCategory(e.target.value as any)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-amber-300 font-bold focus:outline-none focus:border-amber-500"
+                >
+                  <option value="cabelo">Cabelo</option>
+                  <option value="barba">Barba</option>
+                  <option value="combo">Combo (múltiplos serviços)</option>
+                  <option value="especial">Especial / Químico</option>
+                </select>
+              </div>
+
+              {/* SE FOR COMBO: ADICIONAR OUTROS SERVIÇOS INCLUSOS */}
+              {serviceCategory === 'combo' && (
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-amber-300 text-xs flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Serviços Inclusos no Combo</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {comboItems.length} adicionado(s)
+                    </span>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Ex: Barba Terapia, Sobrancelha..."
+                      value={newComboSubService}
+                      onChange={(e) => setNewComboSubService(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          handleAddComboItem()
+                        }
+                      }}
+                      className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddComboItem}
+                      className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shrink-0 cursor-pointer transition-all active:scale-95"
+                    >
+                      + Adicionar
+                    </button>
+                  </div>
+
+                  {comboItems.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {comboItems.map((item, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2.5 py-1 rounded-lg bg-slate-900 border border-amber-500/40 text-amber-200 text-xs flex items-center gap-1.5 font-medium"
+                        >
+                          <span>{item}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveComboItem(idx)}
+                            className="text-slate-400 hover:text-rose-400 text-xs font-bold leading-none cursor-pointer"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">Nome do Serviço *</label>
                 <input
                   type="text"
                   required
-                  placeholder="Ex: Corte Degradê Navalhado"
+                  placeholder="Ex: Corte Degradê + Barboterapia"
                   value={serviceName}
                   onChange={(e) => setServiceName(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-amber-500"
@@ -1761,7 +2352,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Preço (R$) *</label>
+                  <label className="block text-slate-300 font-semibold mb-1">Preço Total (R$) *</label>
                   <input
                     type="number"
                     step="0.50"
@@ -1773,7 +2364,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Duração (min) *</label>
+                  <label className="block text-slate-300 font-semibold mb-1">Duração Total (min) *</label>
                   <input
                     type="number"
                     step="5"
@@ -1786,24 +2377,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Categoria</label>
-                <select
-                  value={serviceCategory}
-                  onChange={(e) => setServiceCategory(e.target.value as any)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-amber-500"
-                >
-                  <option value="cabelo">Cabelo</option>
-                  <option value="barba">Barba</option>
-                  <option value="combo">Combo</option>
-                  <option value="especial">Especial</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Descrição Curta</label>
+                <label className="block text-slate-300 font-semibold mb-1">Descrição Curta (Opcional)</label>
                 <input
                   type="text"
-                  placeholder="Ex: Inclui lavagem e finalização com pomada"
+                  placeholder="Ex: Inclui lavagem, esfoliação facial e finalização"
                   value={serviceDesc}
                   onChange={(e) => setServiceDesc(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-amber-500"
@@ -1962,36 +2539,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* ===================== BARRA DE NAVEGAÇÃO INFERIOR PARA CELULAR (TAB BAR) ===================== */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#0d0f17]/95 border-t border-slate-800/90 backdrop-blur-xl sm:hidden px-1 py-1.5">
-        <div className="grid grid-cols-6 gap-0.5 max-w-md mx-auto">
-          {[
-            { id: 'agenda', label: 'Hoje', icon: Calendar },
-            { id: 'semana', label: 'Semana', icon: CalendarDays },
-            { id: 'historico', label: 'Histórico', icon: History },
-            { id: 'servicos', label: 'Serviços', icon: Scissors },
-            { id: 'horarios', label: 'Horários', icon: Clock },
-            { id: 'config', label: 'Config', icon: Settings }
-          ].map((tab) => {
-            const Icon = tab.icon
-            const isActive = activeTab === tab.id
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as AdminTab)}
-                className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-xl transition-all cursor-pointer ${
-                  isActive
-                    ? 'text-amber-400 bg-amber-500/10 font-bold'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Icon className={`w-4 h-4 mb-1 ${isActive ? 'stroke-[2.5]' : ''}`} />
-                <span className="text-[10px] leading-none truncate max-w-full">{tab.label}</span>
-              </button>
-            )
-          })}
-        </div>
-      </nav>
     </div>
   )
 }

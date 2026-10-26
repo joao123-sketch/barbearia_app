@@ -46,7 +46,11 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
   const [shopName, setShopName] = useState('')
   const [slug, setSlug] = useState('')
   const [phone, setPhone] = useState('')
-  const [address, setAddress] = useState('')
+  const [street, setStreet] = useState('')
+  const [number, setNumber] = useState('')
+  const [neighborhood, setNeighborhood] = useState('')
+  const [city, setCity] = useState('')
+  const [referencePoint, setReferencePoint] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [slogan, setSlogan] = useState('Tradição, estilo e o melhor corte da região.')
@@ -132,8 +136,20 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       alert('Por favor, crie uma senha de acesso com no mínimo 4 dígitos.')
       return
     }
-    if (!address.trim()) {
-      alert('Por favor, informe o endereço da barbearia.')
+    if (!street.trim()) {
+      alert('Por favor, informe a rua / logradouro da barbearia.')
+      return
+    }
+    if (!number.trim()) {
+      alert('Por favor, informe o número do estabelecimento (ou S/N).')
+      return
+    }
+    if (!neighborhood.trim()) {
+      alert('Por favor, informe o bairro da barbearia.')
+      return
+    }
+    if (!city.trim()) {
+      alert('Por favor, informe a cidade e estado da barbearia.')
       return
     }
     // E-mail opcional
@@ -142,18 +158,51 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       return
     }
 
-    const newShopId = 'shop-' + Date.now()
-    const today = new Date()
-    let billingYear = today.getFullYear()
-    let billingMonth = today.getMonth() // 0-indexed
-    if (today.getDate() >= dueDay) {
-      billingMonth += 1
-      if (billingMonth > 11) {
-        billingMonth = 0
-        billingYear += 1
+    const cleanPhone = phone.replace(/\D/g, '')
+
+    // RECONHECIMENTO DE CADASTRO E PREVENÇÃO DE FRAUDE (Anti-Trial Abuser)
+    const auditRaw = localStorage.getItem('barber_audit_history')
+    let auditList: Array<{ phone: string; shop_name: string; created_at: string; trial_used: boolean }> = []
+    if (auditRaw) {
+      try {
+        auditList = JSON.parse(auditRaw)
+      } catch {
+        auditList = []
       }
     }
-    const nextDate = new Date(billingYear, billingMonth, dueDay)
+    const previousRecord = auditList.find((a) => a.phone === cleanPhone)
+    let initialStatus: import('../types').SubscriptionStatus = 'active'
+
+    if (previousRecord) {
+      const confirmReactivation = window.confirm(
+        '⚠️ Identificamos que este número de WhatsApp já possuiu uma conta anterior no BarberApp e já utilizou o período de avaliação.\n\n' +
+        'Sua conta será reativada mediante o pagamento da primeira mensalidade de R$ 50,00 para liberar o link público.\n\nDeseja prosseguir?'
+      )
+      if (!confirmReactivation) return
+      initialStatus = 'pending'
+    } else {
+      auditList.push({
+        phone: cleanPhone,
+        shop_name: shopName.trim(),
+        created_at: new Date().toISOString(),
+        trial_used: true
+      })
+      localStorage.setItem('barber_audit_history', JSON.stringify(auditList))
+    }
+
+    const newShopId = 'shop-' + Date.now()
+
+    // COBRANÇA SEMPRE NO MÊS SEGUINTE (Mês + 1)
+    const today = new Date()
+    let billingYear = today.getFullYear()
+    let billingMonth = today.getMonth() + 1 // Mês seguinte
+    if (billingMonth > 11) {
+      billingMonth = 0
+      billingYear += 1
+    }
+    const daysInMonth = new Date(billingYear, billingMonth + 1, 0).getDate()
+    const validDay = Math.min(dueDay, daysInMonth)
+    const nextDate = new Date(billingYear, billingMonth, validDay)
     const nextDateStr = nextDate.toISOString().split('T')[0]
 
     const finalSlug = slug || shopName.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'minha-barbearia'
@@ -165,6 +214,8 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       cleanInstagram = `@${cleanInstagram}`
     }
 
+    const fullAddress = `${street.trim()}, ${number.trim()} - ${neighborhood.trim()}, ${city.trim()}${referencePoint.trim() ? ` (${referencePoint.trim()})` : ''}`
+
     const newBarbershop: Barbershop = {
       id: newShopId,
       name: shopName.trim(),
@@ -175,13 +226,18 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       description: 'Atendimento de alta qualidade, conforto e estilo.',
       logo_url: logoUrl,
       banner_url: 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=1200&q=80',
-      phone_whatsapp: phone.replace(/\D/g, '') || '5511999998888',
-      address: address.trim(),
+      phone_whatsapp: cleanPhone,
+      address: fullAddress,
+      street: street.trim(),
+      number: number.trim(),
+      neighborhood: neighborhood.trim(),
+      city: city.trim(),
+      reference_point: referencePoint.trim() || undefined,
       instagram: cleanInstagram || undefined,
       theme_color: '#EAB308',
       created_at: new Date().toISOString(),
       monthly_fee: 50.00,
-      subscription_status: 'active', // ATIVAÇÃO IMEDIATA SEM APROVAÇÃO MANUAL
+      subscription_status: initialStatus, // ATIVAÇÃO IMEDIATA (ou pending se já usou trial antes)
       due_day: Number(dueDay) || 10,
       next_billing_date: nextDateStr,
       pix_key: DEFAULT_PIX_KEY,
@@ -368,20 +424,75 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
                 </div>
               </div>
 
-              {/* Endereço */}
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+              {/* Endereço Detalhado em Campos Separados */}
+              <div className="space-y-3 p-3.5 rounded-2xl bg-slate-800/50 border border-slate-700/80">
+                <div className="flex items-center gap-1.5 text-slate-200 font-semibold text-xs border-b border-slate-700/60 pb-1.5">
                   <MapPin className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Endereço Completo & Bairro/Cidade *</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: Av. Brasil, 450 - Centro"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-sm"
-                />
+                  <span>Localização da Barbearia</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-slate-300 font-semibold mb-1">Rua / Avenida / Logradouro *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Rua das Flores"
+                      value={street}
+                      onChange={(e) => setStreet(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Número *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: 120 ou S/N"
+                      value={number}
+                      onChange={(e) => setNumber(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Bairro *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Centro"
+                      value={neighborhood}
+                      onChange={(e) => setNeighborhood(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Cidade / UF *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: São Paulo - SP"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Ponto de Referência (Opcional)</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Em frente à praça central, ao lado da padaria"
+                    value={referencePoint}
+                    onChange={(e) => setReferencePoint(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-xs"
+                  />
+                </div>
               </div>
 
               {/* Instagram & E-mail (Opcionais) */}
@@ -446,8 +557,8 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
                   </span>
                   <span className="text-amber-400 font-mono font-bold">Dia {dueDay}</span>
                 </label>
-                <p className="text-[11px] text-slate-400">
-                  A mensalidade fixa é de R$ 50,00. Escolha o dia do mês que prefere pagar:
+                <p className="text-[11px] text-slate-300">
+                  A mensalidade fixa é de R$ 50,00. Sua primeira cobrança só será realizada no <strong className="text-amber-400">mês seguinte</strong>, no dia que você escolher abaixo:
                 </p>
                 <div className="grid grid-cols-6 gap-1.5 pt-1">
                   {[5, 10, 15, 20, 25, 30].map((d) => (

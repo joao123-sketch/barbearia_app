@@ -19,11 +19,15 @@ function BookingRouteWrapper({
   barbershop,
   barbershopsList,
   services,
+  theme,
+  onToggleTheme,
   onNewBooking
 }: {
   barbershop: Barbershop
   barbershopsList: Barbershop[]
   services: Service[]
+  theme: 'dark' | 'light'
+  onToggleTheme: () => void
   onNewBooking: (b: any) => void
 }) {
   const { slug } = useParams()
@@ -39,11 +43,16 @@ function BookingRouteWrapper({
       : barbershop.name
   }
 
+  // Filtrar serviços específicos desta barbearia
+  const shopServices = services.filter((s) => s.barbershop_id === currentShop.id)
+
   return (
     <div className="relative">
       <BookingClientView
         barbershop={currentShop}
-        services={services}
+        services={shopServices}
+        theme={theme}
+        onToggleTheme={onToggleTheme}
         onNewBooking={onNewBooking}
       />
     </div>
@@ -55,6 +64,8 @@ function AdminRouteWrapper({
   appointments,
   services,
   workingHours,
+  theme,
+  onToggleTheme,
   onUpdateAppointments,
   onUpdateServices,
   onUpdateBarbershop,
@@ -65,6 +76,8 @@ function AdminRouteWrapper({
   appointments: Appointment[]
   services: Service[]
   workingHours: import('./types').WorkingHour[]
+  theme: 'dark' | 'light'
+  onToggleTheme: () => void
   onUpdateAppointments: (a: Appointment[]) => void
   onUpdateServices: (s: Service[]) => void
   onUpdateBarbershop: (b: Barbershop) => void
@@ -73,17 +86,29 @@ function AdminRouteWrapper({
 }) {
   const navigate = useNavigate()
 
+  // Isolamento estrito de agendamentos e serviços da barbearia atual (novas contas começam zeradas)
+  const shopAppointments = appointments.filter((a) => a.barbershop_id === barbershop.id)
+  const shopServices = services.filter((s) => s.barbershop_id === barbershop.id)
+
   return (
     <div className="relative">
       <AdminDashboard
         barbershop={barbershop}
         barbers={demoBarbers}
-        services={services}
-        appointments={appointments}
+        services={shopServices}
+        appointments={shopAppointments}
         workingHours={workingHours}
+        theme={theme}
+        onToggleTheme={onToggleTheme}
         onBackToClientView={() => navigate(`/${barbershop.slug}`)}
-        onUpdateAppointments={onUpdateAppointments}
-        onUpdateServices={onUpdateServices}
+        onUpdateAppointments={(updatedShopApts) => {
+          const others = appointments.filter((a) => a.barbershop_id !== barbershop.id)
+          onUpdateAppointments([...updatedShopApts, ...others])
+        }}
+        onUpdateServices={(updatedShopServices) => {
+          const others = services.filter((s) => s.barbershop_id !== barbershop.id)
+          onUpdateServices([...updatedShopServices, ...others])
+        }}
         onUpdateBarbershop={onUpdateBarbershop}
         onDeleteBarbershop={(id) => {
           onDeleteBarbershop(id)
@@ -158,6 +183,26 @@ export function App() {
     return demoWorkingHours
   })
 
+  // Tema Claro / Escuro
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('barber_theme') as 'dark' | 'light') || 'dark'
+  })
+
+  useEffect(() => {
+    localStorage.setItem('barber_theme', theme)
+    if (theme === 'light') {
+      document.documentElement.classList.add('light')
+      document.documentElement.classList.remove('dark')
+    } else {
+      document.documentElement.classList.add('dark')
+      document.documentElement.classList.remove('light')
+    }
+  }, [theme])
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
+  }
+
   // Sincronização e persistência no LocalStorage
   useEffect(() => {
     localStorage.setItem('barber_shops_list', JSON.stringify(barbershopsList))
@@ -189,7 +234,7 @@ export function App() {
   const handleRegisterBarbershop = (newShop: Barbershop, newServices: Service[]) => {
     setBarbershopsList((prev) => [newShop, ...prev])
     setCurrentBarbershop(newShop)
-    setServices(newServices)
+    setServices((prev) => [...newServices, ...prev])
   }
 
   // Atualização de dados da barbearia ativa (ex: pausas, endereço, etc.)
@@ -200,8 +245,36 @@ export function App() {
     )
   }
 
-  // Exclusão de barbearia pelo barbeiro
+  // Exclusão de barbearia pelo barbeiro (com registro de auditoria anti-fraude)
   const handleDeleteBarbershop = (shopId: string) => {
+    const shopToDelete = barbershopsList.find((s) => s.id === shopId)
+    if (shopToDelete) {
+      const cleanPhone = shopToDelete.phone_whatsapp.replace(/\D/g, '')
+      const auditRaw = localStorage.getItem('barber_audit_history')
+      let auditList: any[] = []
+      if (auditRaw) {
+        try {
+          auditList = JSON.parse(auditRaw)
+        } catch {
+          auditList = []
+        }
+      }
+      const existing = auditList.find((a) => a.phone === cleanPhone)
+      if (existing) {
+        existing.deleted_at = new Date().toISOString()
+        existing.trial_used = true
+      } else {
+        auditList.push({
+          phone: cleanPhone,
+          shop_name: shopToDelete.name,
+          created_at: shopToDelete.created_at || new Date().toISOString(),
+          deleted_at: new Date().toISOString(),
+          trial_used: true
+        })
+      }
+      localStorage.setItem('barber_audit_history', JSON.stringify(auditList))
+    }
+
     const remaining = barbershopsList.filter((s) => s.id !== shopId)
     setBarbershopsList(remaining)
     localStorage.removeItem('barber_current_shop_id')
@@ -233,6 +306,8 @@ export function App() {
               barbershop={currentBarbershop}
               barbershopsList={barbershopsList}
               services={services}
+              theme={theme}
+              onToggleTheme={toggleTheme}
               onNewBooking={handleNewBooking}
             />
           }
@@ -276,6 +351,8 @@ export function App() {
               appointments={appointments}
               services={services}
               workingHours={workingHours}
+              theme={theme}
+              onToggleTheme={toggleTheme}
               onUpdateAppointments={setAppointments}
               onUpdateServices={setServices}
               onUpdateBarbershop={handleUpdateBarbershop}
@@ -313,6 +390,8 @@ export function App() {
               barbershop={currentBarbershop}
               barbershopsList={barbershopsList}
               services={services}
+              theme={theme}
+              onToggleTheme={toggleTheme}
               onNewBooking={handleNewBooking}
             />
           }

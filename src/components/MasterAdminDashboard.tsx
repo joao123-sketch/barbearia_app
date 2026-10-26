@@ -113,6 +113,9 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
         return {
           ...s,
           subscription_status: 'active' as SubscriptionStatus,
+          // Se havia reajuste de mensalidade agendado para o mês seguinte, aplica agora
+          monthly_fee: s.next_monthly_fee || s.monthly_fee,
+          next_monthly_fee: undefined,
           last_payment_date: today.toISOString().split('T')[0],
           next_billing_date: nextDate.toISOString().split('T')[0]
         }
@@ -156,19 +159,25 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
     setDeleteInputText('')
   }
 
-  // Salvar alterações de mensalidade individual
+  // Salvar alterações de mensalidade individual (muda somente no mês seguinte)
   const handleSaveEdit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingShop) return
 
+    const newFee = Number(editFee)
     const updated = barbershops.map((s) =>
       s.id === editingShop.id
-        ? { ...s, monthly_fee: Number(editFee), due_day: Number(editDueDay) }
+        ? {
+            ...s,
+            next_monthly_fee: newFee,
+            due_day: Number(editDueDay)
+          }
         : s
     )
 
     onUpdateBarbershops(updated)
     setEditingShop(null)
+    alert(`Reajuste para R$ ${newFee.toFixed(2).replace('.', ',')} agendado com sucesso para a barbearia ${editingShop.name}! Passará a valer a partir do próximo mês/ciclo.`)
   }
 
   // Montar link do WhatsApp para cobrar o barbeiro
@@ -521,6 +530,11 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
                           <span>•</span>
                           <span>
                             Mensalidade: <strong className="text-white">R$ {(shop.monthly_fee || 50).toFixed(2).replace('.', ',')}</strong>
+                            {shop.next_monthly_fee && shop.next_monthly_fee !== shop.monthly_fee && (
+                              <span className="ml-1 text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 font-bold">
+                                ➔ R$ {shop.next_monthly_fee.toFixed(2).replace('.', ',')} próx. mês
+                              </span>
+                            )}
                           </span>
                           <span>•</span>
                           <span>
@@ -640,6 +654,9 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
                     className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-bold text-sm"
                   />
                 </div>
+                <p className="text-[11px] text-amber-400 mt-1">
+                  ⚡ Nota: O novo valor entrará em vigor no <strong>mês seguinte</strong>. O ciclo atual mantém o valor vigente.
+                </p>
               </div>
 
               <div>

@@ -12,11 +12,17 @@ export interface Barbershop {
   banner_url?: string
   phone_whatsapp: string
   address: string
+  street?: string
+  number?: string
+  neighborhood?: string
+  city?: string
+  reference_point?: string
   instagram?: string
   theme_color?: string
   created_at?: string
   // Assinatura SaaS & Cobrança
   monthly_fee: number
+  next_monthly_fee?: number
   subscription_status: SubscriptionStatus
   due_day: number
   next_billing_date: string
@@ -45,6 +51,7 @@ export interface Service {
   duration_minutes: number
   price: number
   category?: 'cabelo' | 'barba' | 'combo' | 'especial'
+  combo_items?: string[]
   active: boolean
 }
 

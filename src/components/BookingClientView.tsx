@@ -9,7 +9,9 @@ import {
   Scissors,
   CheckCircle2,
   ArrowLeft,
-  Bell
+  Bell,
+  Sun,
+  Moon
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import type { Barbershop, Service } from '../types'
@@ -26,12 +28,16 @@ const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) =>
 interface BookingClientViewProps {
   barbershop: Barbershop
   services: Service[]
+  theme?: 'dark' | 'light'
+  onToggleTheme?: () => void
   onNewBooking?: (booking: any) => void
 }
 
 export const BookingClientView: React.FC<BookingClientViewProps> = ({
   barbershop,
   services,
+  theme = 'dark',
+  onToggleTheme,
   onNewBooking
 }) => {
   // Estados do fluxo de agendamento
@@ -210,8 +216,13 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
     return `https://wa.me/${phoneClean}?text=${encodeURIComponent(msg)}`
   }, [confirmedBooking, formattedDate, barbershop.phone_whatsapp])
 
+  const isLight = theme === 'light'
+  const googleMapsQuery = barbershop.street && barbershop.number
+    ? `${barbershop.street}, ${barbershop.number}`
+    : barbershop.address.split('-')[0].trim()
+
   return (
-    <div className="min-h-screen bg-[#090A0F] text-slate-100 pb-28 select-none">
+    <div className={`min-h-screen pb-28 select-none transition-colors ${isLight ? 'bg-slate-100 text-slate-900' : 'bg-[#090A0F] text-slate-100'}`}>
       {/* ===================== TOPO / BANNER ===================== */}
       <div className="relative w-full h-48 sm:h-64 overflow-hidden bg-slate-900">
         <img
@@ -219,10 +230,20 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
           alt={barbershop.name}
           className="w-full h-full object-cover opacity-60"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#090A0F] via-[#090A0F]/60 to-transparent" />
+        <div className={`absolute inset-0 bg-gradient-to-t ${isLight ? 'from-slate-100 via-slate-100/50' : 'from-[#090A0F] via-[#090A0F]/60'} to-transparent`} />
 
-        {/* Botão de Instalação PWA no Topo */}
-        <div className="absolute top-4 right-4 z-10">
+        {/* Botão de Instalação PWA no Topo & Alternador de Tema */}
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+          {onToggleTheme && (
+            <button
+              onClick={onToggleTheme}
+              aria-label="Alternar tema claro/escuro"
+              title={isLight ? 'Mudar para tema escuro' : 'Mudar para tema claro'}
+              className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-amber-400 border border-slate-700/80 backdrop-blur-md transition-all active:scale-95 cursor-pointer shadow-lg"
+            >
+              {isLight ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+            </button>
+          )}
           <PWAInstallPrompt variant="compact" />
         </div>
       </div>
@@ -242,10 +263,10 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
               ABERTO HOJE
             </div>
-            <h1 className="text-xl font-black text-white tracking-tight leading-tight">
+            <h1 className={`text-xl font-black tracking-tight leading-tight ${isLight ? 'text-slate-950' : 'text-white'}`}>
               {barbershop.name}
             </h1>
-            <p className="text-xs text-amber-400/90 font-medium">
+            <p className="text-xs text-amber-500 font-medium">
               {barbershop.slogan}
             </p>
           </div>
@@ -254,13 +275,20 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
         {/* Atalhos Rápidos: Endereço & Redes */}
         <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-1 text-xs text-slate-300">
           <a
-            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(barbershop.address)}`}
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(googleMapsQuery)}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white shrink-0 active:scale-95 transition-transform"
+            title="Ver rota no Google Maps (Endereço e Número)"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border shrink-0 active:scale-95 transition-transform ${
+              isLight
+                ? 'bg-white border-slate-200 text-slate-700 hover:text-slate-950 shadow-sm'
+                : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white'
+            }`}
           >
-            <MapPin className="w-3.5 h-3.5 text-amber-400" />
-            <span className="truncate max-w-[170px]">{barbershop.address.split('-')[0]}</span>
+            <MapPin className="w-3.5 h-3.5 text-amber-500" />
+            <span className="truncate max-w-[170px]">
+              {barbershop.street ? `${barbershop.street}, ${barbershop.number || 'S/N'}` : barbershop.address.split('-')[0]}
+            </span>
           </a>
 
           {barbershop.instagram && (
@@ -418,6 +446,19 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                             </span>
                           )}
                         </div>
+                        {service.combo_items && service.combo_items.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            {service.combo_items.map((sub, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-semibold flex items-center gap-1"
+                              >
+                                <Scissors className="w-2.5 h-2.5" />
+                                <span>{sub}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         {service.description && (
                           <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">
                             {service.description}
