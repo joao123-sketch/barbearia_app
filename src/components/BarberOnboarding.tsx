@@ -145,8 +145,9 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       alert('Por favor, informe o endereço da barbearia.')
       return
     }
-    if (!email.trim() || !email.includes('@')) {
-      alert('Por favor, informe um e-mail válido para sua conta.')
+    // E-mail é opcional: se preenchido, valida o formato
+    if (email.trim() && !email.includes('@')) {
+      alert('Por favor, informe um e-mail válido ou deixe o campo em branco.')
       return
     }
     if (!password.trim() || password.length < 4) {
@@ -177,7 +178,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       name: shopName.trim(),
       slug: finalSlug,
       owner_name: ownerName.trim(),
-      owner_email: email.trim(),
+      owner_email: email.trim() || undefined,
       slogan: slogan.trim(),
       description: 'Atendimento de alta qualidade, conforto e estilo.',
       logo_url: logoUrl,
@@ -210,9 +211,11 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       active: true
     }))
 
-    // Salvar sessão do barbeiro
+    // Salvar sessão do barbeiro (login com WhatsApp e Senha)
     localStorage.setItem('barber_current_user', JSON.stringify({
-      email: email.trim(),
+      phone: phone.replace(/\D/g, ''),
+      email: email.trim() || undefined,
+      password: password.trim(),
       owner_name: ownerName.trim(),
       shop_id: newShopId,
       shop_slug: finalSlug
@@ -427,36 +430,41 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
                 </div>
               </div>
 
-              {/* Email e Senha de Acesso */}
+              {/* Senha e E-mail de Acesso */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-blue-400" />
-                    <span>E-mail de Login *</span>
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="seuemail@gmail.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
                     <Lock className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Senha de Acesso *</span>
+                    <span>Criar Senha de Acesso *</span>
                   </label>
                   <input
                     type="password"
                     required
-                    placeholder="Sua senha secreta"
+                    placeholder="Mínimo 4 dígitos"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-xs"
                   />
+                  <span className="text-[10px] text-amber-300/80 mt-1 block">
+                    Você entrará no painel com seu <strong>WhatsApp</strong> e esta senha.
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-blue-400" />
+                    <span>E-mail (Opcional)</span>
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="seuemail@gmail.com (opcional)"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-xs"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    Não é obrigatório. Se não tiver, pode deixar em branco.
+                  </span>
                 </div>
               </div>
 
@@ -481,6 +489,16 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
               <span>Continuar para Serviços</span>
               <ArrowRight className="w-4 h-4" />
             </button>
+
+            <div className="text-center pt-1">
+              <button
+                type="button"
+                onClick={() => navigate('/login')}
+                className="text-xs text-slate-400 hover:text-amber-400 transition-colors cursor-pointer"
+              >
+                Já tem cadastro? <strong className="text-amber-400 underline">Entrar com WhatsApp e Senha</strong>
+              </button>
+            </div>
           </form>
         )}
 

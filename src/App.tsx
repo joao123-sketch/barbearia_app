@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-rout
 import { BookingClientView } from './components/BookingClientView'
 import { AdminDashboard } from './components/AdminDashboard'
 import { BarberOnboarding } from './components/BarberOnboarding'
+import { BarberLogin } from './components/BarberLogin'
 import { MasterAdminDashboard } from './components/MasterAdminDashboard'
 import {
   demoBarbershop,
@@ -229,6 +230,17 @@ export function App() {
           element={
             <BarberOnboarding
               onRegisterBarbershop={handleRegisterBarbershop}
+            />
+          }
+        />
+
+        {/* Login com WhatsApp e Senha para Barbeiros */}
+        <Route
+          path="/login"
+          element={
+            <BarberLogin
+              barbershops={barbershopsList}
+              onSelectBarbershop={(shop) => setCurrentBarbershop(shop)}
             />
           }
         />
