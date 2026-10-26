@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef } from 'react'
 import {
   Calendar,
   DollarSign,
@@ -21,11 +21,20 @@ import {
   CalendarOff,
   BellRing,
   MessageCircle,
-  ChevronRight
+  ChevronRight,
+  Camera
 } from 'lucide-react'
 import type { Barbershop, Barber, Service, Appointment, WorkingHour } from '../types'
 import { PWAInstallPrompt } from './PWAInstallPrompt'
 import { DEFAULT_PIX_KEY, DEFAULT_PIX_NAME, DEFAULT_PIX_QRCODE } from '../lib/mockData'
+
+const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+    <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+  </svg>
+)
 
 interface AdminDashboardProps {
   barbershop: Barbershop
@@ -84,6 +93,56 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Gestão de Pausas e Viagens
   const [newPauseDate, setNewPauseDate] = useState('')
   const [newPauseReason, setNewPauseReason] = useState('')
+
+  // Estados para edição cadastral da barbearia (Logo, Instagram, Endereço, etc.)
+  const [profileName, setProfileName] = useState(barbershop.name)
+  const [profileLogo, setProfileLogo] = useState(barbershop.logo_url)
+  const [profileInstagram, setProfileInstagram] = useState(barbershop.instagram || '')
+  const [profilePhone, setProfilePhone] = useState(barbershop.phone_whatsapp)
+  const [profileAddress, setProfileAddress] = useState(barbershop.address)
+  const [profileSlogan, setProfileSlogan] = useState(barbershop.slogan || '')
+  const [profileSaved, setProfileSaved] = useState(false)
+  const logoFileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 4 * 1024 * 1024) {
+        alert('A foto da logo deve ter menos de 4MB.')
+        return
+      }
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setProfileLogo(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleSaveProfile = (e: React.FormEvent) => {
+    e.preventDefault()
+    let cleanInstagram = profileInstagram.trim()
+    if (cleanInstagram) {
+      cleanInstagram = cleanInstagram.replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/^@/, '')
+      cleanInstagram = `@${cleanInstagram}`
+    }
+
+    const updatedShop: Barbershop = {
+      ...barbershop,
+      name: profileName.trim() || barbershop.name,
+      logo_url: profileLogo || barbershop.logo_url,
+      instagram: cleanInstagram || undefined,
+      phone_whatsapp: profilePhone.replace(/\D/g, '') || barbershop.phone_whatsapp,
+      address: profileAddress.trim() || barbershop.address,
+      slogan: profileSlogan.trim() || barbershop.slogan
+    }
+
+    if (onUpdateBarbershop) {
+      onUpdateBarbershop(updatedShop)
+    }
+    setProfileSaved(true)
+    setTimeout(() => setProfileSaved(false), 3000)
+  }
 
   // Copiar link público para divulgar
   const publicUrl = `${window.location.origin}/${barbershop.slug}`
@@ -959,50 +1018,158 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
 
-            {/* DADOS CADASTRAIS DA BARBEARIA */}
-            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 text-xs">
-              <h3 className="font-bold text-sm text-white">Dados do Estabelecimento</h3>
+            {/* DADOS CADASTRAIS DA BARBEARIA (EDITÁVEL) */}
+            <form onSubmit={handleSaveProfile} className="p-5 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 text-xs shadow-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-sm text-white">Dados do Estabelecimento</h3>
+                  <p className="text-[11px] text-slate-400">Atualize sua logo, Instagram, endereço e contatos.</p>
+                </div>
+
+                {profileSaved && (
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px] flex items-center gap-1 border border-emerald-500/30 animate-in fade-in">
+                    <Check className="w-3 h-3" />
+                    <span>Salvo com sucesso!</span>
+                  </span>
+                )}
+              </div>
+
+              {/* FOTO / LOGO DA BARBEARIA */}
+              <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/80 flex items-center gap-3.5">
+                <div className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-amber-500/60 bg-slate-900 shrink-0 shadow-md">
+                  <img
+                    src={profileLogo}
+                    alt={profileName}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+
+                <div className="flex-1 text-xs space-y-1">
+                  <span className="font-bold text-white text-xs block">
+                    Logo / Foto da Barbearia
+                  </span>
+                  <p className="text-[11px] text-slate-400">
+                    Aparece no topo da página de agendamentos para seus clientes.
+                  </p>
+                  <div className="pt-0.5">
+                    <input
+                      ref={logoFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      className="hidden"
+                      id="profile-logo-upload"
+                    />
+                    <label
+                      htmlFor="profile-logo-upload"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md cursor-pointer active:scale-95 transition-all"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>Trocar Logo / Foto</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">Nome da Barbearia</label>
+                <label className="block text-slate-300 font-semibold mb-1">Nome da Barbearia *</label>
                 <input
                   type="text"
-                  readOnly
-                  value={barbershop.name}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white"
+                  required
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              {/* Instagram */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                  <InstagramIcon className="w-3.5 h-3.5 text-pink-400" />
+                  <span>Instagram da Barbearia</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 flex items-center px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 focus-within:border-amber-500">
+                    <span className="text-pink-400 font-bold mr-1">@</span>
+                    <input
+                      type="text"
+                      placeholder="seunegocio"
+                      value={profileInstagram.replace('@', '')}
+                      onChange={(e) => setProfileInstagram(e.target.value)}
+                      className="w-full bg-transparent text-white text-xs focus:outline-none placeholder-slate-500"
+                    />
+                  </div>
+
+                  {profileInstagram && (
+                    <a
+                      href={`https://instagram.com/${profileInstagram.replace('@', '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-semibold shrink-0 cursor-pointer flex items-center gap-1"
+                    >
+                      <ExternalLink className="w-3 h-3 text-pink-400" />
+                      <span>Testar</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Frase de Destaque / Slogan</label>
+                <input
+                  type="text"
+                  value={profileSlogan}
+                  onChange={(e) => setProfileSlogan(e.target.value)}
+                  placeholder="Ex: Tradição, estilo e o melhor corte da região"
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-amber-500"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">Slug do Link Público</label>
+                <label className="block text-slate-300 font-semibold mb-1">WhatsApp de Contato & Notificações *</label>
                 <input
-                  type="text"
-                  readOnly
-                  value={barbershop.slug}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-amber-300 font-mono"
+                  type="tel"
+                  required
+                  value={profilePhone}
+                  onChange={(e) => setProfilePhone(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono focus:outline-none focus:border-amber-500"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">WhatsApp Notificações</label>
+                <label className="block text-slate-300 font-semibold mb-1">Endereço Completo & Bairro/Cidade *</label>
                 <input
                   type="text"
-                  readOnly
-                  value={barbershop.phone_whatsapp}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono"
+                  required
+                  value={profileAddress}
+                  onChange={(e) => setProfileAddress(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-amber-500"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">Endereço Completo</label>
-                <input
-                  type="text"
-                  readOnly
-                  value={barbershop.address}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white"
-                />
+                <label className="block text-slate-400 mb-1">Slug do Link Público (Fixo)</label>
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+                  <span className="text-amber-300 font-mono text-xs">{publicUrl}</span>
+                  <button
+                    type="button"
+                    onClick={handleCopyLink}
+                    className="text-slate-400 hover:text-amber-400 p-1 cursor-pointer"
+                    title="Copiar link"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
-            </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+              >
+                <Check className="w-4 h-4" />
+                <span>Salvar Alterações da Barbearia</span>
+              </button>
+            </form>
 
             {/* ZONA DE PERIGO: EXCLUSÃO DE CONTA */}
             <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-500/30 space-y-3 text-xs">

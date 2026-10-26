@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Scissors,
@@ -14,11 +14,23 @@ import {
   Phone,
   MapPin,
   Check,
-  Copy
+  Copy,
+  Camera,
+  Trash2
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import type { Barbershop, Service } from '../types'
 import { DEFAULT_PIX_KEY } from '../lib/mockData'
+
+const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+    <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+  </svg>
+)
+
+const DEFAULT_SHOP_LOGO = 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=300&q=80'
 
 interface BarberOnboardingProps {
   onRegisterBarbershop: (shop: Barbershop, services: Service[]) => void
@@ -29,8 +41,9 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
 }) => {
   const navigate = useNavigate()
   const [step, setStep] = useState<1 | 2 | 3>(1)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Dados Obrigatórios do Barbeiro e do Estabelecimento
+  // Dados do Barbeiro e Estabelecimento
   const [ownerName, setOwnerName] = useState('')
   const [shopName, setShopName] = useState('')
   const [slug, setSlug] = useState('')
@@ -39,6 +52,11 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [slogan, setSlogan] = useState('Tradição, estilo e o melhor corte da região.')
+  const [instagram, setInstagram] = useState('')
+
+  // Logo da Barbearia (se tiver)
+  const [logoUrl, setLogoUrl] = useState<string>(DEFAULT_SHOP_LOGO)
+  const [hasCustomLogo, setHasCustomLogo] = useState(false)
 
   const [copiedLink, setCopiedLink] = useState(false)
 
@@ -75,6 +93,31 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       value = `(${value}`
     }
     setPhone(value)
+  }
+
+  // Upload de Logo da Barbearia
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 4 * 1024 * 1024) {
+        alert('A foto da logo deve ter menos de 4MB.')
+        return
+      }
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setLogoUrl(reader.result as string)
+        setHasCustomLogo(true)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleRemoveCustomLogo = () => {
+    setLogoUrl(DEFAULT_SHOP_LOGO)
+    setHasCustomLogo(false)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
   }
 
   const handlePriceChange = (index: number, newPrice: number) => {
@@ -122,6 +165,13 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
 
     const finalSlug = slug || shopName.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'minha-barbearia'
 
+    // Formatar Instagram limpo
+    let cleanInstagram = instagram.trim()
+    if (cleanInstagram) {
+      cleanInstagram = cleanInstagram.replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/^@/, '')
+      cleanInstagram = `@${cleanInstagram}`
+    }
+
     const newBarbershop: Barbershop = {
       id: newShopId,
       name: shopName.trim(),
@@ -130,10 +180,11 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       owner_email: email.trim(),
       slogan: slogan.trim(),
       description: 'Atendimento de alta qualidade, conforto e estilo.',
-      logo_url: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=300&q=80',
+      logo_url: logoUrl,
       banner_url: 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=1200&q=80',
       phone_whatsapp: phone.replace(/\D/g, '') || '5511999998888',
       address: address.trim(),
+      instagram: cleanInstagram || undefined,
       theme_color: '#EAB308',
       created_at: new Date().toISOString(),
       monthly_fee: 50.00,
@@ -212,15 +263,66 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
           <div className={`h-1.5 rounded-full transition-all ${step === 3 ? 'w-10 bg-emerald-400' : 'w-4 bg-slate-800'}`} />
         </div>
 
-        {/* ===================== PASSO 1: DADOS OBRIGATÓRIOS ===================== */}
+        {/* ===================== PASSO 1: DADOS OBRIGATÓRIOS E LOGO ===================== */}
         {step === 1 && (
           <form onSubmit={handleStep1Submit} className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-4 shadow-2xl">
             <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider">
               <Store className="w-4 h-4" />
-              <span>Passo 1: Informações Obrigatórias</span>
+              <span>Passo 1: Informações da Barbearia</span>
             </div>
 
-            <div className="space-y-3.5 text-xs">
+            {/* FOTO / LOGO DO NEGÓCIO */}
+            <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/80 flex items-center gap-3.5">
+              <div className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-amber-500/60 bg-slate-900 shrink-0 shadow-md">
+                <img
+                  src={logoUrl}
+                  alt="Logo da Barbearia"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+
+              <div className="flex-1 text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white text-xs">
+                    Logo / Foto do Negócio
+                  </span>
+                  {hasCustomLogo && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveCustomLogo}
+                      className="text-rose-400 hover:text-rose-300 text-[10px] flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Remover</span>
+                    </button>
+                  )}
+                </div>
+
+                <p className="text-[11px] text-slate-400">
+                  {hasCustomLogo ? 'Sua logo personalizada carregada!' : 'Se tiver a logo no celular, envie agora. Se não tiver, usaremos uma foto moderna.'}
+                </p>
+
+                <div className="pt-0.5">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoFileChange}
+                    className="hidden"
+                    id="logo-upload-input"
+                  />
+                  <label
+                    htmlFor="logo-upload-input"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md cursor-pointer active:scale-95 transition-all"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>{hasCustomLogo ? 'Trocar Foto/Logo' : 'Enviar Logo / Foto'}</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs">
               {/* Nome do Responsável / Barbeiro */}
               <div>
                 <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
@@ -251,6 +353,27 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
                   onChange={handleNameChange}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-sm"
                 />
+              </div>
+
+              {/* Instagram da Barbearia */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                  <InstagramIcon className="w-3.5 h-3.5 text-pink-400" />
+                  <span>Instagram da Barbearia (Opcional)</span>
+                </label>
+                <div className="flex items-center px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 focus-within:border-amber-500">
+                  <span className="text-pink-400 font-bold mr-1">@</span>
+                  <input
+                    type="text"
+                    placeholder="barbearia_exemplo"
+                    value={instagram.replace('@', '')}
+                    onChange={(e) => setInstagram(e.target.value)}
+                    className="w-full bg-transparent text-white text-xs focus:outline-none placeholder-slate-500"
+                  />
+                </div>
+                <span className="text-[10px] text-slate-500 mt-0.5 block">
+                  Aparecerá com botão direto na página de agendamento dos seus clientes.
+                </span>
               </div>
 
               {/* Slug / Link personalizado */}

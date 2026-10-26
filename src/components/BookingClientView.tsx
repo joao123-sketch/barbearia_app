@@ -265,13 +265,13 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
 
           {barbershop.instagram && (
             <a
-              href={`https://instagram.com/${barbershop.instagram.replace('@', '')}`}
+              href={`https://instagram.com/${barbershop.instagram.replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/^@/, '')}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white shrink-0 active:scale-95 transition-transform"
             >
               <InstagramIcon className="w-3.5 h-3.5 text-pink-400" />
-              <span>{barbershop.instagram}</span>
+              <span>{barbershop.instagram.startsWith('@') ? barbershop.instagram : `@${barbershop.instagram}`}</span>
             </a>
           )}
 
