@@ -1,3 +1,5 @@
+import { normalizePhone } from './phone'
+
 // Contas do barbeiro neste aparelho. Provisório: troca por Supabase Auth quando o banco entrar.
 export interface BarberAccount {
   email: string
@@ -29,13 +31,11 @@ function saveAccounts(list: BarberAccount[]) {
   localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list))
 }
 
-export const onlyDigits = (v: string) => v.replace(/\D/g, '')
-
 export function findAccount(identifier: string): BarberAccount | undefined {
   const raw = identifier.trim().toLowerCase()
-  const digits = onlyDigits(raw)
+  const digits = normalizePhone(raw)
   return loadAccounts().find(
-    (a) => a.email.toLowerCase() === raw || (digits.length >= 10 && a.phone === digits)
+    (a) => a.email.toLowerCase() === raw || (digits.length >= 10 && normalizePhone(a.phone) === digits)
   )
 }
 

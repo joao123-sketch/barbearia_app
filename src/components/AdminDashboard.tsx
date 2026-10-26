@@ -38,9 +38,12 @@ import {
 } from 'lucide-react'
 import type { Barbershop, Barber, Service, Appointment, WorkingHour } from '../types'
 import { PWAInstallPrompt } from './PWAInstallPrompt'
-import { DEFAULT_PIX_KEY, DEFAULT_PIX_NAME, DEFAULT_PIX_QRCODE } from '../lib/mockData'
+import { getPlatformSettings } from '../lib/platform'
+import { formatBR, formatMoney, getBillingState } from '../lib/billing'
+import { normalizePhone, toWaNumber } from '../lib/phone'
+import { BR_STATES } from '../lib/states'
 import { STYLE_PRESETS, STYLE_PRESET_ORDER } from '../lib/stylePresets'
-import { buildShopTheme } from '../lib/shopTheme'
+import { buildShopTheme, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
 import { fileToResizedDataUrl } from '../lib/image'
 
 const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
@@ -149,7 +152,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [profileStreet, setProfileStreet] = useState(barbershop.street || (barbershop.address ? barbershop.address.split(',')[0] : ''))
   const [profileNumber, setProfileNumber] = useState(barbershop.number || '')
   const [profileNeighborhood, setProfileNeighborhood] = useState(barbershop.neighborhood || '')
-  const [profileCity, setProfileCity] = useState(barbershop.city || '')
+  const legacyCity = barbershop.city || ''
+  const [profileCity, setProfileCity] = useState(legacyCity.replace(/\s*-\s*[A-Za-z]{2}$/, ''))
+  const [profileState, setProfileState] = useState(barbershop.state || legacyCity.match(/-\s*([A-Za-z]{2})$/)?.[1]?.toUpperCase() || '')
   const [profileReferencePoint, setProfileReferencePoint] = useState(barbershop.reference_point || '')
   const [profileSlogan, setProfileSlogan] = useState(barbershop.slogan || '')
   const [profileSaved, setProfileSaved] = useState(false)
@@ -157,15 +162,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], [])
 
-  // ===================== CÁLCULO DE DIAS PARA O VENCIMENTO =====================
-  const daysUntilDue = useMemo(() => {
-    if (!barbershop.next_billing_date) return 99
-    const due = new Date(barbershop.next_billing_date + 'T00:00:00')
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const diffTime = due.getTime() - today.getTime()
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-  }, [barbershop.next_billing_date])
+  // ===================== PLANO PRÉ-PAGO (TESTE GRÁTIS / PERÍODO PAGO) =====================
+  const billing = getBillingState(barbershop)
+  const daysUntilDue = billing.daysLeft
 
   // ===================== AGENDA DE HOJE =====================
   const todayAppointments = useMemo(() => {
@@ -672,9 +671,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Mensagem WhatsApp para o cliente de hoje
   const getClientWhatsappUrl = (apt: Appointment) => {
-    const phone = apt.client_phone.replace(/\D/g, '')
-    const msg = `Olá ${apt.client_name}! Confirmando seu corte hoje às ${apt.start_time} na ${barbershop.name}. Te aguardo!`
-    return `https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`
+    const msg = `Olá ${apt.client_name}! Confirmando seu horário hoje às ${apt.start_time} em ${barbershop.name}. Te aguardo!`
+    return `https://wa.me/${toWaNumber(apt.client_phone)}?text=${encodeURIComponent(msg)}`
   }
 
   // Link público e ações de cópia
@@ -687,7 +685,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }
 
   const handleCopyPix = () => {
-    navigator.clipboard.writeText(barbershop.pix_key || DEFAULT_PIX_KEY)
+    navigator.clipboard.writeText(platform.pix_key)
     setCopiedPixKey(true)
     setTimeout(() => setCopiedPixKey(false), 2000)
   }
@@ -704,18 +702,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault()
-    const fullAddress = `${profileStreet.trim()}, ${profileNumber.trim()} - ${profileNeighborhood.trim()}, ${profileCity.trim()}${profileReferencePoint.trim() ? ` (${profileReferencePoint.trim()})` : ''}`
+    const fullAddress = `${profileStreet.trim()}, ${profileNumber.trim()} - ${profileNeighborhood.trim()}, ${profileCity.trim()}${profileState ? ` - ${profileState}` : ''}${profileReferencePoint.trim() ? ` (${profileReferencePoint.trim()})` : ''}`
     const updatedShop: Barbershop = {
       ...barbershop,
       name: profileName,
       logo_url: profileLogo,
       instagram: profileInstagram ? (profileInstagram.startsWith('@') ? profileInstagram : `@${profileInstagram}`) : '',
-      phone_whatsapp: profilePhone,
+      phone_whatsapp: normalizePhone(profilePhone),
       address: fullAddress,
       street: profileStreet.trim(),
       number: profileNumber.trim(),
       neighborhood: profileNeighborhood.trim(),
       city: profileCity.trim(),
+      state: profileState || undefined,
       reference_point: profileReferencePoint.trim() || undefined,
       slogan: profileSlogan
     }
@@ -724,7 +723,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setTimeout(() => setProfileSaved(false), 3000)
   }
 
-  const isLight = theme === 'light'
+  // Cores claro/escuro vêm do tema do estilo (shopTheme), então as classes são sempre as "escuras"
+  const isLight = false
+  const isLightMode = theme === 'light'
+  const platform = getPlatformSettings()
+  useShopChrome(barbershop.style_preset, isLightMode ? 'light' : 'dark')
 
   const adminTabsList = [
     { id: 'agenda' as AdminTab, label: 'Hoje', fullLabel: 'Agenda de Hoje', icon: Calendar, badge: todayAppointments.length },
@@ -738,8 +741,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   return (
     <div
-      style={buildShopTheme(barbershop.style_preset, isLight ? 'light' : 'dark', true)}
-      className={`min-h-screen select-none transition-colors ${isLight ? 'bg-slate-100 text-slate-900' : 'bg-[#090A0F] text-slate-100'}`}
+      {...shopThemeAttrs(barbershop.style_preset)}
+      style={buildShopTheme(barbershop.style_preset, isLightMode ? 'light' : 'dark')}
+      className="min-h-screen select-none transition-colors bg-slate-950 text-slate-100"
     >
       {/* ===================== BARRA LATERAL ESQUERDA (SIDEBAR RETRÁTIL) ===================== */}
       <aside
@@ -748,7 +752,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         } ${
           isLight
             ? 'bg-white/95 border-slate-200 backdrop-blur-xl'
-            : 'bg-[#0d0f17]/95 border-slate-800/90 backdrop-blur-xl'
+            : 'bg-slate-950/95 border-slate-800/90 backdrop-blur-xl'
         }`}
       >
         {/* Topo da Sidebar: Logo + Botão Minimizar/Expandir */}
@@ -824,13 +828,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {onToggleTheme && (
             <button
               onClick={onToggleTheme}
-              title={isLight ? 'Modo Escuro' : 'Modo Claro'}
+              title={isLightMode ? 'Modo Escuro' : 'Modo Claro'}
               className={`w-full flex items-center gap-3 p-2 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
                 isLight ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
             >
-              {isLight ? <Moon className="w-5 h-5 text-indigo-500 shrink-0" /> : <Sun className="w-5 h-5 text-amber-400 shrink-0" />}
-              {sidebarExpanded && <span>{isLight ? 'Modo Escuro' : 'Modo Claro'}</span>}
+              {isLightMode ? <Moon className="w-5 h-5 text-indigo-500 shrink-0" /> : <Sun className="w-5 h-5 text-amber-400 shrink-0" />}
+              {sidebarExpanded && <span>{isLightMode ? 'Modo Escuro' : 'Modo Claro'}</span>}
             </button>
           )}
 
@@ -852,7 +856,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* ===================== BARRA INFERIOR (CELULAR) ===================== */}
       <nav
         className={`sm:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-7 border-t backdrop-blur-xl pb-[env(safe-area-inset-bottom)] ${
-          isLight ? 'bg-white/95 border-slate-200' : 'bg-[#0d0f17]/95 border-slate-800/90'
+          isLight ? 'bg-white/95 border-slate-200' : 'bg-slate-950/95 border-slate-800/90'
         }`}
       >
         {adminTabsList.map((tab) => {
@@ -882,7 +886,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <div className="sm:pl-16 min-h-screen flex flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:pb-0">
         {/* Topo Administrativo */}
         <header className={`sticky top-0 z-30 border-b backdrop-blur-md px-3 sm:px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] transition-colors ${
-          isLight ? 'bg-white/90 border-slate-200' : 'bg-[#0d0f17]/95 border-slate-800/80'
+          isLight ? 'bg-white/90 border-slate-200' : 'bg-slate-950/95 border-slate-800/80'
         }`}>
           <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
@@ -900,12 +904,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {onToggleTheme && (
                 <button
                   onClick={onToggleTheme}
-                  title={isLight ? 'Modo Escuro' : 'Modo Claro'}
+                  title={isLightMode ? 'Modo Escuro' : 'Modo Claro'}
                   className={`p-2 rounded-xl border text-xs cursor-pointer active:scale-95 transition-all ${
                     isLight ? 'bg-slate-100 border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-amber-400'
                   }`}
                 >
-                  {isLight ? <Moon className="w-4 h-4 text-indigo-500" /> : <Sun className="w-4 h-4" />}
+                  {isLightMode ? <Moon className="w-4 h-4 text-indigo-500" /> : <Sun className="w-4 h-4" />}
                 </button>
               )}
               {onBackToClientView && (
@@ -925,8 +929,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </header>
 
         <main className="max-w-4xl mx-auto px-3 sm:px-4 py-5 space-y-5 flex-1 w-full">
-        {/* ===================== ALERTA DE VENCIMENTO DA MENSALIDADE (5, 4, 3, 2, 1 DIAS) ===================== */}
-        {daysUntilDue <= 5 && daysUntilDue >= 0 && barbershop.subscription_status !== 'blocked' && (
+        {/* ===================== AVISO: TESTE OU PERÍODO PAGO ACABANDO (5 DIAS OU MENOS) ===================== */}
+        {(billing.status === 'trial' || billing.status === 'active') && billing.daysLeft <= 5 && (
           <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/20 via-slate-900 to-slate-900 border border-amber-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl">
             <div className="flex items-start gap-3">
               <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
@@ -934,14 +938,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
               <div>
                 <h4 className="font-bold text-sm text-amber-300">
-                  {daysUntilDue === 0
-                    ? 'Atenção: Sua mensalidade vence hoje!'
-                    : daysUntilDue === 1
-                    ? 'Atenção: Sua mensalidade vence amanhã!'
-                    : `Atenção: Sua mensalidade vence em ${daysUntilDue} dias!`}
+                  {billing.status === 'trial' ? 'Seu teste grátis' : 'Seu período pago'}{' '}
+                  {billing.daysLeft === 0
+                    ? 'termina hoje!'
+                    : billing.daysLeft === 1
+                    ? 'termina amanhã!'
+                    : `termina em ${billing.daysLeft} dias.`}
                 </h4>
                 <p className="text-xs text-slate-300 mt-0.5">
-                  Valor: <strong>R$ {(barbershop.monthly_fee || 50).toFixed(2).replace('.', ',')}</strong>. Pague via PIX para manter seus agendamentos online sem interrupção.
+                  Para continuar sem interrupção, pague antecipadamente <strong>R$ {formatMoney(barbershop.monthly_fee || platform.monthly_fee)}</strong> via PIX e ganhe mais 30 dias.
                 </p>
               </div>
             </div>
@@ -957,7 +962,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         )}
 
         {/* ===================== ALERTA SE ESTIVER BLOQUEADO ===================== */}
-        {barbershop.subscription_status === 'blocked' && (
+        {(billing.status === 'blocked' || billing.status === 'expired') && (
           <div className="p-5 rounded-3xl bg-rose-950/40 border border-rose-500/50 text-slate-200 space-y-3.5 shadow-2xl">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-2xl bg-rose-500/20 text-rose-400 shrink-0">
@@ -966,7 +971,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div>
                 <h3 className="font-black text-base text-white">Acesso Temporariamente Suspenso</h3>
                 <p className="text-xs text-rose-200/80">
-                  Seu link de agendamento público está pausado por pendência na mensalidade.
+                  {billing.status === 'expired' ? 'Seu período acabou e o link de agendamento público está pausado. Pague para liberar mais 30 dias.' : 'Seu link de agendamento público está pausado.'}
                 </p>
               </div>
             </div>
@@ -974,7 +979,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs space-y-2">
               <p className="text-slate-400">Pague via PIX para reativação imediata:</p>
               <div className="flex items-center justify-between gap-2">
-                <span className="font-mono font-bold text-amber-400 text-sm">{barbershop.pix_key || DEFAULT_PIX_KEY}</span>
+                <span className="font-mono font-bold text-amber-400 text-sm">{platform.pix_key}</span>
                 <button
                   onClick={handleCopyPix}
                   className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs flex items-center gap-1 cursor-pointer"
@@ -983,17 +988,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <span>{copiedPixKey ? 'Copiado!' : 'Copiar PIX'}</span>
                 </button>
               </div>
-              <p className="text-[11px] text-slate-400">Titular: {DEFAULT_PIX_NAME} - Banco Inter</p>
+              <p className="text-[11px] text-slate-400">Titular: {platform.pix_name} - {platform.pix_bank}</p>
             </div>
           </div>
         )}
 
-        {/* ===================== CARD DO LINK PÚBLICO (DIVULGAÇÃO) ===================== */}
+        {/* ===================== CARD DO LINK PÚBLICO (SÓ NA ABA HOJE) ===================== */}
+        {activeTab === 'agenda' && (
         <div
           className={`p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors ${
             isLight
-              ? 'bg-gradient-to-r from-amber-50 via-white to-amber-50/70 border border-amber-200/90 shadow-sm text-slate-900'
-              : 'bg-gradient-to-r from-amber-500/15 via-slate-900 to-slate-900 border border-amber-500/30 shadow-xl text-white'
+              ? 'bg-white border border-slate-200 shadow-sm text-slate-900'
+              : 'bg-slate-900 border border-amber-500/30 shadow-xl text-white'
           }`}
         >
           <div className="flex items-start gap-3 min-w-0">
@@ -1014,7 +1020,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span
                 className={`text-xs font-mono mt-1.5 inline-block px-2.5 py-0.5 rounded-lg max-w-full sm:max-w-sm truncate border ${
                   isLight
-                    ? 'bg-amber-100/80 text-amber-900 border-amber-300/80 font-bold'
+                    ? 'bg-slate-100 text-slate-800 border-slate-200 font-bold'
                     : 'bg-slate-950/60 text-amber-300 border-amber-500/20'
                 }`}
               >
@@ -1044,6 +1050,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             )}
           </button>
         </div>
+        )}
 
         {/* ========================================================================= */}
         {/* ===================== ABA 1: AGENDA DE HOJE ============================= */}
@@ -1428,7 +1435,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             return (
                               <td
                                 key={d.dateStr}
-                                className="p-2 border-r border-slate-800/40 bg-slate-950/30 text-center text-[10px] text-amber-500/70 font-semibold select-none"
+                                className="p-2 border-r border-slate-800/40 bg-slate-950/30 text-center text-[10px] text-amber-400 font-semibold select-none"
                               >
                                 Almoço
                               </td>
@@ -1538,7 +1545,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   setShowAddBookingModal(true)
                                 }}
                                 title={`Agendar corte manual para ${d.dayName} às ${slot}`}
-                                className="w-full py-2 px-1 rounded-xl border border-dashed border-emerald-500/20 hover:border-emerald-500/60 hover:bg-emerald-500/10 text-emerald-400/60 hover:text-emerald-300 text-[10px] font-semibold text-center transition-all cursor-pointer flex items-center justify-center gap-0.5"
+                                className="w-full py-2 px-1 rounded-xl border border-dashed border-emerald-500/20 hover:border-emerald-500/60 hover:bg-emerald-500/10 text-emerald-400 hover:text-emerald-300 text-[10px] font-semibold text-center transition-all cursor-pointer flex items-center justify-center gap-0.5"
                               >
                                 <span>+ Livre</span>
                               </button>
@@ -2273,8 +2280,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <h5 className="font-bold text-amber-300">Reajuste de Mensalidade Agendado</h5>
                     <p className="text-slate-300 mt-0.5">
                       Foi agendado um novo valor de mensalidade de{' '}
-                      <strong className="text-white">R$ {barbershop.next_monthly_fee.toFixed(2).replace('.', ',')}</strong>{' '}
-                      para o próximo ciclo de pagamento do seu negócio.
+                      <strong className="text-white">R$ {formatMoney(barbershop.next_monthly_fee)}</strong>{' '}
+                      a partir do seu próximo pagamento.
                     </p>
                   </div>
                 </div>
@@ -2285,18 +2292,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="p-3 rounded-2xl bg-slate-800/80 border border-slate-700/80 space-y-1">
                   <span className="text-slate-400 text-[11px]">Valor da Mensalidade:</span>
                   <p className="font-black text-amber-400 text-lg">
-                    R$ {(barbershop.monthly_fee || 50).toFixed(2).replace('.', ',')}
+                    R$ {formatMoney(barbershop.monthly_fee || platform.monthly_fee)}
                   </p>
-                  <span className="text-[10px] text-slate-400">preço fixo mensal</span>
+                  <span className="text-[10px] text-slate-400">pago antecipado, a cada 30 dias</span>
                 </div>
 
                 <div className="p-3 rounded-2xl bg-slate-800/80 border border-slate-700/80 space-y-1">
-                  <span className="text-slate-400 text-[11px]">Próximo Vencimento:</span>
+                  <span className="text-slate-400 text-[11px]">
+                    {billing.status === 'trial' ? 'Teste grátis até:' : billing.status === 'active' ? 'Pago até:' : 'Venceu em:'}
+                  </span>
                   <p className="font-bold text-white text-base">
-                    {barbershop.next_billing_date ? barbershop.next_billing_date.split('-').reverse().join('/') : `Dia ${barbershop.due_day || 10}`}
+                    {formatBR(billing.dueDate)}
                   </p>
-                  <span className={`text-[10px] font-bold ${daysUntilDue <= 5 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                    {daysUntilDue <= 0 ? 'Vence hoje' : `${daysUntilDue} dias restantes`}
+                  <span className={`text-[10px] font-bold ${billing.status === 'expired' ? 'text-rose-400' : daysUntilDue <= 5 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    {billing.status === 'expired' ? 'Acesso pausado' : daysUntilDue === 0 ? 'Termina hoje' : `${daysUntilDue} dias restantes`}
                   </span>
                 </div>
               </div>
@@ -2310,7 +2319,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="flex justify-center">
                   <div className="p-2.5 rounded-2xl bg-white shadow-xl border-2 border-amber-500/40 inline-block">
                     <img
-                      src={DEFAULT_PIX_QRCODE}
+                      src={platform.pix_qrcode}
                       alt="QR Code PIX Banco Inter"
                       className="w-48 h-48 object-contain rounded-xl"
                     />
@@ -2321,7 +2330,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <p className="text-slate-400 text-[11px]">Ou utilize a chave PIX copia e cola:</p>
                   <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-slate-800 max-w-sm mx-auto">
                     <span className="font-mono font-bold text-amber-300 text-xs truncate mr-2">
-                      {barbershop.pix_key || DEFAULT_PIX_KEY}
+                      {platform.pix_key}
                     </span>
                     <button
                       type="button"
@@ -2333,19 +2342,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </button>
                   </div>
                   <p className="text-[10px] text-slate-500 pt-1">
-                    Titular: {DEFAULT_PIX_NAME} (Banco Inter)
+                    Titular: {platform.pix_name} ({platform.pix_bank})
                   </p>
                 </div>
 
-                <a
-                  href={`https://wa.me/55${barbershop.phone_whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá João! Realizei o pagamento da mensalidade de R$ ${(barbershop.monthly_fee || 50).toFixed(2).replace('.', ',')} da barbearia ${barbershop.name}. Segue o comprovante em anexo:`)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full max-w-sm mx-auto py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
-                >
-                  <Phone className="w-4 h-4 fill-current" />
-                  <span>Enviar Comprovante via WhatsApp</span>
-                </a>
+                {platform.contact_whatsapp && (
+                  <a
+                    href={`https://wa.me/${toWaNumber(platform.contact_whatsapp)}?text=${encodeURIComponent(`Olá! Realizei o pagamento antecipado de R$ ${formatMoney(barbershop.monthly_fee || platform.monthly_fee)} de ${barbershop.name}. Segue o comprovante:`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full max-w-sm mx-auto py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+                  >
+                    <Phone className="w-4 h-4 fill-current" />
+                    <span>Enviar Comprovante via WhatsApp</span>
+                  </a>
+                )}
               </div>
             </div>
 
@@ -2593,15 +2604,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-slate-400 mb-1">Cidade / UF *</label>
+                    <label className="block text-slate-400 mb-1">Cidade *</label>
                     <input
                       type="text"
                       required
-                      placeholder="Ex: São Paulo - SP"
+                      placeholder="Ex: São Paulo"
                       value={profileCity}
                       onChange={(e) => setProfileCity(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-500"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 mb-1">UF *</label>
+                    <select
+                      required
+                      value={profileState}
+                      onChange={(e) => setProfileState(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-500"
+                    >
+                      <option value="">Selecione</option>
+                      {BR_STATES.map((st) => (
+                        <option key={st} value={st}>{st}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 

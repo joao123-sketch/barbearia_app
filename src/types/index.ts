@@ -1,4 +1,4 @@
-export type SubscriptionStatus = 'active' | 'pending' | 'overdue' | 'blocked'
+export type SubscriptionStatus = 'trial' | 'active' | 'pending' | 'overdue' | 'blocked'
 
 export type ShopStylePreset = 'elegante' | 'sofisticado' | 'moderno' | 'minimalista' | 'simples' | 'rosa' | 'azul' | 'neutro'
 
@@ -21,6 +21,7 @@ export interface Barbershop {
   number?: string
   neighborhood?: string
   city?: string
+  state?: string // UF
   reference_point?: string
   instagram?: string
   theme_color?: string
@@ -30,8 +31,8 @@ export interface Barbershop {
   monthly_fee: number
   next_monthly_fee?: number
   subscription_status: SubscriptionStatus
-  due_day: number
-  next_billing_date: string
+  due_day?: number
+  next_billing_date: string // pré-pago: último dia de acesso (fim do teste ou do período pago)
   last_payment_date?: string
   pix_key?: string
   // Pausas e Bloqueios de Agenda (Viagens / Férias)

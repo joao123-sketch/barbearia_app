@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, useNavigate, useParams, useLocation, Navigate } from 'react-router-dom'
 import { applyManifestForPath } from './lib/pwa'
 import { endSession, getSession } from './lib/auth'
+import { normalizePhone } from './lib/phone'
 import { getModeFor, type ThemeMode } from './lib/shopTheme'
 import { BookingClientView } from './components/BookingClientView'
 import { AdminDashboard } from './components/AdminDashboard'
@@ -51,6 +52,9 @@ function BookingRouteWrapper({
   const shopServices = services.filter((s) => s.barbershop_id === currentShop.id)
   const shopBarbers = barbers.filter((b) => b.barbershop_id === currentShop.id && b.active)
   const mode = getModeFor(currentShop.style_preset, themeOverride)
+  const navigate = useNavigate()
+  // Dono logado vendo a própria página ("Ver como cliente") ganha o botão de voltar ao painel
+  const isOwnerPreview = getSession()?.shop_id === currentShop.id
 
   return (
     <div className="relative">
@@ -61,6 +65,7 @@ function BookingRouteWrapper({
         theme={mode}
         onToggleTheme={() => onToggleTheme(mode)}
         onNewBooking={onNewBooking}
+        onBackToPanel={isOwnerPreview ? () => navigate('/admin') : undefined}
       />
     </div>
   )
@@ -104,6 +109,7 @@ function AdminRouteWrapper({
   const shopAppointments = appointments.filter((a) => a.barbershop_id === barbershop.id)
   const shopServices = services.filter((s) => s.barbershop_id === barbershop.id)
   const shopBarbers = barbers.filter((b) => b.barbershop_id === barbershop.id)
+  const mode = getModeFor(barbershop.style_preset, themeOverride)
 
   return (
     <div className="relative">
@@ -113,8 +119,8 @@ function AdminRouteWrapper({
         services={shopServices}
         appointments={shopAppointments}
         workingHours={workingHours}
-        theme={themeOverride ?? 'dark'}
-        onToggleTheme={() => onToggleTheme(themeOverride ?? 'dark')}
+        theme={mode}
+        onToggleTheme={() => onToggleTheme(mode)}
         onBackToClientView={() => navigate(`/${barbershop.slug}`)}
         onLogout={() => {
           endSession()
@@ -324,7 +330,7 @@ export function App() {
   const handleDeleteBarbershop = (shopId: string) => {
     const shopToDelete = barbershopsList.find((s) => s.id === shopId)
     if (shopToDelete) {
-      const cleanPhone = shopToDelete.phone_whatsapp.replace(/\D/g, '')
+      const cleanPhone = normalizePhone(shopToDelete.phone_whatsapp)
       const auditRaw = localStorage.getItem('barber_audit_history')
       let auditList: any[] = []
       if (auditRaw) {

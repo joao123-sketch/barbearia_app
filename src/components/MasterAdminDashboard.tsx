@@ -16,10 +16,14 @@ import {
   Store,
   CreditCard,
   QrCode,
-  UserPlus
+  UserPlus,
+  Camera
 } from 'lucide-react'
-import type { Barbershop, SubscriptionStatus } from '../types'
-import { DEFAULT_PIX_KEY, DEFAULT_PIX_NAME, DEFAULT_PIX_QRCODE, DEFAULT_MONTHLY_FEE } from '../lib/mockData'
+import type { Barbershop } from '../types'
+import { getPlatformSettings, savePlatformSettings, type PlatformSettings } from '../lib/platform'
+import { PAID_PERIOD_DAYS, TRIAL_DAYS, addDays, formatBR, formatMoney, getBillingState, toDateStr } from '../lib/billing'
+import { normalizePhone, toWaNumber } from '../lib/phone'
+import { fileToResizedDataUrl } from '../lib/image'
 
 interface MasterAdminDashboardProps {
   barbershops: Barbershop[]
@@ -45,18 +49,16 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
     setTimeout(() => setCopiedRegisterLink(false), 2500)
   }
 
-  // Mensalidade Base Global da Plataforma
-  const [baseFee, setBaseFee] = useState<number>(() => {
-    const saved = localStorage.getItem('barber_master_base_fee')
-    return saved ? Number(saved) : DEFAULT_MONTHLY_FEE
-  })
-  const [isEditingBaseFee, setIsEditingBaseFee] = useState(false)
-  const [newBaseFeeInput, setNewBaseFeeInput] = useState(baseFee)
+  // Cobrança da plataforma: mensalidade, chave PIX, titular e QR Code
+  const [settings, setSettings] = useState<PlatformSettings>(() => getPlatformSettings())
+  const [draft, setDraft] = useState<PlatformSettings>(settings)
+  const [isEditingSettings, setIsEditingSettings] = useState(false)
+  const [applyFeeToAll, setApplyFeeToAll] = useState(false)
+  const [settingsSaved, setSettingsSaved] = useState(false)
 
   // Modal de edição individual de barbearia
   const [editingShop, setEditingShop] = useState<Barbershop | null>(null)
   const [editFee, setEditFee] = useState<number>(50)
-  const [editDueDay, setEditDueDay] = useState<number>(10)
 
   // Modal de Exclusão de Barbearia com trava de segurança
   const [shopToDelete, setShopToDelete] = useState<Barbershop | null>(null)
@@ -65,17 +67,49 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
   // Visualizar QR Code PIX
   const [showPixPreview, setShowPixPreview] = useState(false)
 
-  // Salvar nova mensalidade base global
-  const handleSaveBaseFee = (e: React.FormEvent) => {
+  const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault()
-    setBaseFee(newBaseFeeInput)
-    localStorage.setItem('barber_master_base_fee', String(newBaseFeeInput))
-    setIsEditingBaseFee(false)
+    const clean: PlatformSettings = {
+      monthly_fee: Number(draft.monthly_fee) > 0 ? Number(draft.monthly_fee) : settings.monthly_fee,
+      pix_key: draft.pix_key.trim(),
+      pix_name: draft.pix_name.trim(),
+      pix_bank: draft.pix_bank.trim(),
+      pix_qrcode: draft.pix_qrcode,
+      contact_whatsapp: normalizePhone(draft.contact_whatsapp)
+    }
+    if (!clean.pix_key) {
+      alert('Informe a chave PIX.')
+      return
+    }
+    savePlatformSettings(clean)
+    setSettings(clean)
+
+    // Novo valor vale para quem se cadastrar daqui para frente; nas contas atuais só se marcado, no próximo pagamento
+    if (applyFeeToAll && clean.monthly_fee !== settings.monthly_fee) {
+      onUpdateBarbershops(
+        barbershops.map((sh) => (sh.monthly_fee === clean.monthly_fee ? sh : { ...sh, next_monthly_fee: clean.monthly_fee }))
+      )
+    }
+    setApplyFeeToAll(false)
+    setIsEditingSettings(false)
+    setSettingsSaved(true)
+    setTimeout(() => setSettingsSaved(false), 3000)
+  }
+
+  const handleQrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const qr = await fileToResizedDataUrl(file, 700, 1, 'image/png')
+      setDraft((d) => ({ ...d, pix_qrcode: qr }))
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Não foi possível usar esta imagem.')
+    }
   }
 
   // Copiar chave PIX
   const handleCopyPix = () => {
-    navigator.clipboard.writeText(DEFAULT_PIX_KEY)
+    navigator.clipboard.writeText(settings.pix_key)
     setCopiedPix(true)
     setTimeout(() => setCopiedPix(false), 2000)
   }
@@ -86,45 +120,45 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
       const matchesSearch =
         shop.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         shop.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        shop.phone_whatsapp.includes(searchTerm)
+        shop.phone_whatsapp.includes(searchTerm.replace(/\D/g, '') || searchTerm)
 
       if (filterStatus === 'all') return matchesSearch
-      return matchesSearch && shop.subscription_status === filterStatus
+      return matchesSearch && getBillingState(shop).status === filterStatus
     })
   }, [barbershops, searchTerm, filterStatus])
 
   // KPIs
   const totalShops = barbershops.length
-  const activeShops = barbershops.filter((s) => s.subscription_status === 'active').length
-  const overdueShops = barbershops.filter((s) => s.subscription_status === 'overdue' || s.subscription_status === 'pending').length
-  const blockedShops = barbershops.filter((s) => s.subscription_status === 'blocked').length
+  const trialShops = barbershops.filter((s) => getBillingState(s).status === 'trial').length
+  const paidShops = barbershops.filter((s) => getBillingState(s).status === 'active').length
+  const expiredShops = barbershops.filter((s) => getBillingState(s).status === 'expired').length
+  const blockedShops = barbershops.filter((s) => getBillingState(s).status === 'blocked').length
+  // Receita recorrente: só quem está com o período pago em dia
   const totalMRR = barbershops
-    .filter((s) => s.subscription_status !== 'blocked')
-    .reduce((acc, curr) => acc + (curr.monthly_fee || 50), 0)
+    .filter((s) => getBillingState(s).status === 'active')
+    .reduce((acc, curr) => acc + (curr.monthly_fee || settings.monthly_fee), 0)
 
-  // Confirmar pagamento PIX e renovar por +30 dias
+  // Confirmar pagamento PIX: libera mais 30 dias a partir de hoje (ou do fim do período atual, se ainda vigente)
   const handleConfirmPayment = (shopId: string) => {
     const today = new Date()
-    const nextDate = new Date()
-    nextDate.setDate(nextDate.getDate() + 30)
+    const todayStr = toDateStr(today)
 
     const updated = barbershops.map((s) => {
-      if (s.id === shopId) {
-        return {
-          ...s,
-          subscription_status: 'active' as SubscriptionStatus,
-          // Se havia reajuste de mensalidade agendado para o mês seguinte, aplica agora
-          monthly_fee: s.next_monthly_fee || s.monthly_fee,
-          next_monthly_fee: undefined,
-          last_payment_date: today.toISOString().split('T')[0],
-          next_billing_date: nextDate.toISOString().split('T')[0]
-        }
+      if (s.id !== shopId) return s
+      const base = s.next_billing_date && s.next_billing_date >= todayStr ? s.next_billing_date : todayStr
+      return {
+        ...s,
+        subscription_status: 'active' as const,
+        // Reajuste agendado vale a partir deste pagamento
+        monthly_fee: s.next_monthly_fee || s.monthly_fee,
+        next_monthly_fee: undefined,
+        last_payment_date: todayStr,
+        next_billing_date: addDays(base, PAID_PERIOD_DAYS)
       }
-      return s
     })
 
     onUpdateBarbershops(updated)
-    alert('Pagamento registrado com sucesso! Assinatura renovada por +30 dias.')
+    alert(`Pagamento registrado! Acesso liberado por mais ${PAID_PERIOD_DAYS} dias.`)
   }
 
   // Alternar Bloqueio / Desbloqueio
@@ -132,7 +166,7 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
     const shop = barbershops.find((s) => s.id === shopId)
     if (!shop) return
 
-    const newStatus: SubscriptionStatus = shop.subscription_status === 'blocked' ? 'active' : 'blocked'
+    const newStatus = shop.subscription_status === 'blocked' ? ('active' as const) : ('blocked' as const)
     const confirmMsg = newStatus === 'blocked'
       ? `Tem certeza que deseja bloquear "${shop.name}"? O link público e o painel dele serão suspensos.`
       : `Deseja reativar o acesso de "${shop.name}"?`
@@ -169,27 +203,25 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
       s.id === editingShop.id
         ? {
             ...s,
-            next_monthly_fee: newFee,
-            due_day: Number(editDueDay)
+            next_monthly_fee: newFee
           }
         : s
     )
 
     onUpdateBarbershops(updated)
     setEditingShop(null)
-    alert(`Reajuste para R$ ${newFee.toFixed(2).replace('.', ',')} agendado com sucesso para a barbearia ${editingShop.name}! Passará a valer a partir do próximo mês/ciclo.`)
+    alert(`Reajuste para R$ ${newFee.toFixed(2).replace('.', ',')} agendado com sucesso para a barbearia ${editingShop.name}! Passará a valer a partir do próximo pagamento.`)
   }
 
   // Montar link do WhatsApp para cobrar o barbeiro
   const getCobrarWhatsappUrl = (shop: Barbershop) => {
-    const phone = shop.phone_whatsapp.replace(/\D/g, '')
     const msg = `Olá, equipe da *${shop.name}*! Tudo bem?\n\n` +
-      `Passando para lembrar sobre a mensalidade do seu sistema de agendamentos no valor de *R$ ${(shop.monthly_fee || 50).toFixed(2).replace('.', ',')}*.\n\n` +
-      `🔑 *Chave PIX:* ${DEFAULT_PIX_KEY}\n` +
-      `👤 *Titular:* ${DEFAULT_PIX_NAME} (Banco Inter)\n\n` +
+      `Passando para lembrar do pagamento antecipado do seu sistema de agendamentos no valor de *R$ ${formatMoney(shop.monthly_fee || settings.monthly_fee)}*.\n\n` +
+      `🔑 *Chave PIX:* ${settings.pix_key}\n` +
+      `👤 *Titular:* ${settings.pix_name} (${settings.pix_bank})\n\n` +
       `Assim que realizar o pagamento, por favor envie o comprovante por aqui para mantermos seu sistema 100% ativo. Obrigado!`
 
-    return `https://wa.me/${phone.startsWith('55') ? phone : '55' + phone}?text=${encodeURIComponent(msg)}`
+    return `https://wa.me/${toWaNumber(shop.phone_whatsapp)}?text=${encodeURIComponent(msg)}`
   }
 
   return (
@@ -211,7 +243,7 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                Gestão Geral de Barbearias, Mensalidades e Recebíveis
+                Gestão geral de contas, pagamentos e recebíveis
               </p>
             </div>
           </div>
@@ -229,7 +261,7 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
               onClick={handleCopyPix}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/40 text-xs text-slate-300 hover:text-white transition-all cursor-pointer"
             >
-              <span className="font-mono font-bold text-amber-400">{DEFAULT_PIX_KEY}</span>
+              <span className="font-mono font-bold text-amber-400">{settings.pix_key}</span>
               {copiedPix ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
             </button>
           </div>
@@ -253,7 +285,7 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-300 max-w-xl">
-                Envie este link para qualquer barbeiro que queira usar o sistema. Ele preenche os dados, escolhe o dia da mensalidade e já começa a usar na hora sem você precisar aprovar manualmente.
+                {`Envie este link para qualquer barbeiro que queira usar o sistema. Ele cria a conta, ganha ${TRIAL_DAYS} dias grátis e já começa a usar na hora, sem você precisar aprovar. Depois, o acesso é pré-pago por PIX.`}
               </p>
               <div className="pt-1">
                 <span className="font-mono text-xs font-bold text-amber-300 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 inline-block truncate max-w-xs sm:max-w-md">
@@ -294,7 +326,7 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
             <div className="flex items-center gap-4">
               <div className="p-2 rounded-2xl bg-white shadow-md border border-amber-500/40 shrink-0">
                 <img
-                  src={DEFAULT_PIX_QRCODE}
+                  src={settings.pix_qrcode}
                   alt="QR Code Banco Inter"
                   className="w-24 h-24 object-contain"
                 />
@@ -302,13 +334,13 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
               <div className="text-xs space-y-1">
                 <h4 className="font-bold text-white text-sm">QR Code & Chave PIX Ativos</h4>
                 <p className="text-slate-400">
-                  Titular: <strong className="text-amber-300">{DEFAULT_PIX_NAME}</strong> (Banco Inter)
+                  Titular: <strong className="text-amber-300">{settings.pix_name}</strong> ({settings.pix_bank})
                 </p>
                 <p className="text-slate-400">
-                  Chave CPF: <strong className="font-mono text-white">{DEFAULT_PIX_KEY}</strong>
+                  Chave PIX: <strong className="font-mono text-white">{settings.pix_key}</strong>
                 </p>
                 <p className="text-[11px] text-emerald-400 font-medium">
-                  Configurado para R$ {(baseFee).toFixed(2).replace('.', ',')} por barbearia
+                  Mensalidade de R$ {formatMoney(settings.monthly_fee)} por negócio
                 </p>
               </div>
             </div>
@@ -326,7 +358,7 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800">
             <div className="flex items-center justify-between text-slate-400 mb-1">
-              <span className="text-xs font-medium">Barbearias</span>
+              <span className="text-xs font-medium">Contas</span>
               <Store className="w-4 h-4 text-amber-400" />
             </div>
             <p className="text-2xl font-black text-white">{totalShops}</p>
@@ -341,82 +373,185 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
             <p className="text-2xl font-black text-emerald-400">
               R$ {totalMRR.toFixed(2).replace('.', ',')}
             </p>
-            <p className="text-[10px] text-slate-400 mt-0.5">recorrente por mês</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">de quem já pagou</p>
           </div>
 
           <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800">
             <div className="flex items-center justify-between text-slate-400 mb-1">
-              <span className="text-xs font-medium">Em Dia</span>
+              <span className="text-xs font-medium">Pagantes</span>
               <CheckCircle2 className="w-4 h-4 text-blue-400" />
             </div>
-            <p className="text-2xl font-black text-white">{activeShops}</p>
-            <p className="text-[10px] text-emerald-400 mt-0.5">assinaturas ativas</p>
+            <p className="text-2xl font-black text-white">{paidShops}</p>
+            <p className="text-[10px] text-emerald-400 mt-0.5">{trialShops} em teste grátis</p>
           </div>
 
           <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800">
             <div className="flex items-center justify-between text-slate-400 mb-1">
-              <span className="text-xs font-medium">Inadimplentes / Pendentes</span>
+              <span className="text-xs font-medium">Vencidos</span>
               <AlertTriangle className="w-4 h-4 text-rose-400" />
             </div>
-            <p className="text-2xl font-black text-rose-400">{overdueShops}</p>
+            <p className="text-2xl font-black text-rose-400">{expiredShops}</p>
             <p className="text-[10px] text-slate-400 mt-0.5">{blockedShops} bloqueadas</p>
           </div>
         </div>
 
-        {/* ===================== CONFIGURADOR DA MENSALIDADE BASE ===================== */}
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-900 to-slate-900 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
-              <CreditCard className="w-5 h-5" />
+        {/* ===================== COBRANÇA: MENSALIDADE, PIX E QR CODE ===================== */}
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-900 to-slate-900 border border-amber-500/30 space-y-3 text-xs">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
+                <CreditCard className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-white">Cobrança e PIX</h3>
+                <p className="text-slate-400 text-xs">
+                  Valor, chave e QR Code que aparecem para os donos na hora de pagar.
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-bold text-sm text-white">Preço Base da Mensalidade</h3>
-              <p className="text-slate-400 text-xs">
-                Valor cobrado por padrão para novas barbearias cadastradas.
-              </p>
-            </div>
-          </div>
-
-          {!isEditingBaseFee ? (
-            <div className="flex items-center gap-3 self-end sm:self-auto">
-              <span className="text-lg font-black text-amber-400">
-                R$ {baseFee.toFixed(2).replace('.', ',')} / mês
-              </span>
+            {!isEditingSettings && (
               <button
                 onClick={() => {
-                  setNewBaseFeeInput(baseFee)
-                  setIsEditingBaseFee(true)
+                  setDraft(settings)
+                  setIsEditingSettings(true)
                 }}
-                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center gap-1 cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center gap-1 cursor-pointer shrink-0"
               >
                 <Edit2 className="w-3.5 h-3.5 text-amber-400" />
-                <span>Alterar Valor</span>
+                <span>Editar</span>
               </button>
+            )}
+          </div>
+
+          {settingsSaved && (
+            <div className="px-3 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold">
+              Salvo! Os donos já veem os novos dados.
+            </div>
+          )}
+
+          {!isEditingSettings ? (
+            <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-4 items-center">
+              <div className="p-1.5 rounded-xl bg-white w-fit">
+                <img src={settings.pix_qrcode} alt="QR Code PIX" className="w-24 h-24 object-contain" />
+              </div>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+                <div>
+                  <dt className="text-slate-400 text-[11px]">Mensalidade</dt>
+                  <dd className="text-lg font-black text-amber-400">R$ {formatMoney(settings.monthly_fee)} / mês</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-400 text-[11px]">Chave PIX</dt>
+                  <dd className="font-mono font-bold text-white break-all">{settings.pix_key}</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-400 text-[11px]">Titular</dt>
+                  <dd className="text-white">{settings.pix_name}</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-400 text-[11px]">Banco</dt>
+                  <dd className="text-white">{settings.pix_bank}</dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-slate-400 text-[11px]">WhatsApp para comprovantes</dt>
+                  <dd className="text-white">{settings.contact_whatsapp || 'Não informado (o botão de comprovante fica oculto para os donos)'}</dd>
+                </div>
+              </dl>
             </div>
           ) : (
-            <form onSubmit={handleSaveBaseFee} className="flex items-center gap-2 self-end sm:self-auto">
-              <span className="text-slate-400 font-bold">R$</span>
-              <input
-                type="number"
-                step="5"
-                min="10"
-                value={newBaseFeeInput}
-                onChange={(e) => setNewBaseFeeInput(Number(e.target.value))}
-                className="w-24 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-amber-500/50 text-amber-300 font-bold text-sm text-right focus:outline-none"
-              />
-              <button
-                type="submit"
-                className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs cursor-pointer"
-              >
-                Salvar
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsEditingBaseFee(false)}
-                className="px-2 py-1.5 rounded-xl bg-slate-800 text-slate-400 text-xs cursor-pointer"
-              >
-                ✕
-              </button>
+            <form onSubmit={handleSaveSettings} className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Mensalidade (R$)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    value={draft.monthly_fee}
+                    onChange={(e) => setDraft({ ...draft, monthly_fee: Number(e.target.value) })}
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-amber-500 focus:outline-none text-white font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Chave PIX</label>
+                  <input
+                    type="text"
+                    required
+                    value={draft.pix_key}
+                    onChange={(e) => setDraft({ ...draft, pix_key: e.target.value })}
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-amber-500 focus:outline-none text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Nome do titular</label>
+                  <input
+                    type="text"
+                    value={draft.pix_name}
+                    onChange={(e) => setDraft({ ...draft, pix_name: e.target.value })}
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-amber-500 focus:outline-none text-white"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-slate-300 font-semibold mb-1">Seu WhatsApp para receber comprovantes</label>
+                  <input
+                    type="tel"
+                    placeholder="(11) 99999-9999"
+                    value={draft.contact_whatsapp}
+                    onChange={(e) => setDraft({ ...draft, contact_whatsapp: e.target.value })}
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-amber-500 focus:outline-none text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Banco</label>
+                  <input
+                    type="text"
+                    value={draft.pix_bank}
+                    onChange={(e) => setDraft({ ...draft, pix_bank: e.target.value })}
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-amber-500 focus:outline-none text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="p-1.5 rounded-xl bg-white shrink-0">
+                  <img src={draft.pix_qrcode} alt="QR Code PIX" className="w-20 h-20 object-contain" />
+                </div>
+                <div className="space-y-1.5">
+                  <input type="file" accept="image/*" onChange={handleQrUpload} className="hidden" id="master-qr-upload" />
+                  <label
+                    htmlFor="master-qr-upload"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold cursor-pointer active:scale-95 transition-all"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>Trocar QR Code</span>
+                  </label>
+                  <p className="text-[11px] text-slate-400">Envie o print ou a imagem do QR Code do seu PIX.</p>
+                </div>
+              </div>
+
+              {Number(draft.monthly_fee) !== settings.monthly_fee && (
+                <label className="flex items-start gap-2 text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={applyFeeToAll}
+                    onChange={(e) => setApplyFeeToAll(e.target.checked)}
+                    className="accent-amber-500 w-4 h-4 mt-0.5"
+                  />
+                  <span>Aplicar o novo valor também às contas atuais, a partir do próximo pagamento de cada uma</span>
+                </label>
+              )}
+
+              <div className="flex gap-2">
+                <button type="submit" className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold cursor-pointer">
+                  Salvar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingSettings(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+              </div>
             </form>
           )}
         </div>
@@ -437,9 +572,9 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
           <div className="flex gap-1.5 overflow-x-auto pb-1 text-xs">
             {[
               { id: 'all', label: 'Todas' },
-              { id: 'active', label: 'Em Dia' },
-              { id: 'pending', label: 'Pendentes' },
-              { id: 'overdue', label: 'Atrasadas' },
+              { id: 'trial', label: 'Em teste' },
+              { id: 'active', label: 'Pagas' },
+              { id: 'expired', label: 'Vencidas' },
               { id: 'blocked', label: 'Bloqueadas' }
             ].map((st) => (
               <button
@@ -465,10 +600,11 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
             </div>
           ) : (
             filteredShops.map((shop) => {
-              const isBlocked = shop.subscription_status === 'blocked'
-              const isOverdue = shop.subscription_status === 'overdue'
-              const isPending = shop.subscription_status === 'pending'
-              const isActive = shop.subscription_status === 'active'
+              const billing = getBillingState(shop)
+              const isBlocked = billing.status === 'blocked'
+              const isExpired = billing.status === 'expired'
+              const isTrial = billing.status === 'trial'
+              const isActive = billing.status === 'active'
 
               return (
                 <div
@@ -476,7 +612,7 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
                   className={`p-4 rounded-2xl border transition-all ${
                     isBlocked
                       ? 'bg-rose-950/20 border-rose-900/60'
-                      : isOverdue
+                      : isExpired
                       ? 'bg-amber-950/20 border-amber-800/60'
                       : 'bg-slate-900 border-slate-800'
                   }`}
@@ -485,11 +621,13 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
                     {/* Informações da Barbearia */}
                     <div className="flex items-start gap-3">
                       <div className="w-12 h-12 rounded-xl overflow-hidden border border-slate-700 bg-slate-800 shrink-0">
-                        <img
-                          src={shop.logo_url}
-                          alt={shop.name}
-                          className="w-full h-full object-cover"
-                        />
+                        {shop.logo_url ? (
+                          <img src={shop.logo_url} alt={shop.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-amber-400 font-black">
+                            {shop.name.trim().charAt(0).toUpperCase()}
+                          </div>
+                        )}
                       </div>
 
                       <div>
@@ -507,19 +645,19 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
                             className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                               isActive
                                 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                : isPending
-                                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                                : isOverdue
+                                : isTrial
+                                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                : isExpired
                                 ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                                 : 'bg-slate-800 text-slate-400 border border-slate-700'
                             }`}
                           >
                             {isActive
-                              ? 'Em Dia (Pago)'
-                              : isPending
-                              ? 'Vencendo'
-                              : isOverdue
-                              ? 'Inadimplente'
+                              ? 'Pago'
+                              : isTrial
+                              ? `Teste grátis (${billing.daysLeft}d)`
+                              : isExpired
+                              ? 'Vencido'
                               : 'Bloqueado'}
                           </span>
                         </div>
@@ -529,16 +667,16 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
                           <span className="font-mono text-amber-300">/{shop.slug}</span>
                           <span>•</span>
                           <span>
-                            Mensalidade: <strong className="text-white">R$ {(shop.monthly_fee || 50).toFixed(2).replace('.', ',')}</strong>
+                            Mensalidade: <strong className="text-white">R$ {formatMoney(shop.monthly_fee || settings.monthly_fee)}</strong>
                             {shop.next_monthly_fee && shop.next_monthly_fee !== shop.monthly_fee && (
                               <span className="ml-1 text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 font-bold">
-                                ➔ R$ {shop.next_monthly_fee.toFixed(2).replace('.', ',')} próx. mês
+                                ➔ R$ {formatMoney(shop.next_monthly_fee)} no próximo pagamento
                               </span>
                             )}
                           </span>
                           <span>•</span>
                           <span>
-                            Vencimento: <strong className="text-slate-200">Dia {shop.due_day || 10}</strong> (Próx: {shop.next_billing_date || 'A definir'})
+                            {isTrial ? 'Teste até' : isActive ? 'Pago até' : 'Venceu em'}: <strong className="text-slate-200">{formatBR(billing.dueDate)}</strong>
                           </span>
                         </div>
 
@@ -554,7 +692,7 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
                     <div className="flex items-center gap-2 flex-wrap self-end sm:self-center pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/80 w-full sm:w-auto justify-end">
                       {/* Abrir Link do Cliente */}
                       <button
-                        onClick={() => onNavigateToShop ? onNavigateToShop(shop.slug) : window.open(`/${shop.slug}`, '_blank')}
+                        onClick={() => onNavigateToShop ? onNavigateToShop(shop.slug) : window.open(`/b/${shop.slug}`, '_blank')}
                         title="Ver Link do Cliente"
                         className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs cursor-pointer"
                       >
@@ -576,19 +714,18 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
                       {/* Confirmar Pagamento PIX */}
                       <button
                         onClick={() => handleConfirmPayment(shop.id)}
-                        title="Marcar como Pago e Prorrogar +30 dias"
+                        title="Registrar pagamento e liberar mais 30 dias"
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 text-xs font-semibold cursor-pointer"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Pago (+30d)</span>
+                        <span>Recebi (+30d)</span>
                       </button>
 
                       {/* Editar Mensalidade e Dia */}
                       <button
                         onClick={() => {
                           setEditingShop(shop)
-                          setEditFee(shop.monthly_fee || 50)
-                          setEditDueDay(shop.due_day || 10)
+                          setEditFee(shop.monthly_fee || settings.monthly_fee)
                         }}
                         title="Editar Mensalidade"
                         className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs cursor-pointer"
@@ -655,22 +792,8 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
                   />
                 </div>
                 <p className="text-[11px] text-amber-400 mt-1">
-                  ⚡ Nota: O novo valor entrará em vigor no <strong>mês seguinte</strong>. O ciclo atual mantém o valor vigente.
+                  ⚡ Nota: O novo valor vale a partir do <strong>próximo pagamento</strong>. O período já pago não muda.
                 </p>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  Dia de Vencimento do Mês (1 a 31)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="31"
-                  value={editDueDay}
-                  onChange={(e) => setEditDueDay(Number(e.target.value))}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-bold text-sm"
-                />
               </div>
 
               <div className="flex gap-2 pt-2">

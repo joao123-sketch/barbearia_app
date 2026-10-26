@@ -19,7 +19,9 @@ import type { Barbershop, Service, ShopStylePreset, BusinessType } from '../type
 import { fileToResizedDataUrl } from '../lib/image'
 import { createAccount, findAccount, startSession } from '../lib/auth'
 import { getTerms } from '../lib/terms'
-import { DEFAULT_PIX_KEY } from '../lib/mockData'
+import { normalizePhone } from '../lib/phone'
+import { TRIAL_DAYS, addDays, formatMoney, getBaseFee } from '../lib/billing'
+import { BR_STATES } from '../lib/states'
 import { STYLE_PRESETS, STYLE_PRESET_ORDER } from '../lib/stylePresets'
 import { buildShopTheme, getModeFor, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
 
@@ -59,7 +61,8 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
   const [businessType, setBusinessType] = useState<BusinessType | null>(null)
   const terms = getTerms(businessType ?? undefined)
   const [instagram, setInstagram] = useState('')
-  const [dueDay, setDueDay] = useState<number>(10)
+  const [uf, setUf] = useState('')
+  const baseFee = getBaseFee()
 
   // Estilo Visual Escolhido
   const [stylePreset, setStylePreset] = useState<ShopStylePreset>('neutro')
@@ -84,6 +87,11 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
   const [logoUrl, setLogoUrl] = useState<string>('')
   const [hasCustomLogo, setHasCustomLogo] = useState(false)
 
+  // Conta já existente com este WhatsApp ou e-mail: sugere entrar em vez de cadastrar de novo
+  const existingByPhone = normalizePhone(phone).length >= 10 ? findAccount(phone) : undefined
+  const existingByEmail = /^\S+@\S+\.\S+$/.test(email.trim()) ? findAccount(email) : undefined
+  const existingAccount = existingByPhone || existingByEmail
+
   // Gerar slug automaticamente ao digitar o nome da barbearia
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value
@@ -99,7 +107,8 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
 
   // Formatação de telefone / WhatsApp
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, '')
+    // Aceita número colado com +55 e guarda só DDD + número
+    let value = normalizePhone(e.target.value)
     if (value.length > 11) value = value.slice(0, 11)
 
     if (value.length > 6) {
@@ -173,15 +182,19 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       return
     }
     if (!city.trim()) {
-      alert('Por favor, informe a cidade e estado do seu negócio.')
+      alert('Por favor, informe a cidade do seu negócio.')
       return
     }
-    if (findAccount(email) || findAccount(phone)) {
-      alert('Já existe uma conta com este e-mail ou WhatsApp. Volte e entre com a sua senha.')
+    if (!uf) {
+      alert('Por favor, escolha o estado (UF).')
+      return
+    }
+    if (existingAccount) {
+      alert('Já existe uma conta com este WhatsApp ou e-mail. Toque em "Entrar" para acessar a sua conta.')
       return
     }
 
-    const cleanPhone = phone.replace(/\D/g, '')
+    const cleanPhone = normalizePhone(phone)
 
     // RECONHECIMENTO DE CADASTRO E PREVENÇÃO DE FRAUDE (Anti-Trial Abuser)
     const auditRaw = localStorage.getItem('barber_audit_history')
@@ -194,15 +207,19 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       }
     }
     const previousRecord = auditList.find((a) => a.phone === cleanPhone)
-    let initialStatus: import('../types').SubscriptionStatus = 'active'
+    // Pré-pago: 20 dias grátis para quem nunca teve conta; quem já usou o teste paga antes de usar
+    const today = new Date()
+    let initialStatus: import('../types').SubscriptionStatus = 'trial'
+    let accessUntil = addDays(today, TRIAL_DAYS)
 
     if (previousRecord) {
       const confirmReactivation = window.confirm(
         '⚠️ Identificamos que este número de WhatsApp já possuiu uma conta anterior no BarberApp e já utilizou o período de avaliação.\n\n' +
-        'Sua conta será reativada mediante o pagamento da primeira mensalidade de R$ 50,00 para liberar o link público.\n\nDeseja prosseguir?'
+        `Sua conta será criada, mas o acesso só é liberado após o pagamento antecipado da mensalidade de R$ ${formatMoney(baseFee)}.\n\nDeseja prosseguir?`
       )
       if (!confirmReactivation) return
       initialStatus = 'pending'
+      accessUntil = addDays(today, -1)
     } else {
       auditList.push({
         phone: cleanPhone,
@@ -215,19 +232,6 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
 
     const newShopId = 'shop-' + Date.now()
 
-    // COBRANÇA SEMPRE NO MÊS SEGUINTE (Mês + 1)
-    const today = new Date()
-    let billingYear = today.getFullYear()
-    let billingMonth = today.getMonth() + 1 // Mês seguinte
-    if (billingMonth > 11) {
-      billingMonth = 0
-      billingYear += 1
-    }
-    const daysInMonth = new Date(billingYear, billingMonth + 1, 0).getDate()
-    const validDay = Math.min(dueDay, daysInMonth)
-    const nextDate = new Date(billingYear, billingMonth, validDay)
-    const nextDateStr = nextDate.toISOString().split('T')[0]
-
     const finalSlug = slug || shopName.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'meu-negocio'
 
     // Formatar Instagram limpo
@@ -237,7 +241,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       cleanInstagram = `@${cleanInstagram}`
     }
 
-    const fullAddress = `${street.trim()}, ${number.trim()} - ${neighborhood.trim()}, ${city.trim()}${referencePoint.trim() ? ` (${referencePoint.trim()})` : ''}`
+    const fullAddress = `${street.trim()}, ${number.trim()} - ${neighborhood.trim()}, ${city.trim()} - ${uf}${referencePoint.trim() ? ` (${referencePoint.trim()})` : ''}`
 
     const newBarbershop: Barbershop = {
       id: newShopId,
@@ -255,16 +259,15 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       number: number.trim(),
       neighborhood: neighborhood.trim(),
       city: city.trim(),
+      state: uf,
       reference_point: referencePoint.trim() || undefined,
       instagram: cleanInstagram || undefined,
       theme_color: '#EAB308',
       style_preset: stylePreset,
       created_at: new Date().toISOString(),
-      monthly_fee: 50.00,
-      subscription_status: initialStatus, // ATIVAÇÃO IMEDIATA (ou pending se já usou trial antes)
-      due_day: Number(dueDay) || 10,
-      next_billing_date: nextDateStr,
-      pix_key: DEFAULT_PIX_KEY,
+      monthly_fee: baseFee,
+      subscription_status: initialStatus, // trial por 20 dias (ou pending se já usou o teste antes)
+      next_billing_date: accessUntil,
       blocked_dates: []
     }
 
@@ -544,6 +547,21 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
                 </div>
               </div>
 
+              {existingAccount && (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/40 text-xs space-y-2">
+                  <p className="text-slate-200">
+                    Já existe uma conta com {existingByPhone ? 'este WhatsApp' : 'este e-mail'}. Que tal entrar nela?
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs cursor-pointer active:scale-95 transition-all"
+                  >
+                    Entrar na minha conta
+                  </button>
+                </div>
+              )}
+
               {/* Endereço Detalhado em Campos Separados */}
               <div className="space-y-3 p-3.5 rounded-2xl bg-slate-800/50 border border-slate-700/80">
                 <div className="flex items-center gap-1.5 text-slate-200 font-semibold text-xs border-b border-slate-700/60 pb-1.5">
@@ -591,15 +609,30 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Cidade / UF *</label>
+                    <label className="block text-slate-300 font-semibold mb-1">Cidade *</label>
                     <input
                       type="text"
                       required
-                      placeholder="Ex: São Paulo - SP"
+                      placeholder="Ex: São Paulo"
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-xs"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">UF *</label>
+                    <select
+                      required
+                      value={uf}
+                      onChange={(e) => setUf(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-xs"
+                    >
+                      <option value="">Selecione</option>
+                      {BR_STATES.map((st) => (
+                        <option key={st} value={st}>{st}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
@@ -669,34 +702,15 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
                 </div>
               </div>
 
-              {/* Dia de Pagamento da Mensalidade */}
-              <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/80 space-y-2">
-                <label className="block text-slate-200 font-semibold flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Melhor dia para pagar a mensalidade: *</span>
-                  </span>
-                  <span className="text-amber-400 font-mono font-bold">Dia {dueDay}</span>
-                </label>
-                <p className="text-[11px] text-slate-300">
-                  A mensalidade fixa é de R$ 50,00. Sua primeira cobrança só será realizada no <strong className="text-amber-400">mês seguinte</strong>, no dia que você escolher abaixo:
+              {/* Plano pré-pago */}
+              <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/80 space-y-1">
+                <p className="text-slate-200 font-semibold flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{TRIAL_DAYS} dias grátis para testar</span>
                 </p>
-                <div className="grid grid-cols-6 gap-1.5 pt-1">
-                  {[5, 10, 15, 20, 25, 30].map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => setDueDay(d)}
-                      className={`py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-                        dueDay === d
-                          ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 scale-105'
-                          : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                      }`}
-                    >
-                      {d}
-                    </button>
-                  ))}
-                </div>
+                <p className="text-[11px] text-slate-300">
+                  Depois, a mensalidade é de <strong className="text-amber-400">R$ {formatMoney(baseFee)}</strong>, paga antecipadamente por PIX a cada 30 dias. Sem fidelidade.
+                </p>
               </div>
 
               {/* EQUIPE / PROFISSIONAIS DA BARBEARIA */}
@@ -805,9 +819,9 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
             </div>
 
             <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200/90">
-              <p className="font-bold text-amber-300">⚡ Ativação Imediata</p>
+              <p className="font-bold text-amber-300">⚡ Ativação imediata</p>
               <p className="text-[11px] mt-0.5">
-                Sua conta será criada na hora e você entra direto no painel. Os serviços e preços você cadastra com calma por lá.
+                Sua conta é criada na hora e você entra direto no painel, com {TRIAL_DAYS} dias grátis. Os serviços e preços você cadastra com calma por lá.
               </p>
             </div>
 

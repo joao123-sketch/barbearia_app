@@ -101,12 +101,16 @@ const SEMANTIC_LIGHT: Record<string, string> = {
   '--color-blue-300': '#1d4ed8', '--color-blue-400': '#1d4ed8',
   '--color-sky-400': '#0369a1', '--color-indigo-400': '#4338ca', '--color-indigo-500': '#4f46e5',
   '--color-orange-300': '#c2410c', '--color-orange-400': '#c2410c',
+  // fundos escuros de avisos (ex.: bg-rose-950/20) viram tons claros no modo claro
+  '--color-rose-900': '#ffe4e6', '--color-rose-950': '#fff1f2', '--color-red-900': '#fee2e2', '--color-red-950': '#fef2f2',
+  '--color-emerald-900': '#d1fae5', '--color-emerald-950': '#ecfdf5', '--color-blue-900': '#dbeafe', '--color-blue-950': '#eff6ff',
+  '--color-green-900': '#dcfce7', '--color-green-950': '#f0fdf4',
   '--color-pink-400': '#be185d', '--color-purple-400': '#7e22ce', '--color-cyan-400': '#0e7490'
 }
 
 // Tons de texto do app (slate 50..600) em cada modo.
 const TEXT_DARK = { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569' }
-const TEXT_LIGHT = { 50: '#0f172a', 100: '#1e293b', 200: '#334155', 300: '#475569', 400: '#64748b', 500: '#7c8aa0', 600: '#a3aec0' }
+const TEXT_LIGHT = { 50: '#0f172a', 100: '#1e293b', 200: '#334155', 300: '#475569', 400: '#64748b', 500: '#66758b', 600: '#8794a8' }
 
 // Em modo claro os tons "claros" do destaque ficam escuros para dar contraste no fundo branco.
 function accentFor(scale: Scale, mode: ThemeMode, light?: Scale): Scale {

@@ -19,6 +19,8 @@ import type { Barbershop, Service, Barber } from '../types'
 import { getStylePreset } from '../lib/stylePresets'
 import { buildShopTheme, getLook, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
 import { getTerms } from '../lib/terms'
+import { toWaNumber } from '../lib/phone'
+import { isServiceActive } from '../lib/billing'
 import { PWAInstallPrompt } from './PWAInstallPrompt'
 
 const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
@@ -36,6 +38,7 @@ interface BookingClientViewProps {
   theme?: 'dark' | 'light'
   onToggleTheme?: () => void
   onNewBooking?: (booking: any) => void
+  onBackToPanel?: () => void // só quando o dono abriu a página pelo painel ("Ver como cliente")
 }
 
 export const BookingClientView: React.FC<BookingClientViewProps> = ({
@@ -44,7 +47,8 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
   barbers = [],
   theme = 'dark',
   onToggleTheme,
-  onNewBooking
+  onNewBooking,
+  onBackToPanel
 }) => {
   // Estilo visual configurado para a barbearia
   const preset = getStylePreset(barbershop.style_preset)
@@ -247,8 +251,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
       (confirmedBooking.notes ? `📝 *Observação:* ${confirmedBooking.notes}\n` : '') +
       `\nAguardo a confirmação. Obrigado!`
 
-    const phoneClean = barbershop.phone_whatsapp.replace(/\D/g, '')
-    return `https://wa.me/${phoneClean}?text=${encodeURIComponent(msg)}`
+    return `https://wa.me/${toWaNumber(barbershop.phone_whatsapp)}?text=${encodeURIComponent(msg)}`
   }, [confirmedBooking, formattedDate, barbershop.phone_whatsapp])
 
   // Claro/escuro e cores do estilo vêm das variáveis do tema (shopTheme), não de classes condicionais
@@ -272,6 +275,16 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
           <div className="w-full h-full bg-gradient-to-br from-amber-500/40 via-slate-900 to-slate-950" />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" />
+
+        {onBackToPanel && (
+          <button
+            onClick={onBackToPanel}
+            className="absolute top-4 left-4 z-10 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/85 hover:bg-slate-800 text-amber-400 border border-slate-700/80 backdrop-blur-md text-xs font-bold active:scale-95 transition-all cursor-pointer shadow-lg"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Voltar ao painel</span>
+          </button>
+        )}
 
         {/* Botão de Instalação PWA no Topo & Alternador de Tema */}
         <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
@@ -359,7 +372,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
           )}
 
           <a
-            href={`https://wa.me/${barbershop.phone_whatsapp.replace(/\D/g, '')}`}
+            href={`https://wa.me/${toWaNumber(barbershop.phone_whatsapp)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white active:scale-[0.99] transition-transform"
@@ -372,7 +385,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
           </a>
         </div>
 
-        {barbershop.subscription_status === 'blocked' ? (
+        {!isServiceActive(barbershop) ? (
           <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 text-center space-y-3.5 my-6 shadow-2xl">
             <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto">
               <Clock className="w-6 h-6" />
@@ -384,7 +397,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               </p>
             </div>
             <a
-              href={`https://wa.me/${barbershop.phone_whatsapp.replace(/\D/g, '')}`}
+              href={`https://wa.me/${toWaNumber(barbershop.phone_whatsapp)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition-transform"

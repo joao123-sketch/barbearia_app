@@ -1,5 +1,10 @@
 // Reduz a foto enviada para caber no armazenamento do navegador (celulares geram fotos de vários MB).
-export function fileToResizedDataUrl(file: File, maxSide = 480, quality = 0.82): Promise<string> {
+export function fileToResizedDataUrl(
+  file: File,
+  maxSide = 480,
+  quality = 0.82,
+  format: 'image/jpeg' | 'image/png' = 'image/jpeg'
+): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
       reject(new Error('Escolha um arquivo de imagem.'))
@@ -19,7 +24,7 @@ export function fileToResizedDataUrl(file: File, maxSide = 480, quality = 0.82):
         return
       }
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-      resolve(canvas.toDataURL('image/jpeg', quality))
+      resolve(canvas.toDataURL(format, quality))
     }
     img.onerror = () => {
       URL.revokeObjectURL(url)

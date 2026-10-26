@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Scissors, Lock, User, Mail, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react'
+import { Lock, User, Mail, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react'
 import type { Barbershop, Service } from '../types'
 import { buildShopTheme, getModeFor, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
 import { checkPassword, findAccount, resetPassword, startSession } from '../lib/auth'
@@ -102,9 +102,6 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({
     >
       <div className="w-full max-w-sm mx-auto space-y-6">
         <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center mx-auto shadow-xl shadow-amber-500/20">
-            <Scissors className="w-7 h-7" />
-          </div>
           <h1 className="text-2xl font-black text-white tracking-tight">
             {view === 'login' ? 'Entrar' : 'Recuperar senha'}
           </h1>
