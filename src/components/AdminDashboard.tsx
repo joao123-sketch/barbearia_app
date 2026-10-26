@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useRef } from 'react'
 import {
   Calendar,
+  CalendarDays,
   DollarSign,
   Clock,
   Plus,
-  CheckCircle,
   XCircle,
   Copy,
   ExternalLink,
@@ -22,7 +22,11 @@ import {
   BellRing,
   MessageCircle,
   ChevronRight,
-  Camera
+  Camera,
+  History,
+  CheckCircle2,
+  Save,
+  Search
 } from 'lucide-react'
 import type { Barbershop, Barber, Service, Appointment, WorkingHour } from '../types'
 import { PWAInstallPrompt } from './PWAInstallPrompt'
@@ -36,6 +40,8 @@ const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) =>
   </svg>
 )
 
+type AdminTab = 'agenda' | 'semana' | 'historico' | 'servicos' | 'horarios' | 'config'
+
 interface AdminDashboardProps {
   barbershop: Barbershop
   barbers: Barber[]
@@ -47,6 +53,7 @@ interface AdminDashboardProps {
   onUpdateServices?: (services: Service[]) => void
   onUpdateBarbershop?: (barbershop: Barbershop) => void
   onDeleteBarbershop?: (id: string) => void
+  onUpdateWorkingHours?: (workingHours: WorkingHour[]) => void
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -54,21 +61,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   barbers,
   services: initialServices,
   appointments: initialAppointments,
-  workingHours,
+  workingHours: initialWorkingHours,
   onBackToClientView,
   onUpdateAppointments,
   onUpdateServices,
   onUpdateBarbershop,
-  onDeleteBarbershop
+  onDeleteBarbershop,
+  onUpdateWorkingHours
 }) => {
-  const [activeTab, setActiveTab] = useState<'agenda' | 'servicos' | 'horarios' | 'perfil'>('agenda')
+  const [activeTab, setActiveTab] = useState<AdminTab>('agenda')
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments)
+  const [localWorkingHours, setLocalWorkingHours] = useState<WorkingHour[]>(initialWorkingHours)
+  const [workingHoursSaved, setWorkingHoursSaved] = useState(false)
   const [services, setServices] = useState<Service[]>(initialServices)
   const [copiedLink, setCopiedLink] = useState(false)
   const [copiedPixKey, setCopiedPixKey] = useState(false)
 
-  // Filtro de Histórico de Cortes: Hoje | Esta Semana | Este Mês | Geral
-  const [historyFilter, setHistoryFilter] = useState<'today' | 'week' | 'month' | 'all'>('today')
+  // Filtro de Histórico de Cortes: Todos | Concluídos | Cancelados
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<'todos' | 'concluidos' | 'cancelados'>('todos')
+  const [historySearch, setHistorySearch] = useState('')
 
   // Modais de Serviços
   const [showAddServiceModal, setShowAddServiceModal] = useState(false)
@@ -94,7 +105,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newPauseDate, setNewPauseDate] = useState('')
   const [newPauseReason, setNewPauseReason] = useState('')
 
-  // Estados para edição cadastral da barbearia (Logo, Instagram, Endereço, etc.)
+  // Estados para edição cadastral da barbearia (Configurações)
   const [profileName, setProfileName] = useState(barbershop.name)
   const [profileLogo, setProfileLogo] = useState(barbershop.logo_url)
   const [profileInstagram, setProfileInstagram] = useState(barbershop.instagram || '')
@@ -104,60 +115,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [profileSaved, setProfileSaved] = useState(false)
   const logoFileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      if (file.size > 4 * 1024 * 1024) {
-        alert('A foto da logo deve ter menos de 4MB.')
-        return
-      }
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setProfileLogo(reader.result as string)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  const handleSaveProfile = (e: React.FormEvent) => {
-    e.preventDefault()
-    let cleanInstagram = profileInstagram.trim()
-    if (cleanInstagram) {
-      cleanInstagram = cleanInstagram.replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/^@/, '')
-      cleanInstagram = `@${cleanInstagram}`
-    }
-
-    const updatedShop: Barbershop = {
-      ...barbershop,
-      name: profileName.trim() || barbershop.name,
-      logo_url: profileLogo || barbershop.logo_url,
-      instagram: cleanInstagram || undefined,
-      phone_whatsapp: profilePhone.replace(/\D/g, '') || barbershop.phone_whatsapp,
-      address: profileAddress.trim() || barbershop.address,
-      slogan: profileSlogan.trim() || barbershop.slogan
-    }
-
-    if (onUpdateBarbershop) {
-      onUpdateBarbershop(updatedShop)
-    }
-    setProfileSaved(true)
-    setTimeout(() => setProfileSaved(false), 3000)
-  }
-
-  // Copiar link público para divulgar
-  const publicUrl = `${window.location.origin}/${barbershop.slug}`
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(publicUrl)
-    setCopiedLink(true)
-    setTimeout(() => setCopiedLink(false), 2500)
-  }
-
-  // Copiar chave PIX
-  const handleCopyPix = () => {
-    navigator.clipboard.writeText(barbershop.pix_key || DEFAULT_PIX_KEY)
-    setCopiedPixKey(true)
-    setTimeout(() => setCopiedPixKey(false), 2000)
-  }
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], [])
 
   // ===================== CÁLCULO DE DIAS PARA O VENCIMENTO =====================
   const daysUntilDue = useMemo(() => {
@@ -169,50 +127,182 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   }, [barbershop.next_billing_date])
 
-  // ===================== FILTRAGEM DINÂMICA DE AGENDAMENTOS =====================
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], [])
+  // ===================== AGENDA DE HOJE =====================
+  const todayAppointments = useMemo(() => {
+    return appointments
+      .filter((apt) => apt.appointment_date === todayStr)
+      .sort((a, b) => a.start_time.localeCompare(b.start_time))
+  }, [appointments, todayStr])
 
-  const filteredAppointments = useMemo(() => {
+  const todayRevenue = useMemo(() => {
+    return todayAppointments
+      .filter((a) => a.status !== 'cancelled')
+      .reduce((acc, curr) => acc + curr.total_price, 0)
+  }, [todayAppointments])
+
+  const todayCompletedCount = useMemo(() => {
+    return todayAppointments.filter((a) => a.status !== 'cancelled').length
+  }, [todayAppointments])
+
+  // ===================== CALENDÁRIO DA SEMANA =====================
+  const weekDays = useMemo(() => {
     const now = new Date()
-    return appointments.filter((apt) => {
-      if (historyFilter === 'today') {
-        return apt.appointment_date === todayStr
-      }
-      if (historyFilter === 'week') {
-        const aptDate = new Date(apt.appointment_date + 'T00:00:00')
-        const diffTime = Math.abs(now.getTime() - aptDate.getTime())
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-        return diffDays <= 7
-      }
-      if (historyFilter === 'month') {
-        const currentYearMonth = todayStr.slice(0, 7) // "YYYY-MM"
-        return apt.appointment_date.startsWith(currentYearMonth)
-      }
-      return true // 'all'
-    })
-  }, [appointments, historyFilter, todayStr])
+    const dayOfWeek = now.getDay() // 0 = Dom, 1 = Seg...
+    const distanceToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+    const monday = new Date(now)
+    monday.setDate(now.getDate() + distanceToMonday)
+    monday.setHours(0, 0, 0, 0)
 
-  // Métricas recalculadas dinamicamente de acordo com o filtro
-  const metricsCount = filteredAppointments.length
-  const metricsCompletedCount = filteredAppointments.filter((a) => a.status === 'completed' || a.status === 'confirmed').length
-  const metricsRevenue = filteredAppointments
-    .filter((a) => a.status !== 'cancelled')
-    .reduce((acc, curr) => acc + curr.total_price, 0)
+    const days = []
+    const dayNamesShort = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
 
-  const filterLabel = {
-    today: 'hoje',
-    week: 'esta semana',
-    month: 'este mês',
-    all: 'todo o período'
-  }[historyFilter]
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday)
+      d.setDate(monday.getDate() + i)
+      const dateStr = d.toISOString().split('T')[0]
+      const dayIndex = d.getDay() // 0 is Sunday, 1 is Monday...
 
-  // ===================== ATUALIZAÇÃO DE STATUS =====================
-  const updateStatus = (id: string, status: 'confirmed' | 'completed' | 'cancelled') => {
+      const wh = localWorkingHours.find((w) => w.day_of_week === dayIndex)
+      const isBlocked = Boolean(barbershop.blocked_dates?.includes(dateStr))
+      const isOpen = wh ? wh.is_open && !isBlocked : !isBlocked
+
+      // Agendamentos ativos do dia
+      const dayApts = appointments
+        .filter((a) => a.appointment_date === dateStr)
+        .sort((a, b) => a.start_time.localeCompare(b.start_time))
+      const activeApts = dayApts.filter((a) => a.status !== 'cancelled')
+      const bookedCount = activeApts.length
+      const dayRevenue = activeApts.reduce((sum, a) => sum + a.total_price, 0)
+
+      // Capacidade estimada baseada no expediente (slot médio ~40 min)
+      let capacity = 0
+      if (isOpen && wh) {
+        const [oH, oM] = wh.open_time.split(':').map(Number)
+        const [cH, cM] = wh.close_time.split(':').map(Number)
+        let totalMins = (cH * 60 + cM) - (oH * 60 + oM)
+        if (wh.lunch_start && wh.lunch_end) {
+          const [lsH, lsM] = wh.lunch_start.split(':').map(Number)
+          const [leH, leM] = wh.lunch_end.split(':').map(Number)
+          totalMins -= (leH * 60 + leM) - (lsH * 60 + lsM)
+        }
+        capacity = Math.max(0, Math.floor(totalMins / 40))
+      }
+      const freeSlots = Math.max(0, capacity - bookedCount)
+
+      days.push({
+        dateStr,
+        displayDate: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`,
+        dayName: dayNamesShort[i],
+        isToday: dateStr === todayStr,
+        isOpen,
+        isBlocked,
+        wh,
+        allAppointments: dayApts,
+        activeAppointments: activeApts,
+        bookedCount,
+        freeSlots,
+        capacity,
+        dayRevenue
+      })
+    }
+    return days
+  }, [appointments, localWorkingHours, barbershop.blocked_dates, todayStr])
+
+  const [selectedWeekDate, setSelectedWeekDate] = useState<string>(todayStr)
+
+  const selectedDayInfo = useMemo(() => {
+    return weekDays.find((d) => d.dateStr === selectedWeekDate) || weekDays[0]
+  }, [weekDays, selectedWeekDate])
+
+  const weekTotalRevenue = useMemo(() => {
+    return weekDays.reduce((acc, d) => acc + d.dayRevenue, 0)
+  }, [weekDays])
+
+  const weekTotalBooked = useMemo(() => {
+    return weekDays.reduce((acc, d) => acc + d.bookedCount, 0)
+  }, [weekDays])
+
+  const weekTotalFree = useMemo(() => {
+    return weekDays.reduce((acc, d) => acc + d.freeSlots, 0)
+  }, [weekDays])
+
+  // ===================== HISTÓRICO GERAL DE CORTES =====================
+  const filteredHistoryAppointments = useMemo(() => {
+    return appointments
+      .filter((apt) => {
+        if (historyStatusFilter === 'concluidos') {
+          if (apt.status === 'cancelled') return false
+        } else if (historyStatusFilter === 'cancelados') {
+          if (apt.status !== 'cancelled') return false
+        }
+
+        if (historySearch.trim()) {
+          const s = historySearch.toLowerCase()
+          return (
+            apt.client_name.toLowerCase().includes(s) ||
+            apt.client_phone.includes(s)
+          )
+        }
+        return true
+      })
+      .sort((a, b) => {
+        const dateA = `${a.appointment_date} ${a.start_time}`
+        const dateB = `${b.appointment_date} ${b.start_time}`
+        return dateB.localeCompare(dateA)
+      })
+  }, [appointments, historyStatusFilter, historySearch])
+
+  const historyTotalRevenue = useMemo(() => {
+    return appointments
+      .filter((a) => a.status !== 'cancelled')
+      .reduce((sum, a) => sum + a.total_price, 0)
+  }, [appointments])
+
+  const historyCompletedCount = useMemo(() => {
+    return appointments.filter((a) => a.status !== 'cancelled').length
+  }, [appointments])
+
+  const historyCancelledCount = useMemo(() => {
+    return appointments.filter((a) => a.status === 'cancelled').length
+  }, [appointments])
+
+  // ===================== AÇÕES DE CANCELAMENTO / REATIVAÇÃO =====================
+  const handleCancelAppointment = (id: string) => {
+    if (window.confirm('Deseja realmente cancelar este agendamento?')) {
+      const updated = appointments.map((apt) =>
+        apt.id === id ? { ...apt, status: 'cancelled' as const } : apt
+      )
+      setAppointments(updated)
+      if (onUpdateAppointments) onUpdateAppointments(updated)
+    }
+  }
+
+  const handleReactivateAppointment = (id: string) => {
     const updated = appointments.map((apt) =>
-      apt.id === id ? { ...apt, status } : apt
+      apt.id === id ? { ...apt, status: 'confirmed' as const } : apt
     )
     setAppointments(updated)
     if (onUpdateAppointments) onUpdateAppointments(updated)
+  }
+
+  // ===================== CONFIGURAÇÃO DE HORÁRIOS SEMANAIS =====================
+  const handleUpdateDaySchedule = (
+    dayIndex: number,
+    field: keyof WorkingHour,
+    value: any
+  ) => {
+    setLocalWorkingHours((prev) =>
+      prev.map((wh) => (wh.day_of_week === dayIndex ? { ...wh, [field]: value } : wh))
+    )
+  }
+
+  const handleSaveWorkingHours = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (onUpdateWorkingHours) {
+      onUpdateWorkingHours(localWorkingHours)
+    }
+    setWorkingHoursSaved(true)
+    setTimeout(() => setWorkingHoursSaved(false), 3000)
   }
 
   // ===================== CADASTRO E EDIÇÃO DE SERVIÇOS =====================
@@ -365,6 +455,50 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return `https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`
   }
 
+  // Link público e ações de cópia
+  const publicUrl = typeof window !== 'undefined' ? `${window.location.origin}/b/${barbershop.slug}` : `/b/${barbershop.slug}`
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(publicUrl)
+    setCopiedLink(true)
+    setTimeout(() => setCopiedLink(false), 2000)
+  }
+
+  const handleCopyPix = () => {
+    navigator.clipboard.writeText(barbershop.pix_key || DEFAULT_PIX_KEY)
+    setCopiedPixKey(true)
+    setTimeout(() => setCopiedPixKey(false), 2000)
+  }
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          setProfileLogo(reader.result)
+        }
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleSaveProfile = (e: React.FormEvent) => {
+    e.preventDefault()
+    const updatedShop: Barbershop = {
+      ...barbershop,
+      name: profileName,
+      logo_url: profileLogo,
+      instagram: profileInstagram ? (profileInstagram.startsWith('@') ? profileInstagram : `@${profileInstagram}`) : '',
+      phone_whatsapp: profilePhone,
+      address: profileAddress,
+      slogan: profileSlogan
+    }
+    if (onUpdateBarbershop) onUpdateBarbershop(updatedShop)
+    setProfileSaved(true)
+    setTimeout(() => setProfileSaved(false), 3000)
+  }
+
   return (
     <div className="min-h-screen bg-[#090A0F] text-slate-100 pb-32 sm:pb-20 select-none">
       {/* ===================== TOPO ADMINISTRATIVO ===================== */}
@@ -428,7 +562,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             <button
-              onClick={() => setActiveTab('perfil')}
+              onClick={() => setActiveTab('config')}
               className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer self-start sm:self-auto shrink-0 shadow-lg shadow-amber-500/20"
             >
               <span>Ver Chave PIX & QR Code</span>
@@ -508,89 +642,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </button>
         </div>
 
-        {/* ===================== FILTRO DE HISTÓRICO & MÉTRICAS DINÂMICAS ===================== */}
-        <div className="space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
-              <Calendar className="w-4 h-4 text-amber-400" />
-              <span>Filtrar Período do Histórico:</span>
-            </div>
-
-            {/* Chips de Filtro */}
-            <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-2xl border border-slate-800 overflow-x-auto text-xs">
-              {[
-                { id: 'today', label: 'Hoje' },
-                { id: 'week', label: 'Esta Semana' },
-                { id: 'month', label: 'Este Mês' },
-                { id: 'all', label: 'Geral (Todos)' }
-              ].map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => setHistoryFilter(f.id as any)}
-                  className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
-                    historyFilter === f.id
-                      ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/25'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Cards de Métricas Recalculadas */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800">
-              <div className="flex items-center justify-between text-slate-400 mb-1">
-                <span className="text-xs font-medium">Cortes ({filterLabel})</span>
-                <Scissors className="w-4 h-4 text-amber-400" />
-              </div>
-              <p className="text-2xl font-black text-white">{metricsCount}</p>
-              <p className="text-[10px] text-emerald-400 mt-0.5 font-medium">
-                {metricsCompletedCount} atendidos / confirmados
-              </p>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800">
-              <div className="flex items-center justify-between text-slate-400 mb-1">
-                <span className="text-xs font-medium">Faturamento Estimado</span>
-                <DollarSign className="w-4 h-4 text-emerald-400" />
-              </div>
-              <p className="text-2xl font-black text-white">
-                R$ {metricsRevenue.toFixed(2).replace('.', ',')}
-              </p>
-              <p className="text-[10px] text-slate-400 mt-0.5">referente a {filterLabel}</p>
-            </div>
-
-            <div className="col-span-2 sm:col-span-1 p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800">
-              <div className="flex items-center justify-between text-slate-400 mb-1">
-                <span className="text-xs font-medium">Ticket Médio</span>
-                <Clock className="w-4 h-4 text-blue-400" />
-              </div>
-              <p className="text-2xl font-black text-white">
-                R$ {metricsCount > 0 ? (metricsRevenue / metricsCount).toFixed(2).replace('.', ',') : '0,00'}
-              </p>
-              <p className="text-[10px] text-slate-400 mt-0.5">por agendamento</p>
-            </div>
-          </div>
-        </div>
-
         {/* ===================== ABAS DO PAINEL (DESKTOP) ===================== */}
         <div className="hidden sm:flex gap-2 border-b border-slate-800 pb-2 overflow-x-auto text-xs">
           {[
-            { id: 'agenda', label: 'Agenda & Histórico', icon: Calendar },
+            { id: 'agenda', label: 'Agenda de Hoje', icon: Calendar },
+            { id: 'semana', label: 'Calendário Semanal', icon: CalendarDays },
+            { id: 'historico', label: 'Histórico de Cortes', icon: History },
             { id: 'servicos', label: 'Serviços & Preços', icon: Scissors },
             { id: 'horarios', label: 'Horários & Pausas', icon: Clock },
-            { id: 'perfil', label: 'Dados da Barbearia & Mensalidade', icon: Settings }
+            { id: 'config', label: 'Configurações', icon: Settings }
           ].map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold transition-all shrink-0 cursor-pointer ${
+                onClick={() => setActiveTab(tab.id as AdminTab)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold transition-all shrink-0 cursor-pointer ${
                   isActive
                     ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                     : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
@@ -603,16 +671,54 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           })}
         </div>
 
-        {/* ===================== ABA 1: AGENDA & HISTÓRICO DE CORTES ===================== */}
+        {/* ========================================================================= */}
+        {/* ===================== ABA 1: AGENDA DE HOJE ============================= */}
+        {/* ========================================================================= */}
         {activeTab === 'agenda' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            {/* Top Cards de Hoje */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-xs font-medium">Cortes Hoje</span>
+                  <Scissors className="w-4 h-4 text-amber-400" />
+                </div>
+                <p className="text-2xl font-black text-white">{todayAppointments.length}</p>
+                <p className="text-[10px] text-emerald-400 mt-0.5 font-medium">
+                  {todayCompletedCount} confirmados / atendidos
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-xs font-medium">Previsão Hoje</span>
+                  <DollarSign className="w-4 h-4 text-emerald-400" />
+                </div>
+                <p className="text-2xl font-black text-emerald-400">
+                  R$ {todayRevenue.toFixed(2).replace('.', ',')}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-0.5">faturamento estimado</p>
+              </div>
+
+              <div className="col-span-2 sm:col-span-1 p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-xs font-medium">Ticket Médio Hoje</span>
+                  <Clock className="w-4 h-4 text-blue-400" />
+                </div>
+                <p className="text-2xl font-black text-white">
+                  R$ {todayCompletedCount > 0 ? (todayRevenue / todayCompletedCount).toFixed(2).replace('.', ',') : '0,00'}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-0.5">por cliente</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
               <div>
                 <h3 className="font-bold text-sm text-white">
-                  {historyFilter === 'today' ? 'Horários Agendados de Hoje' : `Histórico de Cortes (${filterLabel})`}
+                  Horários Agendados de Hoje
                 </h3>
                 <p className="text-[11px] text-slate-400">
-                  {filteredAppointments.length} agendamento(s) listado(s)
+                  {todayAppointments.length} agendamento(s) marcado(s) para hoje
                 </p>
               </div>
 
@@ -625,71 +731,53 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
             </div>
 
-            {/* AVISO DE NOTIFICAÇÃO AUTOMÁTICA ATIVA */}
-            <div className="p-3 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 flex items-start gap-2.5 text-xs text-emerald-200">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 mt-1 animate-pulse" />
-              <div>
-                <p className="font-bold text-emerald-300">
-                  Notificação automática ativa no app
+            {todayAppointments.length === 0 ? (
+              <div className="p-8 rounded-3xl bg-slate-900/60 border border-dashed border-slate-800 text-center text-slate-400 text-xs space-y-2">
+                <p className="font-bold text-white text-sm">Nenhum agendamento para hoje ainda</p>
+                <p className="text-slate-400 text-xs max-w-sm mx-auto">
+                  Divulgue seu link para receber novos agendamentos ou use o botão "Agendar Balcão" para adicionar um cliente presencial.
                 </p>
-                <p className="text-[11px] text-emerald-200/80 mt-0.5">
-                  O sistema já notifica seus clientes automaticamente antes do horário do corte. Você também tem o botão verde ao lado de cada cliente para enviar mensagem manual no WhatsApp sempre que desejar.
-                </p>
-              </div>
-            </div>
-
-            {filteredAppointments.length === 0 ? (
-              <div className="p-8 rounded-2xl bg-slate-900/60 border border-slate-800 text-center text-slate-400 text-xs">
-                Nenhum agendamento encontrado para {filterLabel}.
               </div>
             ) : (
               <div className="space-y-2.5">
-                {filteredAppointments.map((apt) => {
+                {todayAppointments.map((apt) => {
                   const serviceNames = services
                     .filter((s) => apt.service_ids.includes(s.id))
                     .map((s) => s.name)
                     .join(' + ') || 'Corte Padrão'
 
-                  const isForToday = apt.appointment_date === todayStr
                   const hasPhone = apt.client_phone && apt.client_phone !== 'Cliente Balcão'
+                  const isCancelled = apt.status === 'cancelled'
 
                   return (
                     <div
                       key={apt.id}
-                      className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg"
+                      className={`p-3.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg transition-all ${
+                        isCancelled
+                          ? 'bg-rose-950/20 border-rose-900/40 opacity-70'
+                          : 'bg-slate-900 border-slate-800'
+                      }`}
                     >
                       <div className="flex items-start gap-3">
-                        {/* Horário & Data */}
+                        {/* Horário & Ícone */}
                         <div className="w-14 h-14 rounded-xl bg-slate-800 border border-slate-700 flex flex-col items-center justify-center font-bold shrink-0">
                           <span className="text-amber-400 text-sm leading-none">{apt.start_time}</span>
-                          <span className="text-[10px] text-slate-400 mt-0.5">
-                            {apt.appointment_date.split('-').slice(1).reverse().join('/')}
-                          </span>
-                          <span className="text-[9px] text-slate-500">{apt.total_duration}m</span>
+                          <span className="text-[9px] text-slate-500 mt-1">{apt.total_duration}m</span>
                         </div>
 
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="font-bold text-sm text-white">{apt.client_name}</h4>
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                apt.status === 'confirmed'
-                                  ? 'bg-blue-500/20 text-blue-400'
-                                  : apt.status === 'completed'
-                                  ? 'bg-emerald-500/20 text-emerald-400'
-                                  : 'bg-rose-500/20 text-rose-400'
-                              }`}
-                            >
-                              {apt.status === 'confirmed'
-                                ? 'Confirmado'
-                                : apt.status === 'completed'
-                                ? 'Concluído'
-                                : 'Cancelado'}
-                            </span>
+                            <h4 className={`font-bold text-sm ${isCancelled ? 'line-through text-slate-400' : 'text-white'}`}>
+                              {apt.client_name}
+                            </h4>
 
-                            {apt.reminder_preference && (
-                              <span className="text-[10px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">
-                                Lembrete: {apt.reminder_preference}
+                            {isCancelled ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                                Cancelado
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                Concluído
                               </span>
                             )}
                           </div>
@@ -709,10 +797,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
                       </div>
 
-                      {/* Ações: Botão WhatsApp + Status */}
+                      {/* Ações: Botão WhatsApp + Cancelar */}
                       <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
                         {/* BOTÃO WHATSAPP DIRETO AO LADO DO CLIENTE */}
-                        {hasPhone && isForToday && (
+                        {hasPhone && !isCancelled && (
                           <a
                             href={getClientWhatsappUrl(apt)}
                             target="_blank"
@@ -725,24 +813,363 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </a>
                         )}
 
-                        {apt.status !== 'completed' && (
+                        {/* O sistema marca como concluído automaticamente; a única ação é cancelar */}
+                        {!isCancelled ? (
                           <button
-                            onClick={() => updateStatus(apt.id, 'completed')}
-                            title="Marcar como Concluído"
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold cursor-pointer"
+                            onClick={() => handleCancelAppointment(apt.id)}
+                            title="Cancelar Agendamento"
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-500/40 text-xs font-semibold cursor-pointer transition-colors"
                           >
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            <span>Concluir</span>
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span>Cancelar</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleReactivateAppointment(apt.id)}
+                            title="Reativar agendamento"
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 text-xs cursor-pointer"
+                          >
+                            <span>Reativar</span>
                           </button>
                         )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
-                        {apt.status !== 'cancelled' && (
+        {/* ========================================================================= */}
+        {/* ===================== ABA 2: CALENDÁRIO SEMANAL ========================= */}
+        {/* ========================================================================= */}
+        {activeTab === 'semana' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-sm text-white">Previsão e Agendamentos da Semana</h3>
+                <p className="text-xs text-slate-400">
+                  Acompanhe os horários marcados, vagas livres e estimativa de faturamento diário.
+                </p>
+              </div>
+            </div>
+
+            {/* Cards de Resumo da Semana */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/20 via-slate-900 to-slate-900 border border-emerald-500/40">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-xs font-medium">Previsão de Faturamento</span>
+                  <DollarSign className="w-4 h-4 text-emerald-400" />
+                </div>
+                <p className="text-2xl font-black text-emerald-400">
+                  R$ {weekTotalRevenue.toFixed(2).replace('.', ',')}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-0.5">calculado para esta semana</p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-xs font-medium">Horários Marcados</span>
+                  <CheckCircle2 className="w-4 h-4 text-amber-400" />
+                </div>
+                <p className="text-2xl font-black text-white">{weekTotalBooked}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">agendamentos ativos</p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-xs font-medium">Horários Livres</span>
+                  <Clock className="w-4 h-4 text-blue-400" />
+                </div>
+                <p className="text-2xl font-black text-white">{weekTotalFree}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">vagas disponíveis no expediente</p>
+              </div>
+            </div>
+
+            {/* Grid dos 7 Dias da Semana (Cards clicáveis) */}
+            <div className="grid grid-cols-2 sm:grid-cols-7 gap-2">
+              {weekDays.map((d) => {
+                const isSelected = d.dateStr === selectedWeekDate
+
+                return (
+                  <button
+                    key={d.dateStr}
+                    type="button"
+                    onClick={() => setSelectedWeekDate(d.dateStr)}
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      isSelected
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/25 scale-[1.02]'
+                        : d.isToday
+                        ? 'bg-slate-900/90 border-amber-500/50 text-white'
+                        : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[11px] font-bold uppercase truncate ${isSelected ? 'text-slate-900' : 'text-slate-400'}`}>
+                          {d.dayName}
+                        </span>
+                        {d.isToday && (
+                          <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${isSelected ? 'bg-slate-950 text-amber-400' : 'bg-amber-500/20 text-amber-300'}`}>
+                            Hoje
+                          </span>
+                        )}
+                      </div>
+
+                      <p className={`text-base font-black mt-1 ${isSelected ? 'text-slate-950' : 'text-white'}`}>
+                        {d.displayDate}
+                      </p>
+                    </div>
+
+                    <div className="pt-2 text-[10px] space-y-0.5">
+                      {!d.isOpen ? (
+                        <span className={`inline-block px-1.5 py-0.5 rounded font-bold ${isSelected ? 'bg-slate-950/20 text-slate-900' : 'bg-slate-800 text-slate-500'}`}>
+                          {d.isBlocked ? 'Pausa' : 'Fechado'}
+                        </span>
+                      ) : (
+                        <>
+                          <p className={`font-bold ${isSelected ? 'text-slate-950' : 'text-emerald-400'}`}>
+                            {d.bookedCount} marcados
+                          </p>
+                          <p className={`text-[9px] ${isSelected ? 'text-slate-800' : 'text-slate-400'}`}>
+                            {d.freeSlots} livres
+                          </p>
+                          <p className={`font-mono font-bold pt-0.5 ${isSelected ? 'text-slate-950 font-black' : 'text-amber-300'}`}>
+                            R$ {d.dayRevenue.toFixed(0)}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Detalhe do Dia Selecionado */}
+            <div className="p-4 rounded-3xl bg-slate-900 border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div>
+                  <h4 className="font-bold text-sm text-white">
+                    Agendamentos de {selectedDayInfo.dayName} ({selectedDayInfo.displayDate})
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {selectedDayInfo.isOpen
+                      ? `${selectedDayInfo.bookedCount} agendamento(s) • ${selectedDayInfo.freeSlots} vaga(s) livre(s) • R$ ${selectedDayInfo.dayRevenue.toFixed(2).replace('.', ',')} previsto`
+                      : 'Barbearia fechada neste dia'}
+                  </p>
+                </div>
+              </div>
+
+              {selectedDayInfo.allAppointments.length === 0 ? (
+                <p className="text-xs text-slate-400 italic py-3 text-center">
+                  Nenhum corte agendado para este dia da semana.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {selectedDayInfo.allAppointments.map((apt) => {
+                    const isCancelled = apt.status === 'cancelled'
+                    const serviceNames = services
+                      .filter((s) => apt.service_ids.includes(s.id))
+                      .map((s) => s.name)
+                      .join(' + ') || 'Corte Padrão'
+
+                    return (
+                      <div
+                        key={apt.id}
+                        className={`p-3 rounded-2xl border flex items-center justify-between gap-3 text-xs ${
+                          isCancelled
+                            ? 'bg-rose-950/20 border-rose-900/40 opacity-70'
+                            : 'bg-slate-800/80 border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono font-bold text-amber-400 text-sm">
+                            {apt.start_time}
+                          </span>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className={`font-bold text-white ${isCancelled ? 'line-through text-slate-400' : ''}`}>
+                                {apt.client_name}
+                              </span>
+                              <span
+                                className={`text-[9px] px-2 py-0.2 rounded-full font-bold ${
+                                  isCancelled
+                                    ? 'bg-rose-500/20 text-rose-400'
+                                    : 'bg-emerald-500/20 text-emerald-400'
+                                }`}
+                              >
+                                {isCancelled ? 'Cancelado' : 'Concluído'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-400">{serviceNames}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-amber-300">
+                            R$ {apt.total_price.toFixed(2).replace('.', ',')}
+                          </span>
+
+                          {!isCancelled && (
+                            <button
+                              onClick={() => handleCancelAppointment(apt.id)}
+                              className="text-slate-400 hover:text-rose-400 p-1 cursor-pointer"
+                              title="Cancelar corte"
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* ===================== ABA 3: HISTÓRICO DE CORTES ======================== */}
+        {/* ========================================================================= */}
+        {activeTab === 'historico' && (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-bold text-sm text-white">Histórico Geral de Cortes</h3>
+                <p className="text-xs text-slate-400">
+                  Todos os atendimentos realizados e cancelados no sistema.
+                </p>
+              </div>
+
+              {/* Filtro de Status: Todos | Concluídos | Cancelados */}
+              <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-2xl border border-slate-800 text-xs self-start sm:self-auto">
+                {[
+                  { id: 'todos', label: 'Todos' },
+                  { id: 'concluidos', label: `Concluídos (${historyCompletedCount})` },
+                  { id: 'cancelados', label: `Cancelados (${historyCancelledCount})` }
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setHistoryStatusFilter(f.id as any)}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+                      historyStatusFilter === f.id
+                        ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Cards de Métricas do Histórico */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800">
+                <span className="text-xs text-slate-400 font-medium">Total de Cortes Realizados</span>
+                <p className="text-2xl font-black text-white mt-1">{historyCompletedCount}</p>
+                <p className="text-[10px] text-emerald-400 mt-0.5">atendimentos concluídos</p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800">
+                <span className="text-xs text-slate-400 font-medium">Faturamento Acumulado</span>
+                <p className="text-2xl font-black text-emerald-400 mt-1">
+                  R$ {historyTotalRevenue.toFixed(2).replace('.', ',')}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-0.5">total histórico de cortes</p>
+              </div>
+
+              <div className="col-span-2 sm:col-span-1 p-3.5 rounded-2xl bg-slate-900 border border-slate-800">
+                <span className="text-xs text-slate-400 font-medium">Cancelados</span>
+                <p className="text-2xl font-black text-rose-400 mt-1">{historyCancelledCount}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">cortes cancelados</p>
+              </div>
+            </div>
+
+            {/* Busca no Histórico */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Buscar cliente por nome ou WhatsApp..."
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-amber-500 focus:outline-none text-xs text-white"
+              />
+            </div>
+
+            {/* Lista do Histórico */}
+            {filteredHistoryAppointments.length === 0 ? (
+              <div className="p-8 rounded-3xl bg-slate-900/60 border border-slate-800 text-center text-slate-400 text-xs">
+                Nenhum corte encontrado no histórico com os filtros selecionados.
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {filteredHistoryAppointments.map((apt) => {
+                  const isCancelled = apt.status === 'cancelled'
+                  const serviceNames = services
+                    .filter((s) => apt.service_ids.includes(s.id))
+                    .map((s) => s.name)
+                    .join(' + ') || 'Corte Padrão'
+
+                  return (
+                    <div
+                      key={apt.id}
+                      className={`p-3.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg ${
+                        isCancelled
+                          ? 'bg-rose-950/20 border-rose-900/40 opacity-70'
+                          : 'bg-slate-900 border-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Data e Horário */}
+                        <div className="w-14 h-14 rounded-xl bg-slate-800 border border-slate-700 flex flex-col items-center justify-center font-bold shrink-0">
+                          <span className="text-amber-400 text-sm leading-none">{apt.start_time}</span>
+                          <span className="text-[10px] text-slate-400 mt-1">
+                            {apt.appointment_date.split('-').slice(1).reverse().join('/')}
+                          </span>
+                        </div>
+
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className={`font-bold text-sm ${isCancelled ? 'line-through text-slate-400' : 'text-white'}`}>
+                              {apt.client_name}
+                            </h4>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                isCancelled
+                                  ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                  : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                              }`}
+                            >
+                              {isCancelled ? 'Cancelado' : 'Concluído'}
+                            </span>
+                          </div>
+
+                          <p className="text-xs text-slate-300 mt-0.5">{serviceNames}</p>
+
+                          <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-400 flex-wrap">
+                            <span className="text-amber-400 font-bold">
+                              R$ {apt.total_price.toFixed(2).replace('.', ',')}
+                            </span>
+                            {apt.client_phone && apt.client_phone !== 'Cliente Balcão' && (
+                              <span>Tel: {apt.client_phone}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Ação: Cancelar se não foi cancelado */}
+                      <div className="flex items-center gap-2 self-end sm:self-center">
+                        {!isCancelled && (
                           <button
-                            onClick={() => updateStatus(apt.id, 'cancelled')}
-                            title="Cancelar Agendamento"
-                            className="p-1.5 rounded-xl bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700 text-xs cursor-pointer"
+                            onClick={() => handleCancelAppointment(apt.id)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-500/40 text-xs font-semibold cursor-pointer"
                           >
-                            <XCircle className="w-4 h-4" />
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span>Cancelar</span>
                           </button>
                         )}
                       </div>
@@ -798,13 +1225,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     key={s.id}
                     className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3 shadow-lg"
                   >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-sm text-white">{s.name}</h4>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-amber-300 font-semibold uppercase">
-                          {s.category || 'geral'}
-                        </span>
+                    <div className="flex items-center gap-3 flex-1">
+                      {/* Ícone Genérico Padrão Para Cada Serviço */}
+                      <div className="w-11 h-11 rounded-2xl bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0">
+                        <Scissors className="w-5 h-5" />
                       </div>
+
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-sm text-white">{s.name}</h4>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-amber-300 font-semibold uppercase">
+                            {s.category || 'geral'}
+                          </span>
+                        </div>
                       {s.description && (
                         <p className="text-xs text-slate-400 mt-0.5">{s.description}</p>
                       )}
@@ -816,8 +1249,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <span className="text-slate-400">{s.duration_minutes} minutos</span>
                       </div>
                     </div>
+                  </div>
 
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
                       {/* Botão de Edição */}
                       <button
                         onClick={() => handleOpenEditService(s)}
@@ -846,11 +1280,122 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         )}
 
-        {/* ===================== ABA 3: HORÁRIOS & PAUSAS ===================== */}
+        {/* ========================================================================= */}
+        {/* ===================== ABA 5: HORÁRIOS & PAUSAS ========================== */}
+        {/* ========================================================================= */}
         {activeTab === 'horarios' && (
           <div className="space-y-6">
-            {/* Seção 1: Pausas Programadas / Férias / Viagens */}
-            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+            {/* SEÇÃO 1: HORÁRIOS REGULARES DE ATENDIMENTO SEMANAL (TOTALMENTE EDITÁVEL) */}
+            <form onSubmit={handleSaveWorkingHours} className="p-5 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                <div>
+                  <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-amber-400" />
+                    <span>Horários Regulares de Atendimento Semanal</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Configure os dias abertos, horários de início e término e intervalo de almoço.
+                  </p>
+                </div>
+
+                {workingHoursSaved && (
+                  <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-xs flex items-center gap-1 border border-emerald-500/30 animate-in fade-in">
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Horários salvos!</span>
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                {localWorkingHours.map((wh) => (
+                  <div
+                    key={wh.day_of_week}
+                    className={`p-3.5 rounded-2xl border transition-all ${
+                      wh.is_open
+                        ? 'bg-slate-800/80 border-slate-700'
+                        : 'bg-slate-950/60 border-slate-800/80 opacity-70'
+                    }`}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      {/* Nome do Dia e Switch Aberto/Fechado */}
+                      <div className="flex items-center justify-between sm:justify-start gap-3">
+                        <span className="font-bold text-white text-sm min-w-[120px]">
+                          {wh.day_name}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateDaySchedule(wh.day_of_week, 'is_open', !wh.is_open)}
+                          className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                            wh.is_open
+                              ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                              : 'bg-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {wh.is_open ? 'Aberto' : 'Fechado'}
+                        </button>
+                      </div>
+
+                      {/* Se Aberto: Horários de Abertura / Fechamento e Almoço */}
+                      {wh.is_open ? (
+                        <div className="flex flex-wrap items-center gap-3 text-xs">
+                          {/* Horário Geral */}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-400 text-[11px]">Expediente:</span>
+                            <input
+                              type="time"
+                              value={wh.open_time}
+                              onChange={(e) => handleUpdateDaySchedule(wh.day_of_week, 'open_time', e.target.value)}
+                              className="px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-amber-300 font-bold focus:outline-none"
+                            />
+                            <span className="text-slate-500">às</span>
+                            <input
+                              type="time"
+                              value={wh.close_time}
+                              onChange={(e) => handleUpdateDaySchedule(wh.day_of_week, 'close_time', e.target.value)}
+                              className="px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-amber-300 font-bold focus:outline-none"
+                            />
+                          </div>
+
+                          {/* Pausa Almoço */}
+                          <div className="flex items-center gap-1.5 border-l border-slate-700 pl-3">
+                            <span className="text-slate-400 text-[11px]">Almoço:</span>
+                            <input
+                              type="time"
+                              value={wh.lunch_start || '12:00'}
+                              onChange={(e) => handleUpdateDaySchedule(wh.day_of_week, 'lunch_start', e.target.value)}
+                              className="px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 focus:outline-none"
+                            />
+                            <span className="text-slate-500">às</span>
+                            <input
+                              type="time"
+                              value={wh.lunch_end || '13:00'}
+                              onChange={(e) => handleUpdateDaySchedule(wh.day_of_week, 'lunch_end', e.target.value)}
+                              className="px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-500 italic">
+                          Dia de descanso / Fechado
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+              >
+                <Save className="w-4 h-4" />
+                <span>Salvar Horários Semanais</span>
+              </button>
+            </form>
+
+            {/* SEÇÃO 2: PAUSAS PROGRAMADAS, VIAGENS E FERIADOS */}
+            <div className="p-5 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
               <div className="flex items-center gap-2">
                 <CalendarOff className="w-5 h-5 text-amber-400" />
                 <div>
@@ -921,42 +1466,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 )}
               </div>
             </div>
-
-            {/* Seção 2: Expediente Semanal Regular */}
-            <div className="space-y-3">
-              <h3 className="font-bold text-sm text-white">Horários Regulares de Atendimento Semanal</h3>
-              <div className="space-y-2">
-                {workingHours.map((wh) => (
-                  <div
-                    key={wh.day_of_week}
-                    className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between text-xs"
-                  >
-                    <span className="font-bold text-slate-200">{wh.day_name}</span>
-                    {wh.is_open ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-amber-400 font-mono font-semibold">
-                          {wh.open_time} - {wh.close_time}
-                        </span>
-                        {wh.lunch_start && (
-                          <span className="text-slate-500 text-[11px]">
-                            (Almoço {wh.lunch_start}-{wh.lunch_end})
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-500 text-[10px] font-semibold">
-                        Fechado
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         )}
 
-        {/* ===================== ABA 4: DADOS DA BARBEARIA & MENSALIDADE ===================== */}
-        {activeTab === 'perfil' && (
+        {/* ===================== ABA 6: CONFIGURAÇÕES & MENSALIDADE ===================== */}
+        {activeTab === 'config' && (
           <div className="space-y-6">
             {/* SEÇÃO DA MENSALIDADE COM QR CODE E CHAVE PIX */}
             <div className="p-5 rounded-3xl bg-slate-900 border border-amber-500/30 space-y-4 shadow-2xl">
@@ -1449,28 +1963,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {/* ===================== BARRA DE NAVEGAÇÃO INFERIOR PARA CELULAR (TAB BAR) ===================== */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#0d0f17]/95 border-t border-slate-800/90 backdrop-blur-xl sm:hidden px-2 py-2">
-        <div className="grid grid-cols-4 gap-1 max-w-md mx-auto">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#0d0f17]/95 border-t border-slate-800/90 backdrop-blur-xl sm:hidden px-1 py-1.5">
+        <div className="grid grid-cols-6 gap-0.5 max-w-md mx-auto">
           {[
-            { id: 'agenda', label: 'Agenda', icon: Calendar },
+            { id: 'agenda', label: 'Hoje', icon: Calendar },
+            { id: 'semana', label: 'Semana', icon: CalendarDays },
+            { id: 'historico', label: 'Histórico', icon: History },
             { id: 'servicos', label: 'Serviços', icon: Scissors },
             { id: 'horarios', label: 'Horários', icon: Clock },
-            { id: 'perfil', label: 'Mensalidade', icon: Settings }
+            { id: 'config', label: 'Config', icon: Settings }
           ].map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-all cursor-pointer ${
+                onClick={() => setActiveTab(tab.id as AdminTab)}
+                className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-xl transition-all cursor-pointer ${
                   isActive
                     ? 'text-amber-400 bg-amber-500/10 font-bold'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <Icon className={`w-5 h-5 mb-1 ${isActive ? 'stroke-[2.5]' : ''}`} />
-                <span className="text-[11px] leading-none">{tab.label}</span>
+                <Icon className={`w-4 h-4 mb-1 ${isActive ? 'stroke-[2.5]' : ''}`} />
+                <span className="text-[10px] leading-none truncate max-w-full">{tab.label}</span>
               </button>
             )
           })}

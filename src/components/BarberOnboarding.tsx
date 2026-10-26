@@ -13,7 +13,8 @@ import {
   Copy,
   Camera,
   Trash2,
-  Sparkles
+  Sparkles,
+  Calendar
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import type { Barbershop, Service } from '../types'
@@ -50,6 +51,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
   const [password, setPassword] = useState('')
   const [slogan, setSlogan] = useState('Tradição, estilo e o melhor corte da região.')
   const [instagram, setInstagram] = useState('')
+  const [dueDay, setDueDay] = useState<number>(10)
 
   // Logo da Barbearia (se tiver)
   const [logoUrl, setLogoUrl] = useState<string>(DEFAULT_SHOP_LOGO)
@@ -141,8 +143,18 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
     }
 
     const newShopId = 'shop-' + Date.now()
-    const nextDate = new Date()
-    nextDate.setDate(nextDate.getDate() + 30)
+    const today = new Date()
+    let billingYear = today.getFullYear()
+    let billingMonth = today.getMonth() // 0-indexed
+    if (today.getDate() >= dueDay) {
+      billingMonth += 1
+      if (billingMonth > 11) {
+        billingMonth = 0
+        billingYear += 1
+      }
+    }
+    const nextDate = new Date(billingYear, billingMonth, dueDay)
+    const nextDateStr = nextDate.toISOString().split('T')[0]
 
     const finalSlug = slug || shopName.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'minha-barbearia'
 
@@ -170,8 +182,8 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
       created_at: new Date().toISOString(),
       monthly_fee: 50.00,
       subscription_status: 'active', // ATIVAÇÃO IMEDIATA SEM APROVAÇÃO MANUAL
-      due_day: new Date().getDate(),
-      next_billing_date: nextDate.toISOString().split('T')[0],
+      due_day: Number(dueDay) || 10,
+      next_billing_date: nextDateStr,
       pix_key: DEFAULT_PIX_KEY,
       blocked_dates: []
     }
@@ -291,7 +303,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
               <div>
                 <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Seu Nome Completo (Barbeiro / Responsável) *</span>
+                  <span>Seu Nome *</span>
                 </label>
                 <input
                   type="text"
@@ -422,6 +434,36 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({
                     onChange={(e) => setSlug(e.target.value)}
                     className="w-full bg-transparent text-amber-300 font-mono font-bold focus:outline-none"
                   />
+                </div>
+              </div>
+
+              {/* Dia de Pagamento da Mensalidade */}
+              <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/80 space-y-2">
+                <label className="block text-slate-200 font-semibold flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Melhor dia para pagar a mensalidade: *</span>
+                  </span>
+                  <span className="text-amber-400 font-mono font-bold">Dia {dueDay}</span>
+                </label>
+                <p className="text-[11px] text-slate-400">
+                  A mensalidade fixa é de R$ 50,00. Escolha o dia do mês que prefere pagar:
+                </p>
+                <div className="grid grid-cols-6 gap-1.5 pt-1">
+                  {[5, 10, 15, 20, 25, 30].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setDueDay(d)}
+                      className={`py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                        dueDay === d
+                          ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 scale-105'
+                          : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
                 </div>
               </div>
 

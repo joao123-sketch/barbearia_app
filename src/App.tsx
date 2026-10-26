@@ -54,18 +54,22 @@ function AdminRouteWrapper({
   barbershop,
   appointments,
   services,
+  workingHours,
   onUpdateAppointments,
   onUpdateServices,
   onUpdateBarbershop,
-  onDeleteBarbershop
+  onDeleteBarbershop,
+  onUpdateWorkingHours
 }: {
   barbershop: Barbershop
   appointments: Appointment[]
   services: Service[]
+  workingHours: import('./types').WorkingHour[]
   onUpdateAppointments: (a: Appointment[]) => void
   onUpdateServices: (s: Service[]) => void
   onUpdateBarbershop: (b: Barbershop) => void
   onDeleteBarbershop: (id: string) => void
+  onUpdateWorkingHours: (wh: import('./types').WorkingHour[]) => void
 }) {
   const navigate = useNavigate()
 
@@ -76,7 +80,7 @@ function AdminRouteWrapper({
         barbers={demoBarbers}
         services={services}
         appointments={appointments}
-        workingHours={demoWorkingHours}
+        workingHours={workingHours}
         onBackToClientView={() => navigate(`/${barbershop.slug}`)}
         onUpdateAppointments={onUpdateAppointments}
         onUpdateServices={onUpdateServices}
@@ -85,6 +89,7 @@ function AdminRouteWrapper({
           onDeleteBarbershop(id)
           navigate('/')
         }}
+        onUpdateWorkingHours={onUpdateWorkingHours}
       />
     </div>
   )
@@ -140,6 +145,19 @@ export function App() {
     return demoServices
   })
 
+  // Horários de Atendimento Semanal
+  const [workingHours, setWorkingHours] = useState<import('./types').WorkingHour[]>(() => {
+    const saved = localStorage.getItem('barber_working_hours')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch {
+        return demoWorkingHours
+      }
+    }
+    return demoWorkingHours
+  })
+
   // Sincronização e persistência no LocalStorage
   useEffect(() => {
     localStorage.setItem('barber_shops_list', JSON.stringify(barbershopsList))
@@ -152,6 +170,10 @@ export function App() {
   useEffect(() => {
     localStorage.setItem('barber_services', JSON.stringify(services))
   }, [services])
+
+  useEffect(() => {
+    localStorage.setItem('barber_working_hours', JSON.stringify(workingHours))
+  }, [workingHours])
 
   useEffect(() => {
     if (currentBarbershop) {
@@ -253,10 +275,12 @@ export function App() {
               barbershop={currentBarbershop}
               appointments={appointments}
               services={services}
+              workingHours={workingHours}
               onUpdateAppointments={setAppointments}
               onUpdateServices={setServices}
               onUpdateBarbershop={handleUpdateBarbershop}
               onDeleteBarbershop={handleDeleteBarbershop}
+              onUpdateWorkingHours={setWorkingHours}
             />
           }
         />

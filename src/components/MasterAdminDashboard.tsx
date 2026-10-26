@@ -15,7 +15,8 @@ import {
   ShieldCheck,
   Store,
   CreditCard,
-  QrCode
+  QrCode,
+  UserPlus
 } from 'lucide-react'
 import type { Barbershop, SubscriptionStatus } from '../types'
 import { DEFAULT_PIX_KEY, DEFAULT_PIX_NAME, DEFAULT_PIX_QRCODE, DEFAULT_MONTHLY_FEE } from '../lib/mockData'
@@ -34,6 +35,15 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [copiedPix, setCopiedPix] = useState(false)
+  const [copiedRegisterLink, setCopiedRegisterLink] = useState(false)
+
+  const registerUrl = `${window.location.origin}/cadastrar`
+
+  const handleCopyRegisterLink = () => {
+    navigator.clipboard.writeText(registerUrl)
+    setCopiedRegisterLink(true)
+    setTimeout(() => setCopiedRegisterLink(false), 2500)
+  }
 
   // Mensalidade Base Global da Plataforma
   const [baseFee, setBaseFee] = useState<number>(() => {
@@ -218,6 +228,57 @@ export const MasterAdminDashboard: React.FC<MasterAdminDashboardProps> = ({
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-5 space-y-5">
+        {/* ===================== LINK PARA ENVIAR AOS BARBEIROS (CADASTRO) ===================== */}
+        <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-500/20 via-slate-900 to-slate-900 border border-amber-500/40 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+          <div className="flex items-start gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center shrink-0">
+              <UserPlus className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <h2 className="font-extrabold text-sm sm:text-base text-white">
+                  Link de Cadastro para Novos Barbeiros
+                </h2>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
+                  ⚡ Ativação Automática
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 max-w-xl">
+                Envie este link para qualquer barbeiro que queira usar o sistema. Ele preenche os dados, escolhe o dia da mensalidade e já começa a usar na hora sem você precisar aprovar manualmente.
+              </p>
+              <div className="pt-1">
+                <span className="font-mono text-xs font-bold text-amber-300 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 inline-block truncate max-w-xs sm:max-w-md">
+                  {registerUrl}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+            <button
+              onClick={handleCopyRegisterLink}
+              className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-md ${
+                copiedRegisterLink
+                  ? 'bg-emerald-500 text-slate-950'
+                  : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/20'
+              }`}
+            >
+              {copiedRegisterLink ? <Check className="w-4 h-4 stroke-[3]" /> : <Copy className="w-4 h-4" />}
+              <span>{copiedRegisterLink ? 'Link Copiado!' : 'Copiar Link'}</span>
+            </button>
+
+            <a
+              href="/cadastrar"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <ExternalLink className="w-4 h-4 text-amber-400" />
+              <span>Testar Cadastro</span>
+            </a>
+          </div>
+        </div>
+
         {/* ===================== PREVIEW DO PIX & BANCO INTER ===================== */}
         {showPixPreview && (
           <div className="p-4 rounded-3xl bg-slate-900 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-2xl animate-in fade-in">
