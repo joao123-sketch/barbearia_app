@@ -1850,17 +1850,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {services.map((s) => (
                   <div
                     key={s.id}
-                    className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3 shadow-lg"
+                    className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg min-w-0"
                   >
-                    <div className="flex items-center gap-3 flex-1">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
                       {/* Ícone Genérico Padrão Para Cada Serviço */}
                       <div className="w-11 h-11 rounded-2xl bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0">
                         <Scissors className="w-5 h-5" />
                       </div>
 
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-sm text-white">{s.name}</h4>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-bold text-sm text-white break-words">{s.name}</h4>
                           {s.category && (
                             <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-amber-300 font-semibold uppercase">
                               {s.category}
@@ -1868,7 +1868,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           )}
                         </div>
                         {s.description && (
-                          <p className="text-xs text-slate-400 mt-0.5">{s.description}</p>
+                          <p className="text-xs text-slate-400 mt-0.5 break-words">{s.description}</p>
                         )}
                         {/* Tags de Serviços Inclusos no Combo */}
                         {s.combo_items && s.combo_items.length > 0 && (
@@ -1894,7 +1894,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                       {/* Botão de Edição */}
                       <button
                         onClick={() => handleOpenEditService(s)}
