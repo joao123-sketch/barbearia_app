@@ -204,7 +204,7 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/" element={<Navigate to={session ? '/admin' : '/login'} replace />} />
 
       {/* Entrar, cadastrar conta e recuperar senha */}
       {['/cadastrar', '/cadastro', '/login'].map((path) => (

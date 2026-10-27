@@ -49,7 +49,7 @@ import { normalizePhone, toWaNumber } from '../lib/phone'
 import { BR_STATES } from '../lib/states'
 import { STYLE_PRESETS, STYLE_PRESET_ORDER } from '../lib/stylePresets'
 import { buildShopTheme, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
-import { fileToResizedDataUrl } from '../lib/image'
+import { fileToResizedDataUrl, logoToAppIcon } from '../lib/image'
 
 const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -727,13 +727,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   }
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
+    // Ícone do app: PNG quadrado gerado da logo (só refaz quando a logo muda)
+    let appIcon = barbershop.app_icon
+    if (profileLogo !== barbershop.logo_url || (profileLogo && !appIcon)) {
+      appIcon = profileLogo ? await logoToAppIcon(profileLogo).catch(() => undefined) : undefined
+    }
     const fullAddress = `${profileStreet.trim()}, ${profileNumber.trim()} - ${profileNeighborhood.trim()}, ${profileCity.trim()}${profileState ? ` - ${profileState}` : ''}${profileReferencePoint.trim() ? ` (${profileReferencePoint.trim()})` : ''}`
     const updatedShop: Barbershop = {
       ...barbershop,
       name: profileName,
       logo_url: profileLogo,
+      app_icon: appIcon,
       instagram: normalizeInstagram(profileInstagram),
       phone_whatsapp: normalizePhone(profilePhone),
       address: fullAddress,
@@ -883,9 +889,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* ===================== BARRA INFERIOR (CELULAR) ===================== */}
       <nav
-        className={`sm:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-7 border-t backdrop-blur-xl pb-[env(safe-area-inset-bottom)] ${
-          isLight ? 'bg-white/95 border-slate-200' : 'bg-slate-950/95 border-slate-800/90'
-        }`}
+        className="sm:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-7 border-t bg-slate-950 border-slate-800 pb-[env(safe-area-inset-bottom)]"
       >
         {adminTabsList.map((tab) => {
           const Icon = tab.icon
@@ -913,9 +917,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* ===================== ÁREA PRINCIPAL COM PADDING DA SIDEBAR ===================== */}
       <div className="sm:pl-16 min-h-screen flex flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:pb-0">
         {/* Topo Administrativo */}
-        <header className={`sticky top-0 z-30 border-b backdrop-blur-md px-3 sm:px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] transition-colors ${
-          isLight ? 'bg-white/90 border-slate-200' : 'bg-slate-950/95 border-slate-800/80'
-        }`}>
+        <header className="safe-top sticky top-0 z-30 border-b bg-slate-950 border-slate-800 px-3 sm:px-4 pb-3 transition-colors">
           <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               <div className="min-w-0">

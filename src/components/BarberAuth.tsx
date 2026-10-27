@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Lock, User, Mail, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { buildShopTheme, getModeFor, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
 import { requestPasswordReset, signIn } from '../lib/auth'
@@ -79,6 +79,12 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
       setBusy(false)
     }
   }
+
+  // Já logado: vai direto ao painel durante a própria renderização (sem exibir o formulário de entrada)
+  if (hasSession && shopLoading) {
+    return <div style={buildShopTheme('neutro', neutralMode)} className="min-h-screen bg-slate-950" />
+  }
+  if (hasSession && hasShop) return <Navigate to={next} replace />
 
   if (view === 'register') {
     return (

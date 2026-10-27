@@ -8,7 +8,7 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/manifest/*", "/icon/*"]
+    "run_worker_first": ["/*", "!/assets/*"]
   },
   "vars": {
     "VITE_SUPABASE_ANON_KEY": "sb_publishable_Pp50y6WaFzFqr0yVUKSx3g_qi5nZQOi",

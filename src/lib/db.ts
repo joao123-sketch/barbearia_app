@@ -151,7 +151,7 @@ export async function isPlatformAdmin(): Promise<boolean> {
 
 const SHOP_FIELDS = [
   'name', 'slug', 'owner_name', 'slogan', 'description', 'logo_url', 'banner_url', 'phone_whatsapp', 'street', 'number',
-  'neighborhood', 'city', 'state', 'reference_point', 'address', 'instagram', 'style_preset', 'business_type'
+  'neighborhood', 'city', 'state', 'reference_point', 'address', 'instagram', 'style_preset', 'business_type', 'app_icon'
 ] as const
 
 export async function updateMyShop(shop: Barbershop) {
@@ -346,5 +346,9 @@ export async function fetchAllShops(): Promise<Barbershop[]> {
 export const adminConfirmPayment = async (shopId: string) => check(await supabase.rpc('admin_confirm_payment', { p_shop: shopId }))
 export const adminSetBlocked = async (shopId: string, blocked: boolean) =>
   check(await supabase.rpc('admin_set_blocked', { p_shop: shopId, p_blocked: blocked }))
+// Mensalidade de uma conta: já neste ciclo (applyNow) ou só a partir do próximo pagamento
+export const adminSetShopFee = async (shopId: string, fee: number, applyNow: boolean) =>
+  check(await supabase.rpc('admin_set_shop_fee', { p_shop: shopId, p_fee: fee, p_apply_now: applyNow }))
+
 export const adminScheduleFee = async (fee: number, shopId?: string) =>
   check(await supabase.rpc('admin_schedule_fee', { p_fee: fee, p_shop: shopId ?? null }))

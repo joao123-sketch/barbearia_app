@@ -14,6 +14,7 @@ export interface Barbershop {
   slogan?: string
   description?: string
   logo_url?: string
+  app_icon?: string // logo em PNG quadrado, usada como ícone do app instalado
   banner_url?: string
   phone_whatsapp: string
   address: string

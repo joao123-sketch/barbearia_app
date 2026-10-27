@@ -34,6 +34,14 @@ function logoVersion(value?: string | null): string {
 
 export function applyShopPwa(slug: string, name: string, app: 'client' | 'admin', logoUrl?: string | null) {
   const query = app === 'admin' ? '?app=admin' : ''
+  // O servidor lê este cookie para já entregar a página do painel com o ícone e o nome do negócio
+  if (app === 'admin') {
+    try {
+      document.cookie = `shop_slug=${slug}; path=/; max-age=31536000; samesite=lax`
+    } catch {
+      // cookies bloqueados: o app continua funcionando
+    }
+  }
   setLink('manifest', `/manifest/${slug}.webmanifest${query}`)
   const icon = `/icon/${slug}?v=${logoVersion(logoUrl)}`
   setLink('apple-touch-icon', icon)

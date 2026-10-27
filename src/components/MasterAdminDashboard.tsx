@@ -18,7 +18,9 @@ import {
   CreditCard,
   QrCode,
   UserPlus,
-  Camera
+  Camera,
+  Sun,
+  Moon
 } from 'lucide-react'
 import type { Barbershop } from '../types'
 import { DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from '../lib/platform'
@@ -26,6 +28,7 @@ import { useSession } from '../lib/auth'
 import {
   adminConfirmPayment,
   adminScheduleFee,
+  adminSetShopFee,
   adminSetBlocked,
   deleteShop,
   fetchAllShops,
@@ -37,6 +40,7 @@ import {
 import { TRIAL_DAYS, formatBR, formatMoney, getBillingState } from '../lib/billing'
 import { normalizePhone, toWaNumber } from '../lib/phone'
 import { fileToResizedDataUrl } from '../lib/image'
+import { buildShopTheme, getModeFor, shopThemeAttrs, useShopChrome, type ThemeMode } from '../lib/shopTheme'
 
 // Entrada do painel geral: só o administrador da plataforma (conta marcada no banco) enxerga as contas
 export const MasterAdminDashboard: React.FC = () => {
@@ -45,6 +49,27 @@ export const MasterAdminDashboard: React.FC = () => {
   const [state, setState] = useState<'loading' | 'denied' | 'ready'>('loading')
   const [barbershops, setBarbershops] = useState<Barbershop[]>([])
   const [settings, setSettings] = useState<PlatformSettings>(DEFAULT_PLATFORM_SETTINGS)
+
+  // Mesmo visual do estilo "neutro", com opção de claro/escuro lembrada neste aparelho
+  const [override, setOverride] = useState<ThemeMode | null>(() => {
+    try {
+      const saved = localStorage.getItem('master_theme')
+      return saved === 'light' || saved === 'dark' ? saved : null
+    } catch {
+      return null
+    }
+  })
+  const mode = getModeFor('neutro', override)
+  useShopChrome('neutro', mode)
+  const toggleMode = () => {
+    const next: ThemeMode = mode === 'light' ? 'dark' : 'light'
+    setOverride(next)
+    try {
+      localStorage.setItem('master_theme', next)
+    } catch {
+      // sem armazenamento: vale só nesta visita
+    }
+  }
 
   const reload = async () => {
     const [shops, platform] = await Promise.all([fetchAllShops(), fetchPlatformSettings()])
@@ -72,12 +97,18 @@ export const MasterAdminDashboard: React.FC = () => {
     }
   }, [ready, session])
 
+  const themed = (children: React.ReactNode) => (
+    <div {...shopThemeAttrs('neutro', mode)} style={buildShopTheme('neutro', mode)} className="min-h-screen bg-slate-950">
+      {children}
+    </div>
+  )
+
   if (state === 'loading') {
-    return <div className="min-h-screen bg-[#090A0F] text-slate-300 flex items-center justify-center text-sm">Carregando...</div>
+    return themed(<div className="min-h-screen bg-slate-950 text-slate-300 flex items-center justify-center text-sm">Carregando...</div>)
   }
   if (state === 'denied') {
-    return (
-      <div className="min-h-screen bg-[#090A0F] text-slate-100 flex flex-col items-center justify-center gap-3 px-6 text-center">
+    return themed(
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center gap-3 px-6 text-center">
         <p className="font-bold">Acesso restrito</p>
         <p className="text-sm text-slate-400 max-w-xs">Esta área é exclusiva do administrador da plataforma.</p>
         <button onClick={() => navigate('/admin')} className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-sm cursor-pointer">
@@ -87,7 +118,16 @@ export const MasterAdminDashboard: React.FC = () => {
     )
   }
 
-  return <MasterPanel barbershops={barbershops} settings={settings} onSettings={setSettings} reload={reload} />
+  return themed(
+    <MasterPanel
+      barbershops={barbershops}
+      settings={settings}
+      onSettings={setSettings}
+      reload={reload}
+      isLight={mode === 'light'}
+      onToggleTheme={toggleMode}
+    />
+  )
 }
 
 interface MasterPanelProps {
@@ -95,9 +135,11 @@ interface MasterPanelProps {
   settings: PlatformSettings
   onSettings: (s: PlatformSettings) => void
   reload: () => Promise<void>
+  isLight: boolean
+  onToggleTheme: () => void
 }
 
-const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSettings, reload }) => {
+const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSettings, reload, isLight, onToggleTheme }) => {
   const run = async (action: () => Promise<unknown>) => {
     try {
       await action()
@@ -131,6 +173,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSett
   // Modal de edição individual de barbearia
   const [editingShop, setEditingShop] = useState<Barbershop | null>(null)
   const [editFee, setEditFee] = useState<number>(50)
+  const [editApplyNow, setEditApplyNow] = useState(false)
 
   // Modal de Exclusão de Barbearia com trava de segurança
   const [shopToDelete, setShopToDelete] = useState<Barbershop | null>(null)
@@ -250,9 +293,14 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSett
       return
     }
     const target = editingShop
-    if (await run(() => adminScheduleFee(newFee, target.id))) {
+    const applyNow = editApplyNow
+    if (await run(() => adminSetShopFee(target.id, Math.round(newFee * 100) / 100, applyNow))) {
       setEditingShop(null)
-      alert(`Reajuste para R$ ${newFee.toFixed(2).replace('.', ',')} agendado para ${target.name}. Passará a valer a partir do próximo pagamento.`)
+      alert(
+        applyNow
+          ? `Mensalidade de ${target.name} alterada para R$ ${formatMoney(newFee)}.`
+          : `Mensalidade de ${target.name} será R$ ${formatMoney(newFee)} a partir do próximo pagamento.`
+      )
     }
   }
 
@@ -268,9 +316,9 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSett
   }
 
   return (
-    <div className="min-h-screen bg-[#090A0F] text-slate-100 pb-24 select-none">
+    <div className="min-h-screen bg-slate-950 text-slate-100 pb-24 select-none">
       {/* ===================== TOPO MASTER ADMIN (PRIVADO) ===================== */}
-      <header className="sticky top-0 z-30 bg-[#0d0f17]/95 border-b border-slate-800/80 backdrop-blur-md px-4 py-3.5">
+      <header className="safe-top sticky top-0 z-30 bg-slate-900 border-b border-slate-800 px-4 pb-3.5">
         <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-amber-500/20 shrink-0">
@@ -292,6 +340,14 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSett
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={onToggleTheme}
+              title={isLight ? 'Modo escuro' : 'Modo claro'}
+              aria-label={isLight ? 'Mudar para modo escuro' : 'Mudar para modo claro'}
+              className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/40 cursor-pointer"
+            >
+              {isLight ? <Moon className="w-4 h-4 text-indigo-500" /> : <Sun className="w-4 h-4 text-amber-400" />}
+            </button>
             <button
               onClick={() => setShowPixPreview(!showPixPreview)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/40 text-xs text-amber-400 cursor-pointer"
@@ -579,7 +635,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSett
                     onChange={(e) => setApplyFeeToAll(e.target.checked)}
                     className="accent-amber-500 w-4 h-4 mt-0.5"
                   />
-                  <span>Aplicar o novo valor também às contas atuais, a partir do próximo pagamento de cada uma</span>
+                  <span>Aplicar o novo valor também às contas atuais, a partir do próximo pagamento de cada uma (substitui valores personalizados). Desmarcado: só vale para quem se cadastrar daqui para frente.</span>
                 </label>
               )}
 
@@ -711,6 +767,11 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSett
                           <span>•</span>
                           <span>
                             Mensalidade: <strong className="text-white">R$ {formatMoney(shop.monthly_fee || settings.monthly_fee)}</strong>
+                            {shop.monthly_fee > 0 && shop.monthly_fee !== settings.monthly_fee && (
+                              <span className="ml-1 text-[10px] text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 font-bold">
+                                personalizada
+                              </span>
+                            )}
                             {shop.next_monthly_fee && shop.next_monthly_fee !== shop.monthly_fee && (
                               <span className="ml-1 text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 font-bold">
                                 ➔ R$ {formatMoney(shop.next_monthly_fee)} no próximo pagamento
@@ -768,6 +829,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSett
                       <button
                         onClick={() => {
                           setEditingShop(shop)
+                          setEditApplyNow(false)
                           setEditFee(shop.monthly_fee || settings.monthly_fee)
                         }}
                         title="Editar Mensalidade"
@@ -812,7 +874,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSett
       {/* ===================== MODAL DE EDIÇÃO DE MENSALIDADE INDIVIDUAL ===================== */}
       {editingShop && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-[#12151f] border border-slate-800 rounded-3xl p-5 text-slate-100 shadow-2xl">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-5 text-slate-100 shadow-2xl">
             <h3 className="font-bold text-base text-white mb-1">
               Editar Mensalidade
             </h3>
@@ -834,9 +896,20 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSett
                     className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-bold text-sm"
                   />
                 </div>
-                <p className="text-[11px] text-amber-400 mt-1">
-                  ⚡ Nota: O novo valor vale a partir do <strong>próximo pagamento</strong>. O período já pago não muda.
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Valor padrão atual: R$ {formatMoney(settings.monthly_fee)}. Aqui você define um valor só para esta conta.
                 </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="flex items-start gap-2 text-slate-200 cursor-pointer">
+                  <input type="radio" name="fee-when" checked={!editApplyNow} onChange={() => setEditApplyNow(false)} className="accent-amber-500 mt-0.5" />
+                  <span>A partir do <strong>próximo pagamento</strong> (o período já pago não muda)</span>
+                </label>
+                <label className="flex items-start gap-2 text-slate-200 cursor-pointer">
+                  <input type="radio" name="fee-when" checked={editApplyNow} onChange={() => setEditApplyNow(true)} className="accent-amber-500 mt-0.5" />
+                  <span>Já vale <strong>agora</strong></span>
+                </label>
               </div>
 
               <div className="flex gap-2 pt-2">
@@ -862,7 +935,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSett
       {/* ===================== MODAL DE EXCLUSÃO COM TRAVA DE SEGURANÇA ===================== */}
       {shopToDelete && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-[#12151f] border border-rose-500/50 rounded-3xl p-6 text-slate-100 shadow-2xl space-y-4">
+          <div className="w-full max-w-sm bg-slate-900 border border-rose-500/50 rounded-3xl p-6 text-slate-100 shadow-2xl space-y-4">
             <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
               <AlertTriangle className="w-6 h-6" />
             </div>

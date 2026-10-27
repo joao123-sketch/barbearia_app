@@ -363,7 +363,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
         {onBackToPanel && (
           <button
             onClick={onBackToPanel}
-            className="absolute top-4 left-4 z-10 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/85 hover:bg-slate-800 text-amber-400 border border-slate-700/80 backdrop-blur-md text-xs font-bold active:scale-95 transition-all cursor-pointer shadow-lg"
+            className="absolute top-[calc(max(env(safe-area-inset-top),var(--ios-min-top,0px))+0.75rem)] left-4 z-10 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/85 hover:bg-slate-800 text-amber-400 border border-slate-700/80 backdrop-blur-md text-xs font-bold active:scale-95 transition-all cursor-pointer shadow-lg"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Voltar ao painel</span>
@@ -371,7 +371,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
         )}
 
         {/* Botão de Instalação PWA no Topo & Alternador de Tema */}
-        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+        <div className="absolute top-[calc(max(env(safe-area-inset-top),var(--ios-min-top,0px))+0.75rem)] right-4 z-10 flex items-center gap-2">
           {onToggleTheme && (
             <button
               onClick={onToggleTheme}

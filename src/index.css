@@ -420,3 +420,8 @@
 [data-shop-theme]:not([data-shop-theme="rosa"]) textarea:focus {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-amber-500) 22%, transparent);
 }
+
+/* Topo seguro: respeita o relógio/notch do iPhone e nunca fica colado nele */
+.safe-top {
+  padding-top: calc(max(env(safe-area-inset-top), var(--ios-min-top, 0px)) + 0.9rem);
+}

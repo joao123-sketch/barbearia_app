@@ -14,6 +14,7 @@ import {
   updateMyShop
 } from './db'
 import { supabase } from './supabase'
+import { logoToAppIcon } from './image'
 import { readOwnerCache, writeOwnerCache } from './ownerCache'
 import { DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from './platform'
 
@@ -85,21 +86,65 @@ export function useOwnerData(userId: string | undefined) {
     if (userId && shop) writeOwnerCache(userId, { shop, services, barbers, workingHours, appointments })
   }, [userId, shop, services, barbers, workingHours, appointments])
 
-  // Agendamentos novos feitos pelos clientes aparecem sem precisar recarregar
+  // Agendamentos novos feitos pelos clientes aparecem na hora (tempo real), com atualização
+  // de segurança ao voltar para o app e a cada 15 segundos caso a conexão em tempo real caia.
+  const shopId = shop?.id
   useEffect(() => {
-    if (!shop) return
-    const shopId = shop.id
-    const timer = window.setInterval(async () => {
-      if (document.hidden) return
+    if (!shopId) return
+    let busy = false
+    let debounce: number | undefined
+    const refresh = async () => {
+      if (busy || document.hidden) return
+      busy = true
       try {
         const fresh = await fetchAppointments(shopId)
         appointmentsRef.current = fresh
         setAppointments(fresh)
       } catch {
         // sem rede: tenta de novo no próximo ciclo
+      } finally {
+        busy = false
       }
-    }, 30000)
-    return () => window.clearInterval(timer)
+    }
+    const channel = supabase
+      .channel(`appointments:${shopId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'appointments', filter: `barbershop_id=eq.${shopId}` },
+        () => {
+          window.clearTimeout(debounce)
+          debounce = window.setTimeout(refresh, 250)
+        }
+      )
+      .subscribe()
+    const onVisible = () => {
+      if (!document.hidden) refresh()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    const timer = window.setInterval(refresh, 15000)
+    return () => {
+      window.clearTimeout(debounce)
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+      supabase.removeChannel(channel)
+    }
+  }, [shopId])
+
+  // Negócios antigos ainda sem ícone PNG: gera da logo uma vez para o app instalar com ela
+  const iconTried = useRef(false)
+  useEffect(() => {
+    if (!shop || !shop.logo_url || shop.app_icon || iconTried.current) return
+    iconTried.current = true
+    logoToAppIcon(shop.logo_url)
+      .then((icon) => {
+        const next = { ...shop, app_icon: icon }
+        shopRef.current = next
+        setShop(next)
+        return updateMyShop(next)
+      })
+      .catch(() => {})
   }, [shop])
 
   const fail = (err: unknown) => {

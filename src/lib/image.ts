@@ -1,4 +1,25 @@
 // Reduz a foto enviada para caber no armazenamento do navegador (celulares geram fotos de vários MB).
+// Logo (qualquer formato) -> PNG quadrado 512x512 para o ícone do app instalado.
+// Fundo branco por baixo para logos com transparência não ficarem pretas no celular.
+export function logoToAppIcon(dataUrl: string, size = 512): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = size
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return reject(new Error('canvas'))
+      const side = Math.min(img.width, img.height)
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, size, size)
+      ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size)
+      resolve(canvas.toDataURL('image/png'))
+    }
+    img.onerror = () => reject(new Error('image'))
+    img.src = dataUrl
+  })
+}
+
 export function fileToResizedDataUrl(
   file: File,
   maxSide = 480,
