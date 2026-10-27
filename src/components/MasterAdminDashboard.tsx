@@ -784,7 +784,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     {/* Informações da Barbearia */}
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
                       <div className="w-12 h-12 rounded-xl overflow-hidden border border-slate-700 bg-slate-800 shrink-0">
                         {shop.logo_url ? (
                           <img src={shop.logo_url} alt={shop.name} className="w-full h-full object-cover" />
@@ -856,29 +856,6 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                           </p>
                         )}
 
-                        {/* Uso e faturamento do cliente (só totais, nunca dados dos clientes finais dele) */}
-                        <div className="flex items-center gap-x-2.5 gap-y-1 mt-1.5 text-[11px] text-slate-400 flex-wrap">
-                          <span>Cadastro: <strong className="text-slate-200">{shop.created_at ? formatBR(shop.created_at.slice(0, 10)) : '—'}</strong></span>
-                          {metrics[shop.id] && (
-                            <>
-                              <span>•</span>
-                              <span>Serviços: <strong className="text-slate-200">{metrics[shop.id].services_count}</strong></span>
-                              <span>•</span>
-                              <span>Atendimentos: <strong className="text-slate-200">{metrics[shop.id].done_total}</strong>
-                                {metrics[shop.id].upcoming_total > 0 && ` (+${metrics[shop.id].upcoming_total} agendados)`}</span>
-                              <span>•</span>
-                              <span>Média: <strong className="text-slate-200">{fmtHours(metrics[shop.id].worked_hours_per_active_day)}</strong>/dia atendido</span>
-                              <span>•</span>
-                              <span>Faturou no mês: <strong className="text-emerald-400">R$ {formatMoney(metrics[shop.id].revenue_this_month)}</strong></span>
-                              <span>•</span>
-                              <span>Mês passado: <strong className="text-slate-200">R$ {formatMoney(metrics[shop.id].revenue_last_month)}</strong></span>
-                              <span>•</span>
-                              <span>Total: <strong className="text-slate-200">R$ {formatMoney(metrics[shop.id].revenue_total)}</strong></span>
-                              <span>•</span>
-                              <span>Último atendimento: <strong className="text-slate-200">{formatBR(metrics[shop.id].last_activity ?? undefined)}</strong></span>
-                            </>
-                          )}
-                        </div>
                       </div>
                     </div>
 
@@ -953,6 +930,32 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
+                  </div>
+
+                  {/* Uso e faturamento do cliente (só totais, nunca dados dos clientes finais dele) */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-3">
+                    {[
+                      { label: 'Cadastro', value: shop.created_at ? formatBR(shop.created_at.slice(0, 10)) : '—' },
+                      ...(metrics[shop.id]
+                        ? [
+                            { label: 'Serviços', value: String(metrics[shop.id].services_count) },
+                            { label: 'Agend. nesta semana', value: String(metrics[shop.id].booked_this_week) },
+                            { label: 'Média por semana', value: `${String(metrics[shop.id].avg_per_week).replace('.', ',')} atend.` },
+                            { label: 'Faturou na semana', value: `R$ ${formatMoney(metrics[shop.id].revenue_this_week)}`, good: true },
+                            { label: 'Faturou no mês', value: `R$ ${formatMoney(metrics[shop.id].revenue_this_month)}`, good: true },
+                            { label: 'Mês passado', value: `R$ ${formatMoney(metrics[shop.id].revenue_last_month)}` },
+                            { label: 'Total faturado', value: `R$ ${formatMoney(metrics[shop.id].revenue_total)}` },
+                            { label: 'Atendimentos', value: `${metrics[shop.id].done_total}${metrics[shop.id].upcoming_total > 0 ? ` (+${metrics[shop.id].upcoming_total})` : ''}` },
+                            { label: 'Horas por dia atendido', value: fmtHours(metrics[shop.id].worked_hours_per_active_day) },
+                            { label: 'Último atendimento', value: formatBR(metrics[shop.id].last_activity ?? undefined) }
+                          ]
+                        : [])
+                    ].map((m) => (
+                      <div key={m.label} className="px-2.5 py-1.5 rounded-xl bg-slate-950/60 border border-slate-800 min-w-0">
+                        <p className="text-[10px] text-slate-500 leading-tight">{m.label}</p>
+                        <p className={`text-xs font-bold truncate ${'good' in m && m.good ? 'text-emerald-400' : 'text-slate-100'}`}>{m.value}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )

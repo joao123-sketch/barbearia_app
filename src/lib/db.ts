@@ -372,6 +372,9 @@ export interface ShopMetrics {
   worked_hours_total: number
   worked_hours_per_active_day: number
   last_activity: string | null
+  booked_this_week: number
+  revenue_this_week: number
+  avg_per_week: number
 }
 
 export async function adminFetchShopMetrics(): Promise<Record<string, ShopMetrics>> {
@@ -384,7 +387,10 @@ export async function adminFetchShopMetrics(): Promise<Record<string, ShopMetric
       revenue_this_month: Number(r.revenue_this_month),
       revenue_last_month: Number(r.revenue_last_month),
       worked_hours_total: Number(r.worked_hours_total),
-      worked_hours_per_active_day: Number(r.worked_hours_per_active_day)
+      worked_hours_per_active_day: Number(r.worked_hours_per_active_day),
+      revenue_this_week: Number(r.revenue_this_week ?? 0),
+      avg_per_week: Number(r.avg_per_week ?? 0),
+      booked_this_week: Number(r.booked_this_week ?? 0)
     }
   }
   return map
