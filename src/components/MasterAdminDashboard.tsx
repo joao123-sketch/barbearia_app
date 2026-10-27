@@ -27,6 +27,8 @@ import { DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from '../lib/platfor
 import { useSession } from '../lib/auth'
 import {
   adminConfirmPayment,
+  adminFetchShopMetrics,
+  type ShopMetrics,
   adminScheduleFee,
   adminRaiseFeesPercent,
   adminSetShopFee,
@@ -50,6 +52,7 @@ export const MasterAdminDashboard: React.FC = () => {
   const [state, setState] = useState<'loading' | 'denied' | 'ready'>('loading')
   const [barbershops, setBarbershops] = useState<Barbershop[]>([])
   const [settings, setSettings] = useState<PlatformSettings>(DEFAULT_PLATFORM_SETTINGS)
+  const [metrics, setMetrics] = useState<Record<string, ShopMetrics>>({})
 
   // Mesmo visual do estilo "neutro", com opção de claro/escuro lembrada neste aparelho
   const [override, setOverride] = useState<ThemeMode | null>(() => {
@@ -76,6 +79,8 @@ export const MasterAdminDashboard: React.FC = () => {
     const [shops, platform] = await Promise.all([fetchAllShops(), fetchPlatformSettings()])
     setBarbershops(shops)
     if (platform) setSettings(platform)
+    // Métricas são extras: se a migração ainda não foi rodada, o painel segue funcionando sem elas
+    adminFetchShopMetrics().then(setMetrics).catch(() => setMetrics({}))
   }
 
   useEffect(() => {
@@ -122,6 +127,7 @@ export const MasterAdminDashboard: React.FC = () => {
   return themed(
     <MasterPanel
       barbershops={barbershops}
+      metrics={metrics}
       settings={settings}
       onSettings={setSettings}
       reload={reload}
@@ -133,6 +139,7 @@ export const MasterAdminDashboard: React.FC = () => {
 
 interface MasterPanelProps {
   barbershops: Barbershop[]
+  metrics: Record<string, ShopMetrics>
   settings: PlatformSettings
   onSettings: (s: PlatformSettings) => void
   reload: () => Promise<void>
@@ -140,7 +147,7 @@ interface MasterPanelProps {
   onToggleTheme: () => void
 }
 
-const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSettings, reload, isLight, onToggleTheme }) => {
+const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, settings, onSettings, reload, isLight, onToggleTheme }) => {
   const run = async (action: () => Promise<unknown>) => {
     try {
       await action()
@@ -266,6 +273,13 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSett
   const totalMRR = barbershops
     .filter((s) => getBillingState(s).status === 'active')
     .reduce((acc, curr) => acc + (curr.monthly_fee || settings.monthly_fee), 0)
+
+  // Quanto os clientes faturaram usando o app (só atendimentos já concluídos)
+  const allMetrics = Object.values(metrics)
+  const platformRevenueMonth = allMetrics.reduce((a, m) => a + m.revenue_this_month, 0)
+  const platformDoneMonth = allMetrics.reduce((a, m) => a + m.done_this_month, 0)
+  const platformRevenueTotal = allMetrics.reduce((a, m) => a + m.revenue_total, 0)
+  const fmtHours = (h: number) => `${h.toFixed(1).replace('.0', '').replace('.', ',')}h`
 
   // Confirmar pagamento PIX: o banco libera mais 30 dias (a partir de hoje, ou do fim do período atual se ainda vigente)
   const handleConfirmPayment = async (shopId: string) => {
@@ -509,6 +523,24 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSett
             <p className="text-[10px] text-slate-400 mt-0.5">{blockedShops} bloqueadas</p>
           </div>
         </div>
+
+        {/* Quanto o app está gerando para os seus clientes (atendimentos concluídos, só totais) */}
+        {allMetrics.length > 0 && (
+          <div className="grid grid-cols-3 gap-3">
+            <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800">
+              <span className="text-xs font-medium text-slate-400">Clientes faturaram no mês</span>
+              <p className="text-lg sm:text-2xl font-black text-emerald-400 mt-1">R$ {formatMoney(platformRevenueMonth)}</p>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800">
+              <span className="text-xs font-medium text-slate-400">Atendimentos no mês</span>
+              <p className="text-lg sm:text-2xl font-black text-white mt-1">{platformDoneMonth}</p>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800">
+              <span className="text-xs font-medium text-slate-400">Total desde o início</span>
+              <p className="text-lg sm:text-2xl font-black text-white mt-1">R$ {formatMoney(platformRevenueTotal)}</p>
+            </div>
+          </div>
+        )}
 
         {/* ===================== COBRANÇA: MENSALIDADE, PIX E QR CODE ===================== */}
         <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-900 to-slate-900 border border-amber-500/30 space-y-3 text-xs">
@@ -823,6 +855,30 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSett
                             {shop.address}
                           </p>
                         )}
+
+                        {/* Uso e faturamento do cliente (só totais, nunca dados dos clientes finais dele) */}
+                        <div className="flex items-center gap-x-2.5 gap-y-1 mt-1.5 text-[11px] text-slate-400 flex-wrap">
+                          <span>Cadastro: <strong className="text-slate-200">{shop.created_at ? formatBR(shop.created_at.slice(0, 10)) : '—'}</strong></span>
+                          {metrics[shop.id] && (
+                            <>
+                              <span>•</span>
+                              <span>Serviços: <strong className="text-slate-200">{metrics[shop.id].services_count}</strong></span>
+                              <span>•</span>
+                              <span>Atendimentos: <strong className="text-slate-200">{metrics[shop.id].done_total}</strong>
+                                {metrics[shop.id].upcoming_total > 0 && ` (+${metrics[shop.id].upcoming_total} agendados)`}</span>
+                              <span>•</span>
+                              <span>Média: <strong className="text-slate-200">{fmtHours(metrics[shop.id].worked_hours_per_active_day)}</strong>/dia atendido</span>
+                              <span>•</span>
+                              <span>Faturou no mês: <strong className="text-emerald-400">R$ {formatMoney(metrics[shop.id].revenue_this_month)}</strong></span>
+                              <span>•</span>
+                              <span>Mês passado: <strong className="text-slate-200">R$ {formatMoney(metrics[shop.id].revenue_last_month)}</strong></span>
+                              <span>•</span>
+                              <span>Total: <strong className="text-slate-200">R$ {formatMoney(metrics[shop.id].revenue_total)}</strong></span>
+                              <span>•</span>
+                              <span>Último atendimento: <strong className="text-slate-200">{formatBR(metrics[shop.id].last_activity ?? undefined)}</strong></span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
 

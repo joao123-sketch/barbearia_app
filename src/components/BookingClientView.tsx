@@ -19,7 +19,7 @@ import type { Barbershop, Service, Barber, WorkingHour } from '../types'
 import { getStylePreset } from '../lib/stylePresets'
 import { buildShopTheme, getLook, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
 import { getTerms } from '../lib/terms'
-import { toWaNumber } from '../lib/phone'
+import { formatPhoneInput, toWaNumber } from '../lib/phone'
 import { normalizeInstagram } from '../lib/instagram'
 import { currentPushKeys, notificationPermission, pushSupport, subscribePush } from '../lib/push'
 import { registerClientPush } from '../lib/db'
@@ -224,17 +224,8 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
 
   // Máscara de telefone WhatsApp
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, '')
-    if (value.length > 11) value = value.slice(0, 11)
-
-    if (value.length > 6) {
-      value = `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7)}`
-    } else if (value.length > 2) {
-      value = `(${value.slice(0, 2)}) ${value.slice(2)}`
-    } else if (value.length > 0) {
-      value = `(${value}`
-    }
-    setClientPhone(value)
+    const next = e.target.value
+    setClientPhone((prev) => formatPhoneInput(next, prev))
   }
 
   // Finalizar agendamento: o servidor confere horário, preço e conflito antes de gravar

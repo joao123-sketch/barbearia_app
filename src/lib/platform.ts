@@ -19,3 +19,6 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   pix_qrcode: '',
   contact_whatsapp: ''
 }
+
+// Atendimento ao dono (suporte do SuaAgenda): WhatsApp do João
+export const SUPPORT_WHATSAPP = '88988941408'

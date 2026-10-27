@@ -356,3 +356,36 @@ export const adminRaiseFeesPercent = async (percent: number) =>
 
 export const adminScheduleFee = async (fee: number, shopId?: string) =>
   check(await supabase.rpc('admin_schedule_fee', { p_fee: fee, p_shop: shopId ?? null }))
+
+// Números agregados por negócio (sem nenhum dado dos clientes finais) — só o administrador consegue chamar
+export interface ShopMetrics {
+  shop_id: string
+  services_count: number
+  team_count: number
+  done_total: number
+  cancelled_total: number
+  upcoming_total: number
+  revenue_total: number
+  revenue_this_month: number
+  revenue_last_month: number
+  done_this_month: number
+  worked_hours_total: number
+  worked_hours_per_active_day: number
+  last_activity: string | null
+}
+
+export async function adminFetchShopMetrics(): Promise<Record<string, ShopMetrics>> {
+  const rows = check(await supabase.rpc('admin_shop_metrics')) as any[] | null
+  const map: Record<string, ShopMetrics> = {}
+  for (const r of rows ?? []) {
+    map[r.shop_id] = {
+      ...r,
+      revenue_total: Number(r.revenue_total),
+      revenue_this_month: Number(r.revenue_this_month),
+      revenue_last_month: Number(r.revenue_last_month),
+      worked_hours_total: Number(r.worked_hours_total),
+      worked_hours_per_active_day: Number(r.worked_hours_per_active_day)
+    }
+  }
+  return map
+}

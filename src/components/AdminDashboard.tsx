@@ -38,13 +38,14 @@ import {
 } from 'lucide-react'
 import type { Barbershop, Barber, Service, Appointment, WorkingHour } from '../types'
 import { PWAInstallPrompt } from './PWAInstallPrompt'
-import { DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from '../lib/platform'
+import { DEFAULT_PLATFORM_SETTINGS, SUPPORT_WHATSAPP, type PlatformSettings } from '../lib/platform'
 import { newId } from '../lib/db'
 import { AccountSettings } from './AccountSettings'
 import { OwnerNotifications } from './OwnerNotifications'
+import { PixPayment } from './PixPayment'
 import { normalizeInstagram } from '../lib/instagram'
 import { getTerms } from '../lib/terms'
-import { formatBR, formatMoney, getBillingState } from '../lib/billing'
+import { formatBR, formatMoney, getBillingState, toDateStr } from '../lib/billing'
 import { normalizePhone, toWaNumber } from '../lib/phone'
 import { BR_STATES } from '../lib/states'
 import { STYLE_PRESETS, STYLE_PRESET_ORDER } from '../lib/stylePresets'
@@ -58,6 +59,15 @@ const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) =>
     <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
   </svg>
 )
+
+// Um atendimento só é "concluído" depois que o horário dele terminou (e não foi cancelado)
+const isAppointmentDone = (apt: Appointment, now: Date) => {
+  if (apt.status === 'cancelled') return false
+  const [h, m] = apt.start_time.split(':').map(Number)
+  const end = new Date(`${apt.appointment_date}T00:00:00`)
+  end.setHours(h, m + (apt.total_duration || 0), 0, 0)
+  return end.getTime() <= now.getTime()
+}
 
 type AdminTab = 'agenda' | 'semana' | 'historico' | 'servicos' | 'equipe' | 'horarios' | 'config'
 
@@ -118,7 +128,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [workingHoursSaved, setWorkingHoursSaved] = useState(false)
   const [services, setServices] = useState<Service[]>(initialServices)
   const [copiedLink, setCopiedLink] = useState(false)
-  const [copiedPixKey, setCopiedPixKey] = useState(false)
 
   // Filtro de Histórico de Cortes: Todos | Concluídos | Cancelados + Filtro de Mês
   const [historyStatusFilter, setHistoryStatusFilter] = useState<'todos' | 'concluidos' | 'cancelados'>('todos')
@@ -180,7 +189,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [profileSaved, setProfileSaved] = useState(false)
   const logoFileInputRef = useRef<HTMLInputElement>(null)
 
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], [])
+  // Relógio do painel: atualiza a cada 30s para os atendimentos virarem "concluídos" na hora certa
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 30000)
+    return () => clearInterval(t)
+  }, [])
+  const todayStr = toDateStr(now)
 
   // ===================== PLANO PRÉ-PAGO (TESTE GRÁTIS / PERÍODO PAGO) =====================
   const billing = getBillingState(barbershop)
@@ -293,20 +308,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const availableHistoryMonths = useMemo(() => {
     const monthSet = new Set<string>()
     appointments.forEach((apt) => {
-      if (apt.appointment_date && apt.appointment_date.length >= 7) {
+      if ((apt.status === 'cancelled' || isAppointmentDone(apt, now)) && apt.appointment_date && apt.appointment_date.length >= 7) {
         monthSet.add(apt.appointment_date.slice(0, 7))
       }
     })
     monthSet.add(todayStr.slice(0, 7))
     return Array.from(monthSet).sort().reverse()
-  }, [appointments, todayStr])
+  }, [appointments, todayStr, now])
 
   // ===================== HISTÓRICO GERAL DE CORTES =====================
   const filteredHistoryAppointments = useMemo(() => {
     return appointments
       .filter((apt) => {
+        // O histórico só tem o que já aconteceu (concluídos) ou foi cancelado
+        const done = isAppointmentDone(apt, now)
+        if (!done && apt.status !== 'cancelled') return false
         if (historyStatusFilter === 'concluidos') {
-          if (apt.status === 'cancelled') return false
+          if (!done) return false
         } else if (historyStatusFilter === 'cancelados') {
           if (apt.status !== 'cancelled') return false
         }
@@ -329,7 +347,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const dateB = `${b.appointment_date} ${b.start_time}`
         return dateB.localeCompare(dateA)
       })
-  }, [appointments, historyStatusFilter, historyMonthFilter, historySearch])
+  }, [appointments, historyStatusFilter, historyMonthFilter, historySearch, now])
 
   const historyTotalRevenue = useMemo(() => {
     return filteredHistoryAppointments
@@ -711,17 +729,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setTimeout(() => setCopiedLink(false), 2000)
   }
 
-  const handleCopyPix = () => {
-    navigator.clipboard.writeText(platform.pix_key)
-    setCopiedPixKey(true)
-    setTimeout(() => setCopiedPixKey(false), 2000)
-  }
-
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     try {
-      setProfileLogo(await fileToResizedDataUrl(file, 512, 0.88, 'image/jpeg', true))
+      const logo = await fileToResizedDataUrl(file, 512, 0.88, 'image/jpeg', true)
+      setProfileLogo(logo)
+      // A logo é salva na hora (sem depender de apertar "Salvar") e já vale para o topo e o ícone do app
+      const appIcon = await logoToAppIcon(logo).catch(() => undefined)
+      if (onUpdateBarbershop) onUpdateBarbershop({ ...barbershop, logo_url: logo, app_icon: appIcon })
+      setProfileSaved(true)
+      setTimeout(() => setProfileSaved(false), 3000)
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Não foi possível usar esta imagem.')
     }
@@ -760,6 +778,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const isLight = false
   const isLightMode = theme === 'light'
   const platform = platformProp ?? DEFAULT_PLATFORM_SETTINGS
+  // Próximo pagamento: usa o novo valor já agendado (reajuste), se houver
+  const amountDue = barbershop.next_monthly_fee || barbershop.monthly_fee || platform.monthly_fee
   const existingCategories = Array.from(new Set(services.map((sv) => sv.category).filter((c): c is string => Boolean(c))))
   useShopChrome(barbershop.style_preset, isLightMode ? 'light' : 'dark')
 
@@ -1017,30 +1037,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {billing.status === 'expired' && (
                 <div className="p-4 space-y-3 text-xs">
                   <p className="text-slate-300">
-                    Mensalidade: <strong className="text-white">R$ {formatMoney(barbershop.monthly_fee || platform.monthly_fee)}</strong> · libera 30 dias
+                    Valor a pagar: <strong className="text-white">R$ {formatMoney(amountDue)}</strong> · libera 30 dias
                   </p>
 
-                  <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-950 border border-slate-800">
-                    {platform.pix_qrcode && (
-                      <div className="p-1.5 rounded-xl bg-white shrink-0">
-                        <img src={platform.pix_qrcode} alt="QR Code PIX" className="w-24 h-24 object-contain" />
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1 space-y-1.5">
-                      <p className="text-slate-400">Chave PIX</p>
-                      <p className="font-mono font-bold text-amber-400 text-sm break-all">{platform.pix_key}</p>
-                      <button
-                        onClick={handleCopyPix}
-                        className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs flex items-center gap-1 cursor-pointer"
-                      >
-                        {copiedPixKey ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{copiedPixKey ? 'Copiado!' : 'Copiar chave'}</span>
-                      </button>
-                      <p className="text-[11px] text-slate-400">
-                        {platform.pix_name}
-                        {platform.pix_bank ? ` · ${platform.pix_bank}` : ''}
-                      </p>
-                    </div>
+                  <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800">
+                    <PixPayment platform={platform} amount={amountDue} />
                   </div>
 
                   {platform.contact_whatsapp && (
@@ -1135,7 +1136,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <p className="text-2xl font-black text-white">{todayAppointments.length}</p>
                 <p className="text-[10px] text-emerald-400 mt-0.5 font-medium">
-                  {todayCompletedCount} confirmados / atendidos
+                  {todayAppointments.filter((a) => isAppointmentDone(a, now)).length} concluídos de {todayCompletedCount} marcados
                 </p>
               </div>
 
@@ -1267,9 +1268,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
                                 Cancelado
                               </span>
-                            ) : (
+                            ) : isAppointmentDone(apt, now) ? (
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                                 Concluído
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                Agendado
                               </span>
                             )}
                           </div>
@@ -2391,43 +2396,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               {/* QR CODE DO BANCO INTER E CHAVE PIX */}
               <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-center space-y-3">
-                <p className="text-xs font-bold text-slate-300">
-                  Pague apontando a câmera para o QR Code abaixo:
-                </p>
-
-                <div className="flex justify-center">
-                  <div className="p-2.5 rounded-2xl bg-white shadow-xl border-2 border-amber-500/40 inline-block">
-                    <img
-                      src={platform.pix_qrcode}
-                      alt="QR Code PIX Banco Inter"
-                      className="w-48 h-48 object-contain rounded-xl"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1 text-xs">
-                  <p className="text-slate-400 text-[11px]">Ou utilize a chave PIX copia e cola:</p>
-                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-slate-800 max-w-sm mx-auto">
-                    <span className="font-mono font-bold text-amber-300 text-xs truncate mr-2">
-                      {platform.pix_key}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleCopyPix}
-                      className="px-3 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-bold text-xs flex items-center gap-1 active:scale-95 transition-all cursor-pointer shrink-0"
-                    >
-                      {copiedPixKey ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedPixKey ? 'Copiado!' : 'Copiar Chave'}</span>
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-slate-500 pt-1">
-                    Titular: {platform.pix_name} ({platform.pix_bank})
-                  </p>
-                </div>
+                <PixPayment platform={platform} amount={amountDue} />
 
                 {platform.contact_whatsapp && (
                   <a
-                    href={`https://wa.me/${toWaNumber(platform.contact_whatsapp)}?text=${encodeURIComponent(`Olá! Realizei o pagamento antecipado de R$ ${formatMoney(barbershop.monthly_fee || platform.monthly_fee)} de ${barbershop.name}. Segue o comprovante:`)}`}
+                    href={`https://wa.me/${toWaNumber(platform.contact_whatsapp)}?text=${encodeURIComponent(`Olá! Realizei o pagamento antecipado de R$ ${formatMoney(amountDue)} de ${barbershop.name}. Segue o comprovante:`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full max-w-sm mx-auto py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
@@ -2727,12 +2700,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <div>
                 <label className="block text-slate-400 mb-1">Slug do Link Público (Fixo)</label>
-                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800">
-                  <span className="text-amber-300 font-mono text-xs">{publicUrl}</span>
+                <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800 min-w-0">
+                  <span className="text-amber-300 font-mono text-xs min-w-0 flex-1 break-all">{publicUrl}</span>
                   <button
                     type="button"
                     onClick={handleCopyLink}
-                    className="text-slate-400 hover:text-amber-400 p-1 cursor-pointer"
+                    className="text-slate-400 hover:text-amber-400 p-1 cursor-pointer shrink-0"
                     title="Copiar link"
                   >
                     <Copy className="w-3.5 h-3.5" />
@@ -2768,6 +2741,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <span>Sair da conta</span>
               </button>
             )}
+
+            {/* ATENDIMENTO: fala direto com o suporte pelo WhatsApp */}
+            <div className="p-4 rounded-2xl bg-slate-900 border border-emerald-500/30 space-y-3 text-xs">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 shrink-0">
+                  <MessageCircle className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="font-bold text-sm text-white">Atendimento</h4>
+                  <p className="text-slate-400 text-xs">Dúvida, problema ou sugestão? Fale direto com a gente.</p>
+                </div>
+              </div>
+              <a
+                href={`https://wa.me/${toWaNumber(SUPPORT_WHATSAPP)}?text=${encodeURIComponent(`Olá! Sou da ${barbershop.name} (${barbershop.slug}) e preciso de ajuda com o SuaAgenda.`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition-all"
+              >
+                <MessageCircle className="w-4 h-4 fill-current" />
+                <span>Falar com o suporte no WhatsApp</span>
+              </a>
+            </div>
 
             {/* ZONA DE PERIGO: EXCLUSÃO DE CONTA */}
             <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-500/30 space-y-3 text-xs">

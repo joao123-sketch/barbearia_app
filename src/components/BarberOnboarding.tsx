@@ -21,7 +21,7 @@ import { PasswordInput } from './PasswordInput'
 import { normalizeInstagram } from '../lib/instagram'
 import { defaultWorkingHours, fetchMonthlyFee, friendlyError, registerBarbershop, saveWorkingHours } from '../lib/db'
 import { getTerms } from '../lib/terms'
-import { normalizePhone } from '../lib/phone'
+import { formatPhoneInput, normalizePhone } from '../lib/phone'
 import { TRIAL_DAYS, formatMoney } from '../lib/billing'
 import { BR_STATES } from '../lib/states'
 import { STYLE_PRESETS, STYLE_PRESET_ORDER } from '../lib/stylePresets'
@@ -139,18 +139,8 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
 
   // Formatação de telefone / WhatsApp
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Aceita número colado com +55 e guarda só DDD + número
-    let value = normalizePhone(e.target.value)
-    if (value.length > 11) value = value.slice(0, 11)
-
-    if (value.length > 6) {
-      value = `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7)}`
-    } else if (value.length > 2) {
-      value = `(${value.slice(0, 2)}) ${value.slice(2)}`
-    } else if (value.length > 0) {
-      value = `(${value}`
-    }
-    setPhone(value)
+    const next = e.target.value
+    setPhone((prev) => formatPhoneInput(next, prev))
   }
 
   // Upload de Logo / Foto (reduzida para caber no armazenamento do aparelho)
