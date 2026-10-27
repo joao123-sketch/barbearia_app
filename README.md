@@ -26,7 +26,8 @@
 | Aviso no celular a cada novo agendamento | Escolhe serviço, profissional e horário livre |
 | Faturamento do dia, da semana e histórico de cortes | Recebe lembrete do horário no celular |
 | Link próprio com a cara do seu negócio (logo, cores, Instagram, endereço) | Não precisa baixar nada nem criar conta |
-| Funciona como app no celular (instala na tela inicial) | Chama o estabelecimento no WhatsApp com um toque |
+| Funciona como app no celular (instala na tela inicial com o nome do seu negócio) | Chama o estabelecimento no WhatsApp com um toque |
+| Pagamento da mensalidade por PIX, com QR Code já com o valor | Vê endereço, Instagram e WhatsApp do negócio em ícones, sem poluição na tela |
 
 ### Oferta
 - **20 dias grátis** para testar, sem precisar de cartão.
@@ -41,8 +42,25 @@
 
 ### Contato / chamada para ação
 - **WhatsApp: (88) 98894-1408** — dúvidas, teste grátis e suporte.
-- Quer ver funcionando? Acesse a **conta de demonstração**: `https://SEU-DOMINIO/b/SLUG-DA-CONTA-DEMO` *(preencher com o link da conta de teste)*.
-- Sugestão de QR Code no panfleto: aponta para o link da conta de demonstração ou para `https://SEU-DOMINIO/cadastrar`.
+- Quer ver funcionando? Acesse uma **conta de demonstração** (os nomes dos clientes são fictícios):
+  - Barbearia: `https://SEU-DOMINIO/b/barbearia-corte-bem` (Barbearia Corte Bem)
+  - Salão de beleza: `https://SEU-DOMINIO/b/salao-fique-linda` (Salão Fique Linda)
+  *(troque `SEU-DOMINIO` pelo endereço real do site)*
+- Sugestão de QR Code no panfleto: aponta para o link da conta de demonstração do tipo de negócio (barbearia ou salão) ou para `https://SEU-DOMINIO/cadastrar` para já criar a conta.
+
+### Fatos verificados (podem ir no panfleto)
+- Teste grátis: 20 dias. Mensalidade: R$ 70,00 por mês, paga antecipada por PIX, cada pagamento libera 30 dias.
+- Funciona para **barbearia** e **salão de beleza** (o painel usa os termos certos de cada um).
+- O cliente agenda pelo link, sem baixar nada. O dono pode instalar como app: no celular ele aparece como **SuaAgenda**; o cliente que instalar a página do negócio vê o nome do estabelecimento na tela inicial.
+- O dono recebe aviso no celular a cada novo agendamento. O cliente recebe lembrete por notificação.
+- O atendimento só aparece como **concluído** depois que o horário termina. O histórico de cortes mostra só o que já aconteceu.
+- Suporte pelo WhatsApp (88) 98894-1408, direto de dentro do painel.
+- O cadastro exige WhatsApp de celular com DDD e o 9 (ex.: (88) 99999-9999) e um e-mail válido, usado para recuperar a senha.
+
+### Ideias de texto para o panfleto
+- **Título:** "Agenda cheia, cabeça tranquila." / "Seu cliente agenda sozinho. Você só atende."
+- **Subtítulo:** "Link de agendamento próprio para sua barbearia ou salão. 20 dias grátis."
+- **Chamada final:** "Teste grátis agora. Chame no WhatsApp (88) 98894-1408."
 
 ### Tom e visual sugeridos
 - Linguagem simples, direta e brasileira. Frases curtas, foco no benefício ("agenda cheia, cabeça tranquila").
@@ -62,8 +80,8 @@
 - **Agendamento em 3 passos:** serviços (com preço e tempo somados na hora) → profissional e horário → nome e WhatsApp.
 - Só mostra horários realmente livres (respeita expediente, almoço, folgas e agendamentos já feitos).
 - **Lembrete no celular** do horário (10 min, 30 min ou 1 hora antes), por notificação.
-- Página do negócio com logo, banner, endereço, Instagram e botão de WhatsApp.
-- **Instalável como app** no Android (1 toque) e no iPhone (tutorial passo a passo na tela).
+- Página do negócio com logo, banner e três ícones de contato: **endereço** (abre a rota no Google Maps), **Instagram** e **WhatsApp**.
+- **Instalável como app** no Android (1 toque) e no iPhone (tutorial passo a passo na tela). Ao instalar, o nome sugerido é o do estabelecimento, com iniciais maiúsculas e sem espaços (ex.: `SalãoFiqueLinda`).
 
 ### Para o dono (painel `/admin`)
 - **Agenda de hoje** com status em tempo real: *Agendado* até o horário passar e *Concluído* automaticamente ao fim do atendimento. Cancelar e reativar quando precisar.
@@ -77,6 +95,8 @@
 - **Notificação no celular** a cada novo agendamento.
 - **Personalização:** 8 estilos visuais (elegante, sofisticado, moderno, minimalista, simples, rosa, azul, neutro), logo, ícone do app, slogan, endereço e Instagram.
 - **Atendimento:** botão de suporte direto no WhatsApp, em Configurações.
+- **Mensalidade por PIX:** QR Code e "PIX copia e cola" gerados na hora, já com o valor da conta (inclusive reajustes agendados).
+- **Instalável como app** com o nome sugerido **SuaAgenda** e a logo do negócio como ícone.
 - Tema claro e escuro.
 
 ### Para a plataforma (painel master `/master`, só administrador)
@@ -84,7 +104,7 @@
 - Confirmação de pagamento por PIX (libera +30 dias), bloqueio e exclusão de contas.
 - Reajuste de mensalidade individual ou em porcentagem para todas.
 - **Métricas de uso por conta**, só totais e sem dados dos clientes finais: data de cadastro, serviços, atendimentos, média de horas atendidas por dia, faturamento do mês, do mês passado e total.
-- Link de cadastro para novos clientes e configuração do PIX/QR Code.
+- Link de cadastro para novos clientes e configuração da chave PIX (o QR Code de cada conta é gerado automaticamente com o valor dela).
 
 ---
 
@@ -116,18 +136,20 @@ VITE_SUPABASE_ANON_KEY=sua-chave-anon-aqui
 ```
 
 ### Banco (Supabase)
-1. Abra o **SQL Editor** e rode, em ordem, os arquivos de `supabase/migrations/` (`0001` até `0009`).
+1. Abra o **SQL Editor** e rode, em ordem, os arquivos de `supabase/migrations/` (`0001` até `0010`).
 2. Crie a sua conta no app e torne-se administrador:
    ```sql
    insert into public.platform_admins (user_id)
    select id from auth.users where email = 'seu@email.com';
    ```
 3. `0009_admin_metrics.sql` habilita as métricas por conta no painel master.
+4. `0010_mobile_and_email_format.sql` trava o WhatsApp no formato celular (DDD + 9 + 8 dígitos) e o e-mail num formato válido; contas antigas com 10 dígitos ganham o 9.
 
 ### Conta de demonstração (para panfleto e vendas)
 1. Crie uma conta normalmente no app.
-2. Abra `supabase/seed_demo_account.sql`, troque o e-mail em `v_email` e rode no SQL Editor.
-3. Ele cria atendimentos fictícios do mês passado até o fim da semana atual. Pode rodar de novo: recria só o que ele mesmo criou (`notes = 'demo'`).
+2. Abra `supabase/seed_demo_account.sql`, troque a lista `v_refs` pelo e-mail ou slug de cada conta de teste (pode ser mais de uma) e rode no SQL Editor.
+3. Ele cria, se a conta ainda não tiver, horário de funcionamento e 5 serviços (de barbearia ou de salão, conforme o tipo da conta) e atendimentos fictícios do mês passado até o fim da semana atual. Pode rodar de novo: recria só o que ele mesmo criou (`notes = 'demo'`).
+4. Não coloque senhas de contas de teste neste arquivo.
 
 ### Deploy
 Cloudflare Workers/Pages com `npm run build` e saída em `dist` (configuração em `wrangler.jsonc`).
