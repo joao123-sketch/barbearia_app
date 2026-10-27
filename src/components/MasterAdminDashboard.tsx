@@ -28,6 +28,7 @@ import { useSession } from '../lib/auth'
 import {
   adminConfirmPayment,
   adminScheduleFee,
+  adminRaiseFeesPercent,
   adminSetShopFee,
   adminSetBlocked,
   deleteShop,
@@ -207,6 +208,21 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSett
     setIsEditingSettings(false)
     setSettingsSaved(true)
     setTimeout(() => setSettingsSaved(false), 3000)
+  }
+
+  // Reajuste percentual de todas as mensalidades (vale no próximo pagamento de cada conta)
+  const [percent, setPercent] = useState('')
+  const handleRaisePercent = async () => {
+    const pct = Number(percent.replace(',', '.'))
+    if (!pct || pct <= -90 || pct > 500) {
+      alert('Informe uma porcentagem válida, por exemplo 10.')
+      return
+    }
+    if (!window.confirm(`Reajustar em ${pct}% a mensalidade de TODAS as contas, a partir do próximo pagamento de cada uma?`)) return
+    if (await run(() => adminRaiseFeesPercent(pct))) {
+      setPercent('')
+      alert(`Pronto! Todas as mensalidades mudam ${pct}% a partir do próximo pagamento.`)
+    }
   }
 
   const handleQrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -638,6 +654,24 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, settings, onSett
                   <span>Aplicar o novo valor também às contas atuais, a partir do próximo pagamento de cada uma (substitui valores personalizados). Desmarcado: só vale para quem se cadastrar daqui para frente.</span>
                 </label>
               )}
+
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <p className="text-slate-300 font-semibold">Reajuste em % para todas as contas</p>
+                <p className="text-slate-400 text-[11px]">Ex.: 10 aumenta 10% (use -5 para reduzir). Vale a partir do próximo pagamento de cada conta e mantém os valores personalizados proporcionais.</p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="10"
+                    value={percent}
+                    onChange={(e) => setPercent(e.target.value)}
+                    className="w-24 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-bold"
+                  />
+                  <button type="button" onClick={handleRaisePercent} className="px-4 py-2 rounded-xl bg-slate-800 text-amber-400 border border-slate-700 font-bold cursor-pointer">
+                    Aplicar %
+                  </button>
+                </div>
+              </div>
 
               <div className="flex gap-2">
                 <button type="submit" className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold cursor-pointer">

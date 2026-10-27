@@ -41,3 +41,20 @@ end $$;
 
 revoke all on function public.admin_set_shop_fee(uuid, numeric, boolean) from public, anon;
 grant execute on function public.admin_set_shop_fee(uuid, numeric, boolean) to authenticated;
+
+-- 4) Reajuste em porcentagem para todas as contas, a partir do próximo pagamento
+create or replace function public.admin_raise_fees_percent(p_percent numeric)
+returns integer
+language plpgsql security definer set search_path = public as $$
+declare n integer;
+begin
+  if not public.is_platform_admin() then raise exception 'forbidden'; end if;
+  if p_percent is null or p_percent <= -90 or p_percent > 500 then raise exception 'invalid_percent'; end if;
+  update public.barbershops
+    set next_monthly_fee = round(coalesce(next_monthly_fee, monthly_fee) * (1 + p_percent / 100.0), 2);
+  get diagnostics n = row_count;
+  return n;
+end $$;
+
+revoke all on function public.admin_raise_fees_percent(numeric) from public, anon;
+grant execute on function public.admin_raise_fees_percent(numeric) to authenticated;

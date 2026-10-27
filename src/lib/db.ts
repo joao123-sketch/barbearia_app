@@ -350,5 +350,9 @@ export const adminSetBlocked = async (shopId: string, blocked: boolean) =>
 export const adminSetShopFee = async (shopId: string, fee: number, applyNow: boolean) =>
   check(await supabase.rpc('admin_set_shop_fee', { p_shop: shopId, p_fee: fee, p_apply_now: applyNow }))
 
+// Reajuste percentual em todas as contas, a partir do próximo pagamento
+export const adminRaiseFeesPercent = async (percent: number) =>
+  check(await supabase.rpc('admin_raise_fees_percent', { p_percent: percent })) as number
+
 export const adminScheduleFee = async (fee: number, shopId?: string) =>
   check(await supabase.rpc('admin_schedule_fee', { p_fee: fee, p_shop: shopId ?? null }))
