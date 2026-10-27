@@ -32,6 +32,17 @@ function logoVersion(value?: string | null): string {
   return h.toString(36) + value.length.toString(36)
 }
 
+// Nome que o celular sugere ao instalar: o dono instala o "SuaAgenda"; o cliente, o nome do estabelecimento
+// com as iniciais maiúsculas e sem espaços (ex.: "salão fique linda" -> "SalãoFiqueLinda").
+// (mesma regra de worker/index.ts)
+function installName(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join('')
+}
+
 export function applyShopPwa(slug: string, name: string, app: 'client' | 'admin', logoUrl?: string | null) {
   const query = app === 'admin' ? '?app=admin' : ''
   // O servidor lê este cookie para já entregar a página do painel com o ícone e o nome do negócio
@@ -46,7 +57,7 @@ export function applyShopPwa(slug: string, name: string, app: 'client' | 'admin'
   const icon = `/icon/${slug}?v=${logoVersion(logoUrl)}`
   setLink('apple-touch-icon', icon)
   setLink('icon', icon)
-  setMeta('apple-mobile-web-app-title', name.length > 14 ? name.slice(0, 14).trim() : name)
+  setMeta('apple-mobile-web-app-title', app === 'admin' ? 'SuaAgenda' : installName(name))
   document.title = app === 'admin' ? `${name} · Painel` : name
 }
 

@@ -73,6 +73,18 @@ function pickIcon(shop: Shop) {
   return source ? parseDataUrl(source) : null
 }
 
+// Nome que o celular sugere ao instalar: o dono instala o "SuaAgenda"; o cliente, o nome do estabelecimento
+// com as iniciais maiúsculas e sem espaços (ex.: "salão fique linda" -> "SalãoFiqueLinda").
+// (mesma regra de src/lib/pwa.ts)
+const OWNER_APP_NAME = 'SuaAgenda'
+function installName(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join('')
+}
+
 async function manifestResponse(slug: string, app: 'client' | 'admin') {
   const shop = await loadShop(slug)
   if (!shop) return new Response('Not found', { status: 404 })
@@ -95,8 +107,8 @@ async function manifestResponse(slug: string, app: 'client' | 'admin') {
   const manifest = {
     // Cliente abre direto no agendamento; dono abre no painel do negócio
     id: isAdmin ? '/admin' : `/b/${shop.slug}`,
-    name: isAdmin ? `${shop.name} · Painel` : shop.name,
-    short_name: shop.name.length > 12 ? shop.name.slice(0, 12).trim() : shop.name,
+    name: isAdmin ? OWNER_APP_NAME : installName(shop.name),
+    short_name: isAdmin ? OWNER_APP_NAME : installName(shop.name),
     description: isAdmin ? `Painel de gestão de ${shop.name}` : `Agende seu horário em ${shop.name}`,
     lang: 'pt-BR',
     start_url: isAdmin ? '/admin' : `/b/${shop.slug}`,
@@ -158,7 +170,7 @@ async function withShopHead(response: Response, shop: Shop, app: 'client' | 'adm
   const icon = pickIcon(shop) ? `/icon/${shop.slug}?v=${logoVersion(shop.logo_url)}` : null
   const manifest = `/manifest/${shop.slug}.webmanifest${app === 'admin' ? '?app=admin' : ''}`
   const title = app === 'admin' ? `${shop.name} · Painel` : shop.name
-  const short = shop.name.length > 14 ? shop.name.slice(0, 14).trim() : shop.name
+  const short = app === 'admin' ? OWNER_APP_NAME : installName(shop.name)
 
   const rewriter = new HTMLRewriter()
     .on('title', { element: (el) => void el.setInnerContent(title) })
