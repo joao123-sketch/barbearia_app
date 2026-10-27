@@ -29,6 +29,13 @@ import { friendlyError } from '../lib/db'
 import type { BusySlot } from '../lib/db'
 import { PWAInstallPrompt } from './PWAInstallPrompt'
 
+const WhatsAppIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 21l1.65-4.85A8.5 8.5 0 1 1 8 19.35L3 21z" />
+    <path d="M9 10c0 3 2 5 5 5l1.5-1.5-2-1-1 .7c-.8-.4-1.5-1.1-1.9-1.9l.7-1-1-2L9 10z" />
+  </svg>
+)
+
 const InstagramIcon = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
@@ -416,24 +423,17 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
           </div>
         </div>
 
-        {/* Contatos: um embaixo do outro */}
-        <div className="shop-contacts flex flex-col gap-2 mb-5 text-xs">
+        {/* Contatos: só os ícones (endereço, Instagram e WhatsApp) */}
+        <div className="flex items-center justify-center gap-4 mb-5">
           <a
             href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(googleMapsQuery)}`}
             target="_blank"
             rel="noopener noreferrer"
             title="Ver rota no Google Maps"
-            className="shop-contact flex items-center gap-3 px-3.5 py-3 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white active:scale-[0.99] transition-transform"
+            aria-label="Endereço: ver rota no Google Maps"
+            className="w-12 h-12 rounded-full flex items-center justify-center bg-slate-900/90 border border-slate-800 text-amber-500 hover:text-amber-400 shadow-md active:scale-95 transition-transform"
           >
-            <MapPin className="w-4 h-4 text-amber-500 shrink-0" />
-            <span className="min-w-0 flex-1">
-              <span className="block text-[10px] uppercase tracking-wide text-slate-400">Endereço</span>
-              <span className="block truncate">
-                {barbershop.street
-                  ? `${barbershop.street}, ${barbershop.number || 'S/N'}${barbershop.neighborhood ? ` - ${barbershop.neighborhood}` : ''}`
-                  : barbershop.address}
-              </span>
-            </span>
+            <MapPin className="w-5 h-5" />
           </a>
 
           {instagramHandle && (
@@ -441,15 +441,11 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               href={`https://instagram.com/${instagramHandle.slice(1)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="shop-contact flex items-center gap-3 px-3.5 py-3 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white active:scale-[0.99] transition-transform"
+              title="Abrir o Instagram"
+              aria-label={`Instagram ${instagramHandle}`}
+              className="w-12 h-12 rounded-full flex items-center justify-center bg-slate-900/90 border border-slate-800 text-pink-400 hover:text-pink-300 shadow-md active:scale-95 transition-transform"
             >
-              <InstagramIcon className="w-4 h-4 text-pink-400 shrink-0" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-[10px] uppercase tracking-wide text-slate-400">Instagram</span>
-                <span className="block truncate">
-                  {instagramHandle}
-                </span>
-              </span>
+              <InstagramIcon className="w-5 h-5" />
             </a>
           )}
 
@@ -457,13 +453,11 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
             href={`https://wa.me/${toWaNumber(barbershop.phone_whatsapp)}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="shop-contact flex items-center gap-3 px-3.5 py-3 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white active:scale-[0.99] transition-transform"
+            title="Chamar no WhatsApp"
+            aria-label="Chamar no WhatsApp"
+            className="w-12 h-12 rounded-full flex items-center justify-center bg-slate-900/90 border border-slate-800 text-emerald-400 hover:text-emerald-300 shadow-md active:scale-95 transition-transform"
           >
-            <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span className="min-w-0 flex-1">
-              <span className="block text-[10px] uppercase tracking-wide text-slate-400">WhatsApp</span>
-              <span className="block truncate">Chamar no WhatsApp</span>
-            </span>
+            <WhatsAppIcon className="w-5 h-5" />
           </a>
         </div>
 
