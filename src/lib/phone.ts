@@ -23,3 +23,19 @@ export function formatPhoneInput(raw: string, previous: string): string {
   if (digits.length > 0) return `(${digits}`
   return ''
 }
+
+// Celular válido: DDD + 9 + 8 dígitos (11 dígitos, o terceiro é sempre 9)
+export function isValidMobile(value: string): boolean {
+  return /^\d{2}9\d{8}$/.test(normalizePhone(value))
+}
+
+export const INVALID_MOBILE_MESSAGE = 'Informe o WhatsApp com DDD e o 9 na frente, por exemplo (88) 99999-9999.'
+
+// E-mail sempre em minúsculas e sem espaços, para o login e a recuperação de senha não falharem por digitação
+export function normalizeEmail(value: string): string {
+  return value.replace(/\s/g, '').toLowerCase()
+}
+
+export function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(normalizeEmail(value))
+}

@@ -19,7 +19,7 @@ import type { Barbershop, Service, Barber, WorkingHour } from '../types'
 import { getStylePreset } from '../lib/stylePresets'
 import { buildShopTheme, getLook, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
 import { getTerms } from '../lib/terms'
-import { formatPhoneInput, toWaNumber } from '../lib/phone'
+import { INVALID_MOBILE_MESSAGE, formatPhoneInput, isValidMobile, toWaNumber } from '../lib/phone'
 import { normalizeInstagram } from '../lib/instagram'
 import { currentPushKeys, notificationPermission, pushSupport, subscribePush } from '../lib/push'
 import { registerClientPush } from '../lib/db'
@@ -237,8 +237,12 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
 
   // Finalizar agendamento: o servidor confere horário, preço e conflito antes de gravar
   const handleFinishBooking = async () => {
-    if (!clientName.trim() || clientPhone.length < 14) {
-      alert('Por favor, informe seu nome e um número de WhatsApp válido.')
+    if (!clientName.trim()) {
+      alert('Por favor, informe seu nome.')
+      return
+    }
+    if (!isValidMobile(clientPhone)) {
+      alert(INVALID_MOBILE_MESSAGE)
       return
     }
     if (submitting) return

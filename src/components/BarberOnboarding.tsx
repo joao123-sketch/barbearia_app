@@ -21,7 +21,7 @@ import { PasswordInput } from './PasswordInput'
 import { normalizeInstagram } from '../lib/instagram'
 import { defaultWorkingHours, fetchMonthlyFee, friendlyError, registerBarbershop, saveWorkingHours } from '../lib/db'
 import { getTerms } from '../lib/terms'
-import { formatPhoneInput, normalizePhone } from '../lib/phone'
+import { INVALID_MOBILE_MESSAGE, formatPhoneInput, isValidEmail, isValidMobile, normalizeEmail, normalizePhone } from '../lib/phone'
 import { TRIAL_DAYS, formatMoney } from '../lib/billing'
 import { BR_STATES } from '../lib/states'
 import { STYLE_PRESETS, STYLE_PRESET_ORDER } from '../lib/stylePresets'
@@ -95,8 +95,8 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
   // Conta já existente com este WhatsApp ou e-mail: sugere entrar em vez de cadastrar de novo
   const [existing, setExisting] = useState<'phone' | 'email' | null>(null)
   useEffect(() => {
-    const phoneOk = normalizePhone(phone).length >= 10
-    const emailOk = !loggedEmail && /^\S+@\S+\.\S+$/.test(email.trim())
+    const phoneOk = isValidMobile(phone)
+    const emailOk = !loggedEmail && isValidEmail(email)
     if (!phoneOk && !emailOk) {
       setExisting(null)
       return
@@ -113,7 +113,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
   // Este WhatsApp já usou o teste grátis (conta apagada antes, por exemplo)? Avisa antes de criar
   const [trialUsed, setTrialUsed] = useState(false)
   useEffect(() => {
-    if (normalizePhone(phone).length < 10) {
+    if (!isValidMobile(phone)) {
       setTrialUsed(false)
       return
     }
@@ -179,11 +179,11 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
       alert('Por favor, informe o nome do seu negócio.')
       return
     }
-    if (phone.replace(/\D/g, '').length < 10) {
-      alert('Por favor, informe um WhatsApp válido com DDD.')
+    if (!isValidMobile(phone)) {
+      alert(INVALID_MOBILE_MESSAGE)
       return
     }
-    if (!loggedEmail && !/^\S+@\S+\.\S+$/.test(email.trim())) {
+    if (!loggedEmail && !isValidEmail(email)) {
       alert('Informe um e-mail válido. Ele é usado para recuperar a sua senha.')
       return
     }
@@ -663,7 +663,11 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
                     required
                     placeholder="seuemail@gmail.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    inputMode="email"
+                    onChange={(e) => setEmail(normalizeEmail(e.target.value))}
                     className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-xs"
                   />
                 </div>

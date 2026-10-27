@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { KeyRound, Mail, Phone, Check } from 'lucide-react'
 import { changeEmail, changePassword, currentEmail } from '../lib/auth'
 import { friendlyError } from '../lib/db'
-import { normalizePhone } from '../lib/phone'
+import { INVALID_MOBILE_MESSAGE, formatPhoneInput, isValidEmail, isValidMobile, normalizeEmail, normalizePhone } from '../lib/phone'
 import { PasswordInput } from './PasswordInput'
 
 interface AccountSettingsProps {
@@ -68,7 +68,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ phone, onChang
 
   const saveEmail = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!/^\S+@\S+\.\S+$/.test(newEmail.trim())) {
+    if (!isValidEmail(newEmail)) {
       setError('Informe um e-mail válido.')
       return
     }
@@ -84,8 +84,8 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ phone, onChang
   const savePhone = (e: React.FormEvent) => {
     e.preventDefault()
     const digits = normalizePhone(newPhone)
-    if (digits.length < 10 || digits.length > 11) {
-      setError('Informe um WhatsApp válido com DDD.')
+    if (!isValidMobile(digits)) {
+      setError(INVALID_MOBILE_MESSAGE)
       return
     }
     run(async () => {
@@ -148,7 +148,9 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ phone, onChang
                 autoCapitalize="none"
                 placeholder="Novo e-mail"
                 value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
+                autoCorrect="off"
+                spellCheck={false}
+                onChange={(e) => setNewEmail(normalizeEmail(e.target.value))}
                 className={field}
               />
               <PasswordInput
@@ -176,7 +178,10 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ phone, onChang
                 required
                 placeholder="(11) 99999-9999"
                 value={newPhone}
-                onChange={(e) => setNewPhone(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setNewPhone((prev) => formatPhoneInput(next, prev))
+                }}
                 className={field}
               />
               {error && <p className="text-rose-400">{error}</p>}

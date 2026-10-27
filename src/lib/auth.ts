@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { clearOwnerCache } from './ownerCache'
+import { normalizeEmail } from './phone'
 
 // Sessão do Supabase Auth (fica guardada no navegador e renova sozinha)
 // Lê a sessão guardada no aparelho de forma imediata: quem já estava logado não vê tela de carregamento
@@ -39,7 +40,7 @@ export function useSession() {
 
 // "Usuário" pode ser o e-mail ou o WhatsApp: o banco devolve o e-mail da conta
 export async function signIn(identifier: string, password: string) {
-  const { data: email } = await supabase.rpc('email_for_login', { p_identifier: identifier.trim() })
+  const { data: email } = await supabase.rpc('email_for_login', { p_identifier: identifier.includes('@') ? normalizeEmail(identifier) : identifier.trim() })
   if (!email) throw new Error('Invalid login credentials')
   const { error } = await supabase.auth.signInWithPassword({ email, password })
   if (error) throw error

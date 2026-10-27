@@ -4,6 +4,7 @@ import { Lock, User, Mail, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-re
 import { buildShopTheme, getModeFor, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
 import { requestPasswordReset, signIn } from '../lib/auth'
 import { friendlyError } from '../lib/db'
+import { normalizeEmail } from '../lib/phone'
 import { BarberOnboarding } from './BarberOnboarding'
 import { PasswordInput } from './PasswordInput'
 
@@ -215,7 +216,11 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
                     required
                     placeholder="seuemail@gmail.com"
                     value={recoveryEmail}
-                    onChange={(e) => setRecoveryEmail(e.target.value)}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    inputMode="email"
+                    onChange={(e) => setRecoveryEmail(normalizeEmail(e.target.value))}
                     className={inputClass}
                   />
                 </div>
