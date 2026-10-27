@@ -3,7 +3,7 @@
 --
 -- Como usar:
 --  1) Crie a conta normalmente no app (cadastro) e cadastre os serviços que quiser.
---  2) Troque o e-mail em v_email abaixo pelo e-mail da conta de teste.
+--  2) Troque a lista v_refs abaixo pelo e-mail (ou slug) de cada conta de teste.
 --  3) Rode tudo no SQL Editor do Supabase. Pode rodar de novo: ele apaga só os
 --     agendamentos marcados como demo (notes = 'demo') e recria.
 --
@@ -15,7 +15,9 @@
 -- ==============================================================
 do $$
 declare
-  v_email text := 'COLOQUE_AQUI_O_EMAIL_DA_CONTA_DE_TESTE';
+  v_refs text[] := array['COLOQUE_AQUI_O_EMAIL_OU_SLUG_DA_CONTA_DE_TESTE'];
+  v_ref text;
+  v_type text;
 
   v_shop uuid;
   v_barber uuid;
@@ -46,9 +48,11 @@ declare
   v_status text;
   v_start timestamp;
 begin
-  select id into v_shop from public.barbershops where owner_email = lower(trim(v_email));
+  foreach v_ref in array v_refs loop
+  select id, business_type into v_shop, v_type from public.barbershops
+  where owner_email = lower(trim(v_ref)) or slug = lower(trim(v_ref));
   if v_shop is null then
-    raise exception 'Não achei conta com o e-mail %. Crie a conta no app primeiro e confira o e-mail.', v_email;
+    raise exception 'Não achei conta com o e-mail ou slug %. Crie a conta no app primeiro e confira.', v_ref;
   end if;
 
   -- Horário de funcionamento (só se ainda não existir)
@@ -65,12 +69,21 @@ begin
 
   -- Serviços de exemplo (só se a conta ainda não tiver nenhum)
   if not exists (select 1 from public.services where barbershop_id = v_shop) then
-    insert into public.services (barbershop_id, name, description, duration_minutes, price, category) values
-      (v_shop, 'Corte Masculino', 'Corte na tesoura ou máquina', 30, 45, 'Cabelo'),
-      (v_shop, 'Barba', 'Barba completa com toalha quente', 30, 35, 'Barba'),
-      (v_shop, 'Corte + Barba', 'Combo completo', 60, 75, 'Combos'),
-      (v_shop, 'Sobrancelha', 'Design na navalha', 15, 20, 'Estética'),
-      (v_shop, 'Pigmentação', 'Pigmentação de barba ou cabelo', 60, 90, 'Estética');
+    if v_type = 'salao' then
+      insert into public.services (barbershop_id, name, description, duration_minutes, price, category) values
+        (v_shop, 'Corte Feminino', 'Corte com finalização', 60, 80, 'Cabelo'),
+        (v_shop, 'Escova', 'Escova modelada', 45, 55, 'Cabelo'),
+        (v_shop, 'Hidratação', 'Hidratação profunda', 60, 90, 'Tratamentos'),
+        (v_shop, 'Manicure', 'Mãos com esmaltação', 45, 35, 'Unhas'),
+        (v_shop, 'Pedicure', 'Pés com esmaltação', 45, 40, 'Unhas');
+    else
+      insert into public.services (barbershop_id, name, description, duration_minutes, price, category) values
+        (v_shop, 'Corte Masculino', 'Corte na tesoura ou máquina', 30, 45, 'Cabelo'),
+        (v_shop, 'Barba', 'Barba completa com toalha quente', 30, 35, 'Barba'),
+        (v_shop, 'Corte + Barba', 'Combo completo', 60, 75, 'Combos'),
+        (v_shop, 'Sobrancelha', 'Design na navalha', 15, 20, 'Estética'),
+        (v_shop, 'Pigmentação', 'Pigmentação de barba ou cabelo', 60, 90, 'Estética');
+    end if;
   end if;
 
   select array_agg(id) into v_svc from public.services where barbershop_id = v_shop and active;
@@ -120,5 +133,7 @@ begin
     end loop;
   end loop;
 
-  raise notice 'Pronto! % atendimentos criados de % até %.', v_count, v_from, v_to;
+  raise notice 'Conta %: % atendimentos criados de % até %.', v_ref, v_count, v_from, v_to;
+  v_count := 0;
+  end loop;
 end $$;
