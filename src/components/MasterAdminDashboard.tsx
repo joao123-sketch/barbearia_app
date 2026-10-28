@@ -282,12 +282,12 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
   // KPIs
   const totalShops = barbershops.length
   const trialShops = barbershops.filter((s) => getBillingState(s, settings.grace_days).status === 'trial').length
-  const paidShops = barbershops.filter((s) => getBillingState(s, settings.grace_days).status === 'active').length
+  const paidShops = barbershops.filter((s) => !s.billing_exempt && getBillingState(s, settings.grace_days).status === 'active').length
   const expiredShops = barbershops.filter((s) => getBillingState(s, settings.grace_days).status === 'expired').length
   const blockedShops = barbershops.filter((s) => getBillingState(s, settings.grace_days).status === 'blocked').length
   // Receita recorrente: só quem está com o período pago em dia
   const totalMRR = barbershops
-    .filter((s) => getBillingState(s, settings.grace_days).status === 'active')
+    .filter((s) => !s.billing_exempt && getBillingState(s, settings.grace_days).status === 'active')
     .reduce((acc, curr) => acc + (curr.monthly_fee || settings.monthly_fee), 0)
 
   // Quanto os clientes faturaram usando o app (só atendimentos já concluídos)
@@ -874,7 +874,9 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                                 : 'bg-slate-800 text-slate-400 border border-slate-700'
                             }`}
                           >
-                            {isActive
+                            {shop.billing_exempt
+                              ? 'Isenta (administradora)'
+                              : isActive
                               ? 'Pago'
                               : isTrial
                               ? `Teste grátis (${billing.daysLeft}d)`
@@ -892,6 +894,10 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                         <div className="flex items-center gap-2.5 mt-1 text-xs text-slate-400 flex-wrap">
                           <span className="font-mono text-amber-300">/{shop.slug}</span>
                           <span>•</span>
+                          {shop.billing_exempt ? (
+                            <span>Sem mensalidade</span>
+                          ) : (
+                          <>
                           <span>
                             Mensalidade: <strong className="text-white">R$ {formatMoney(shop.monthly_fee || settings.monthly_fee)}</strong>
                             {shop.monthly_fee > 0 && shop.monthly_fee !== settings.monthly_fee && (
@@ -909,6 +915,8 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                           <span>
                             {isTrial ? 'Teste até' : isActive ? 'Pago até' : 'Venceu em'}: <strong className="text-slate-200">{formatBR(billing.dueDate)}</strong>
                           </span>
+                          </>
+                          )}
                         </div>
 
                         {shop.address && (

@@ -80,7 +80,7 @@ export const graceUpdatePayload = (days: number, nowIso: string) => {
 
 // Campos que o servidor muda sozinho (pagamento confirmado, bloqueio, reajuste). A releitura periódica do painel
 // do dono atualiza só estes e nunca mexe no que a pessoa está editando (nome, logo, textos...).
-const BILLING_FIELDS = ['subscription_status', 'next_billing_date', 'monthly_fee', 'next_monthly_fee', 'last_payment_date'] as const
+const BILLING_FIELDS = ['subscription_status', 'next_billing_date', 'monthly_fee', 'next_monthly_fee', 'last_payment_date', 'billing_exempt'] as const
 
 export function mergeBillingFields(current: Barbershop, fresh: Barbershop): Barbershop {
   const changed = BILLING_FIELDS.some((f) => current[f] !== fresh[f])
@@ -119,6 +119,9 @@ export function getBillingState(shop: Barbershop, graceDays = DEFAULT_GRACE_DAYS
   const daysLeft = dayNumber(dueDate) - dayNumber(todayBR(now))
   const overdueDays = Math.max(0, -daysLeft)
   const graceDaysLeft = Math.max(0, graceDays - overdueDays)
+
+  // Conta de administrador não paga: o banco já a mantém ativa, e aqui nada a bloqueia nem a cobra
+  if (shop.billing_exempt) return { status: 'active', dueDate, daysLeft: Math.max(daysLeft, 1), overdueDays: 0, graceDaysLeft: graceDays }
 
   let status: BillingStatus
   let blockReason: BlockReason | undefined

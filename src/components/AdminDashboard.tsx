@@ -987,8 +987,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         <main className="max-w-4xl mx-auto px-3 sm:px-4 py-5 space-y-5 flex-1 w-full">
         {/* ===================== COBRANÇA: AVISO DE VENCIMENTO / MENSALIDADE VENCIDA ===================== */}
-        <BillingBanner barbershop={barbershop} platform={platform} onPay={() => setShowPayModal(true)} />
-        <BillingEntryNotice barbershop={barbershop} platform={platform} onPay={() => setShowPayModal(true)} />
+        {!barbershop.billing_exempt && (
+          <>
+            <BillingBanner barbershop={barbershop} platform={platform} onPay={() => setShowPayModal(true)} />
+            <BillingEntryNotice barbershop={barbershop} platform={platform} onPay={() => setShowPayModal(true)} />
+          </>
+        )}
         {showPayModal && (
           <BillingPayModal
             barbershop={barbershop}
@@ -2312,7 +2316,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               )}
 
-              <BillingPanel barbershop={barbershop} platform={platform} onPaid={async () => { await onReload?.() }} />
+              {barbershop.billing_exempt ? (
+                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-200 leading-relaxed">
+                  <strong className="text-emerald-300">Conta administradora.</strong> Esta conta não paga mensalidade e nunca é bloqueada.
+                </div>
+              ) : (
+                <BillingPanel barbershop={barbershop} platform={platform} onPaid={async () => { await onReload?.() }} />
+              )}
             </div>
 
             {/* SEÇÃO DE ESTILO VISUAL / PALETA DE CORES */}
