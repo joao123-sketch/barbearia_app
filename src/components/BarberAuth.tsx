@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Lock, User, Mail, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { buildShopTheme, getModeFor, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
 import { requestPasswordReset, signIn } from '../lib/auth'
@@ -7,6 +7,7 @@ import { friendlyError } from '../lib/db'
 import { normalizeEmail } from '../lib/phone'
 import { BarberOnboarding } from './BarberOnboarding'
 import { PasswordInput } from './PasswordInput'
+import { LandingPage } from './LandingPage'
 
 interface BarberAuthProps {
   hasSession: boolean
@@ -15,7 +16,26 @@ interface BarberAuthProps {
   onRegistered: () => Promise<void>
 }
 
-type View = 'login' | 'forgot' | 'register'
+type View = 'home' | 'login' | 'forgot' | 'register'
+
+// Entrar e recuperação usam o visual neutro (a página inicial tem o seu próprio)
+const NeutralChrome: React.FC = () => {
+  useShopChrome('neutro', getModeFor('neutro', null))
+  return null
+}
+
+// Quem chega pelo link de cadastro vai direto ao formulário; quem foi mandado ao login (?next) ou abriu o app
+// instalado vai direto a entrar; os demais veem a página inicial com as informações do SuaAgenda.
+function initialView(pathname: string, hasNext: boolean): View {
+  if (/^\/cadastr/.test(pathname)) return 'register'
+  if (hasNext) return 'login'
+  try {
+    if (window.matchMedia('(display-mode: standalone)').matches) return 'login'
+  } catch {
+    // sem suporte: mostra a página inicial
+  }
+  return 'home'
+}
 
 const inputClass =
   'w-full px-3.5 py-3 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-sm'
@@ -24,10 +44,11 @@ const primaryClass =
 
 export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, shopLoading, onRegistered }) => {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const [params] = useSearchParams()
   const next = params.get('next') || '/admin'
 
-  const [view, setView] = useState<View>('login')
+  const [view, setView] = useState<View>(() => initialView(pathname, params.has('next')))
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -37,9 +58,7 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
   const [recoveryEmail, setRecoveryEmail] = useState('')
   const [recoverySent, setRecoverySent] = useState(false)
 
-  // Entrada e recuperação usam o visual neutro; o cadastro muda conforme o estilo escolhido
   const neutralMode = getModeFor('neutro', null)
-  useShopChrome('neutro', neutralMode)
 
   // Quem já está logado vai direto ao painel; logado sem negócio completa o cadastro
   useEffect(() => {
@@ -99,12 +118,17 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
     )
   }
 
+  if (view === 'home') {
+    return <LandingPage onSignup={() => goTo('register')} onLogin={() => goTo('login')} />
+  }
+
   return (
     <div
       {...shopThemeAttrs('neutro')}
       style={buildShopTheme('neutro', neutralMode)}
       className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center px-4 py-8 select-none"
     >
+      <NeutralChrome />
       <div className="w-full max-w-sm mx-auto space-y-6">
         <div className="text-center space-y-3">
           <h1 className="text-2xl font-black text-white tracking-tight">
@@ -182,6 +206,14 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
                 className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold text-sm cursor-pointer active:scale-95 transition-all"
               >
                 Cadastrar conta
+              </button>
+              <button
+                type="button"
+                onClick={() => goTo('home')}
+                className="mt-3 w-full flex items-center justify-center gap-1.5 text-xs text-slate-400 hover:text-amber-400 cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Conhecer o SuaAgenda</span>
               </button>
             </div>
           </form>

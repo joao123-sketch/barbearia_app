@@ -70,7 +70,11 @@ export function applyDefaultPwa(pathname: string) {
   const isSignIn = pathname.startsWith('/login') || pathname.startsWith('/cadastr') || pathname.startsWith('/redefinir')
   setLink('icon', isSignIn ? '/favicon-js.png' : '/icon-192.png')
   setMeta('apple-mobile-web-app-title', 'SuaAgenda')
-  document.title = isAdminArea ? 'Painel | SuaAgenda' : 'SuaAgenda | Agendamento Online'
+  document.title = isSignIn
+    ? 'SuaAgenda | Agenda online para barbearias e salões'
+    : isAdminArea
+      ? 'Painel | SuaAgenda'
+      : 'SuaAgenda | Agendamento Online'
 }
 
 export function registerServiceWorker() {
