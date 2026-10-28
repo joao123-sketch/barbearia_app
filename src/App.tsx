@@ -149,6 +149,7 @@ function AdminRoute({
         await signOut()
         navigate('/login')
       }}
+      onReload={owner.reload}
       onUpdateAppointments={owner.updateAppointments}
       onUpdateServices={owner.updateServices}
       onUpdateBarbers={owner.updateBarbers}

@@ -40,6 +40,8 @@ import {
   isPlatformAdmin,
   savePlatformSettingsDb
 } from '../lib/db'
+import { MasterAlerts } from './MasterAlerts'
+import { MasterPayments } from './MasterPayments'
 import { TRIAL_DAYS, formatBR, formatMoney, getBillingState } from '../lib/billing'
 import { normalizePhone, toWaNumber } from '../lib/phone'
 import { fileToResizedDataUrl } from '../lib/image'
@@ -110,7 +112,7 @@ export const MasterAdminDashboard: React.FC = () => {
   )
 
   if (state === 'loading') {
-    return themed(<div className="min-h-screen bg-slate-950 text-slate-300 flex items-center justify-center text-sm">Carregando...</div>)
+    return themed(<div className="min-h-screen bg-slate-950 text-slate-300 flex items-center justify-center text-sm">Carregando…</div>)
   }
   if (state === 'denied') {
     return themed(
@@ -177,6 +179,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
   const [isEditingSettings, setIsEditingSettings] = useState(false)
   const [applyFeeToAll, setApplyFeeToAll] = useState(false)
   const [settingsSaved, setSettingsSaved] = useState(false)
+  const [offsetsText, setOffsetsText] = useState(settings.reminder_offsets.join(', '))
 
   // Modal de edição individual de barbearia
   const [editingShop, setEditingShop] = useState<Barbershop | null>(null)
@@ -198,7 +201,18 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
       pix_name: draft.pix_name.trim(),
       pix_bank: draft.pix_bank.trim(),
       pix_qrcode: draft.pix_qrcode,
-      contact_whatsapp: normalizePhone(draft.contact_whatsapp)
+      contact_whatsapp: normalizePhone(draft.contact_whatsapp),
+      grace_days: Math.min(60, Math.max(0, Math.round(Number(draft.grace_days)))),
+      invoice_lead_days: Math.min(30, Math.max(0, Math.round(Number(draft.invoice_lead_days)))),
+      reminder_offsets: Array.from(
+        new Set(
+          offsetsText
+            .split(/[\s,;]+/)
+            .filter(Boolean)
+            .map(Number)
+            .filter((n) => Number.isInteger(n) && n >= -30 && n <= 90)
+        )
+      ).sort((a, b) => a - b)
     }
     if (!clean.pix_key) {
       alert('Informe a chave PIX.')
@@ -259,19 +273,19 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
         shop.phone_whatsapp.includes(searchTerm.replace(/\D/g, '') || searchTerm)
 
       if (filterStatus === 'all') return matchesSearch
-      return matchesSearch && getBillingState(shop).status === filterStatus
+      return matchesSearch && getBillingState(shop, settings.grace_days).status === filterStatus
     })
   }, [barbershops, searchTerm, filterStatus])
 
   // KPIs
   const totalShops = barbershops.length
-  const trialShops = barbershops.filter((s) => getBillingState(s).status === 'trial').length
-  const paidShops = barbershops.filter((s) => getBillingState(s).status === 'active').length
-  const expiredShops = barbershops.filter((s) => getBillingState(s).status === 'expired').length
-  const blockedShops = barbershops.filter((s) => getBillingState(s).status === 'blocked').length
+  const trialShops = barbershops.filter((s) => getBillingState(s, settings.grace_days).status === 'trial').length
+  const paidShops = barbershops.filter((s) => getBillingState(s, settings.grace_days).status === 'active').length
+  const expiredShops = barbershops.filter((s) => getBillingState(s, settings.grace_days).status === 'expired').length
+  const blockedShops = barbershops.filter((s) => getBillingState(s, settings.grace_days).status === 'blocked').length
   // Receita recorrente: só quem está com o período pago em dia
   const totalMRR = barbershops
-    .filter((s) => getBillingState(s).status === 'active')
+    .filter((s) => getBillingState(s, settings.grace_days).status === 'active')
     .reduce((acc, curr) => acc + (curr.monthly_fee || settings.monthly_fee), 0)
 
   // Quanto os clientes faturaram usando o app (só atendimentos já concluídos)
@@ -388,7 +402,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
 
             <button
               onClick={handleCopyPix}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/40 text-xs text-slate-300 hover:text-white transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/40 text-xs text-slate-300 hover:text-white transition cursor-pointer"
             >
               <span className="font-mono font-bold text-amber-400">{settings.pix_key}</span>
               {copiedPix ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
@@ -398,6 +412,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-5 space-y-5">
+        <MasterAlerts />
         {/* ===================== LINK PARA ENVIAR AOS BARBEIROS (CADASTRO) ===================== */}
         <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-500/20 via-slate-900 to-slate-900 border border-amber-500/40 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
           <div className="flex items-start gap-3.5">
@@ -427,7 +442,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
           <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
             <button
               onClick={handleCopyRegisterLink}
-              className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-md ${
+              className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-md ${
                 copiedRegisterLink
                   ? 'bg-emerald-500 text-slate-950'
                   : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/20'
@@ -441,7 +456,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
               href="/cadastrar"
               target="_blank"
               rel="noopener noreferrer"
-              className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
             >
               <ExternalLink className="w-4 h-4 text-amber-400" />
               <span>Testar Cadastro</span>
@@ -457,6 +472,9 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                 <img
                   src={settings.pix_qrcode}
                   alt="QR Code Banco Inter"
+                  width={96}
+                  height={96}
+                  loading="lazy"
                   className="w-24 h-24 object-contain"
                 />
               </div>
@@ -500,7 +518,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
               <DollarSign className="w-4 h-4 text-emerald-400" />
             </div>
             <p className="text-2xl font-black text-emerald-400">
-              R$ {totalMRR.toFixed(2).replace('.', ',')}
+              R$ {formatMoney(totalMRR)}
             </p>
             <p className="text-[10px] text-slate-400 mt-0.5">de quem já pagou</p>
           </div>
@@ -560,6 +578,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
               <button
                 onClick={() => {
                   setDraft(settings)
+                  setOffsetsText(settings.reminder_offsets.join(', '))
                   setIsEditingSettings(true)
                 }}
                 className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center gap-1 cursor-pointer shrink-0"
@@ -579,7 +598,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
           {!isEditingSettings ? (
             <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-4 items-center">
               <div className="p-1.5 rounded-xl bg-white w-fit">
-                <img src={settings.pix_qrcode} alt="QR Code PIX" className="w-24 h-24 object-contain" />
+                <img src={settings.pix_qrcode} alt="QR Code PIX" width={96} height={96} loading="lazy" className="w-24 h-24 object-contain" />
               </div>
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
                 <div>
@@ -598,6 +617,18 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                   <dt className="text-slate-400 text-[11px]">Banco</dt>
                   <dd className="text-white">{settings.pix_bank}</dd>
                 </div>
+                <div>
+                  <dt className="text-slate-400 text-[11px]">Carência até bloquear</dt>
+                  <dd className="text-white">{settings.grace_days} dias de atraso</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-400 text-[11px]">Fatura criada com antecedência de</dt>
+                  <dd className="text-white">{settings.invoice_lead_days} dias</dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-slate-400 text-[11px]">Avisos ao dono (dias em relação ao vencimento)</dt>
+                  <dd className="text-white font-mono">{settings.reminder_offsets.length ? settings.reminder_offsets.map((n) => (n > 0 ? `+${n}` : String(n))).join('  ') : 'Nenhum'}</dd>
+                </div>
                 <div className="sm:col-span-2">
                   <dt className="text-slate-400 text-[11px]">WhatsApp para comprovantes</dt>
                   <dd className="text-white">{settings.contact_whatsapp || 'Não informado (o botão de comprovante fica oculto para os donos)'}</dd>
@@ -608,8 +639,8 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
             <form onSubmit={handleSaveSettings} className="space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Mensalidade (R$)</label>
-                  <input
+                  <label className="block text-slate-300 font-semibold mb-1" htmlFor="mst-637">Mensalidade (R$)</label>
+                  <input name="mst-637" autoComplete="off" id="mst-637"
                     type="number"
                     step="0.01"
                     min="1"
@@ -619,8 +650,8 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Chave PIX</label>
-                  <input
+                  <label className="block text-slate-300 font-semibold mb-1" htmlFor="mst-648">Chave PIX</label>
+                  <input name="mst-648" autoComplete="off" id="mst-648"
                     type="text"
                     required
                     value={draft.pix_key}
@@ -629,8 +660,8 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Nome do titular</label>
-                  <input
+                  <label className="block text-slate-300 font-semibold mb-1" htmlFor="mst-658">Nome do titular</label>
+                  <input name="mst-658" autoComplete="off" id="mst-658"
                     type="text"
                     value={draft.pix_name}
                     onChange={(e) => setDraft({ ...draft, pix_name: e.target.value })}
@@ -638,8 +669,8 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-slate-300 font-semibold mb-1">Seu WhatsApp para receber comprovantes</label>
-                  <input
+                  <label className="block text-slate-300 font-semibold mb-1" htmlFor="mst-667">Seu WhatsApp para receber comprovantes</label>
+                  <input name="mst-667" autoComplete="off" id="mst-667"
                     type="tel"
                     placeholder="(11) 99999-9999"
                     value={draft.contact_whatsapp}
@@ -648,8 +679,43 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Banco</label>
-                  <input
+                  <label className="block text-slate-300 font-semibold mb-1" htmlFor="mst-677">Carência até bloquear (dias de atraso)</label>
+                  <input name="mst-677" autoComplete="off" id="mst-677"
+                    type="number"
+                    min="0"
+                    max="60"
+                    value={draft.grace_days}
+                    onChange={(e) => setDraft({ ...draft, grace_days: Number(e.target.value) })}
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-amber-500 focus:outline-none text-white font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1" htmlFor="mst-688">Criar a fatura com quantos dias de antecedência</label>
+                  <input name="mst-688" autoComplete="off" id="mst-688"
+                    type="number"
+                    min="0"
+                    max="30"
+                    value={draft.invoice_lead_days}
+                    onChange={(e) => setDraft({ ...draft, invoice_lead_days: Number(e.target.value) })}
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-amber-500 focus:outline-none text-white font-bold"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-slate-300 font-semibold mb-1" htmlFor="mst-699">Dias de aviso ao dono (separe por vírgula)</label>
+                  <input name="mst-699" autoComplete="off" id="mst-699"
+                    type="text"
+                    value={offsetsText}
+                    onChange={(e) => setOffsetsText(e.target.value)}
+                    placeholder="-5, -1, 0, 1, 3, 5, 7, 9, 11, 14, 18, 24, 30"
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-amber-500 focus:outline-none text-white font-mono"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Negativo = antes do vencimento, 0 = no dia, positivo = dias de atraso. Cada marco gera um aviso só. O bloqueio acontece no dia seguinte ao último dia de carência.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1" htmlFor="mst-712">Banco</label>
+                  <input name="mst-712" autoComplete="off" id="mst-712"
                     type="text"
                     value={draft.pix_bank}
                     onChange={(e) => setDraft({ ...draft, pix_bank: e.target.value })}
@@ -660,13 +726,13 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
 
               <div className="flex items-center gap-3">
                 <div className="p-1.5 rounded-xl bg-white shrink-0">
-                  <img src={draft.pix_qrcode} alt="QR Code PIX" className="w-20 h-20 object-contain" />
+                  <img src={draft.pix_qrcode} alt="QR Code PIX" width={80} height={80} loading="lazy" className="w-20 h-20 object-contain" />
                 </div>
                 <div className="space-y-1.5">
                   <input type="file" accept="image/*" onChange={handleQrUpload} className="hidden" id="master-qr-upload" />
                   <label
                     htmlFor="master-qr-upload"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold cursor-pointer active:scale-95 transition-all"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold cursor-pointer active:scale-95 transition"
                   >
                     <Camera className="w-3.5 h-3.5" />
                     <span>Trocar QR Code</span>
@@ -691,7 +757,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                 <p className="text-slate-300 font-semibold">Reajuste em % para todas as contas</p>
                 <p className="text-slate-400 text-[11px]">Ex.: 10 aumenta 10% (use -5 para reduzir). Vale a partir do próximo pagamento de cada conta e mantém os valores personalizados proporcionais.</p>
                 <div className="flex gap-2">
-                  <input
+                  <input name="campo-755" autoComplete="off" aria-label="10"
                     type="text"
                     inputMode="decimal"
                     placeholder="10"
@@ -725,9 +791,9 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
         <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
+            <input name="campo-789" autoComplete="off" aria-label="Buscar por nome, link ou WhatsApp…"
               type="text"
-              placeholder="Buscar por nome, link ou WhatsApp..."
+              placeholder="Buscar por nome, link ou WhatsApp…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-amber-500 focus:outline-none text-xs text-white"
@@ -745,7 +811,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
               <button
                 key={st.id}
                 onClick={() => setFilterStatus(st.id)}
-                className={`px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer ${
                   filterStatus === st.id
                     ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                     : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
@@ -757,6 +823,8 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
           </div>
         </div>
 
+        <MasterPayments onChanged={reload} />
+
         {/* ===================== LISTA DE CLIENTES / BARBEARIAS ===================== */}
         <div className="space-y-3">
           {filteredShops.length === 0 ? (
@@ -765,7 +833,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
             </div>
           ) : (
             filteredShops.map((shop) => {
-              const billing = getBillingState(shop)
+              const billing = getBillingState(shop, settings.grace_days)
               const isBlocked = billing.status === 'blocked'
               const isExpired = billing.status === 'expired'
               const isTrial = billing.status === 'trial'
@@ -774,7 +842,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
               return (
                 <div
                   key={shop.id}
-                  className={`p-4 rounded-2xl border transition-all ${
+                  className={`p-4 rounded-2xl border transition ${
                     isBlocked
                       ? 'bg-rose-950/20 border-rose-900/60'
                       : isExpired
@@ -787,7 +855,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                     <div className="flex items-start gap-3 min-w-0">
                       <div className="w-12 h-12 rounded-xl overflow-hidden border border-slate-700 bg-slate-800 shrink-0">
                         {shop.logo_url ? (
-                          <img src={shop.logo_url} alt={shop.name} className="w-full h-full object-cover" />
+                          <img src={shop.logo_url} alt={shop.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-amber-400 font-black">
                             {shop.name.trim().charAt(0).toUpperCase()}
@@ -822,8 +890,12 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                               : isTrial
                               ? `Teste grátis (${billing.daysLeft}d)`
                               : isExpired
-                              ? 'Vencido'
-                              : 'Bloqueado'}
+                              ? `Vencido há ${billing.overdueDays}d`
+                              : billing.blockReason === 'overdue'
+                              ? 'Bloqueado por atraso'
+                              : billing.blockReason === 'first_payment'
+                              ? 'Falta 1º pagamento'
+                              : 'Suspenso'}
                           </span>
                         </div>
 
@@ -966,7 +1038,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
 
       {/* ===================== MODAL DE EDIÇÃO DE MENSALIDADE INDIVIDUAL ===================== */}
       {editingShop && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overscroll-contain">
           <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-5 text-slate-100 shadow-2xl">
             <h3 className="font-bold text-base text-white mb-1">
               Editar Mensalidade
@@ -975,12 +1047,12 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
 
             <form onSubmit={handleSaveEdit} className="space-y-3.5 text-xs">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">
+                <label className="block text-slate-300 font-semibold mb-1" htmlFor="mst-1045">
                   Valor da Mensalidade (R$)
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400">R$</span>
-                  <input
+                  <input name="mst-1045" autoComplete="off" id="mst-1045"
                     type="number"
                     step="0.01"
                     min="0"
@@ -1027,7 +1099,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
 
       {/* ===================== MODAL DE EXCLUSÃO COM TRAVA DE SEGURANÇA ===================== */}
       {shopToDelete && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overscroll-contain">
           <div className="w-full max-w-sm bg-slate-900 border border-rose-500/50 rounded-3xl p-6 text-slate-100 shadow-2xl space-y-4">
             <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
               <AlertTriangle className="w-6 h-6" />
@@ -1041,10 +1113,10 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
             </div>
 
             <div className="space-y-2 text-xs">
-              <label className="block text-slate-300 font-semibold">
+              <label className="block text-slate-300 font-semibold" htmlFor="mst-1111">
                 Digite exatamente <strong className="text-rose-400">Excluir</strong> para confirmar:
               </label>
-              <input
+              <input name="mst-1111" autoComplete="off" id="mst-1111"
                 type="text"
                 placeholder="Excluir"
                 value={deleteInputText}
@@ -1065,7 +1137,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                 type="button"
                 disabled={deleteInputText.trim() !== 'Excluir'}
                 onClick={handleExecuteDelete}
-                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs cursor-pointer transition-all"
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs cursor-pointer transition"
               >
                 Confirmar Exclusão
               </button>

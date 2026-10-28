@@ -290,10 +290,10 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
 
               {/* TIPO DE NEGÓCIO */}
               <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/80 space-y-2.5">
-                <label className="block text-slate-200 font-semibold flex items-center gap-1.5 text-xs">
+                <p className="block text-slate-200 font-semibold flex items-center gap-1.5 text-xs">
                   <Store className="w-3.5 h-3.5 text-amber-400" />
                   <span>Qual é o seu negócio? *</span>
-                </label>
+                </p>
                 <div className="grid grid-cols-2 gap-2">
                   {([
                     { id: 'barbearia', label: 'Barbearia', icon: '💈' },
@@ -303,7 +303,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
                       key={opt.id}
                       type="button"
                       onClick={() => setBusinessType(opt.id)}
-                      className={`p-3 rounded-xl border text-center transition-all cursor-pointer ${
+                      className={`p-3 rounded-xl border text-center transition cursor-pointer ${
                         businessType === opt.id
                           ? 'bg-slate-900 border-amber-400 ring-2 ring-amber-400/30 shadow-lg'
                           : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
@@ -321,10 +321,10 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
               {/* ESTILO VISUAL DISPONÍVEL (PRESETS DE DESIGN) */}
               <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/80 space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="block text-slate-200 font-semibold flex items-center gap-1.5 text-xs">
+                  <p className="block text-slate-200 font-semibold flex items-center gap-1.5 text-xs">
                     <Palette className="w-3.5 h-3.5 text-amber-400" />
                     <span>Escolha o visual do seu negócio</span>
-                  </label>
+                  </p>
                   <span className="text-[10px] text-amber-400 font-bold uppercase">
                     {STYLE_PRESETS[stylePreset].name}
                   </span>
@@ -343,7 +343,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
                         key={pKey}
                         type="button"
                         onClick={() => setStylePreset(pKey)}
-                        className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                        className={`p-3 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between ${
                           isSelected
                             ? 'bg-slate-900 border-amber-400 ring-2 ring-amber-400/30 shadow-lg'
                             : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
@@ -391,7 +391,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
                 {/* Prévia do Botão e Estilo Escolhido */}
                 <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-center space-y-1 mt-1">
                   <span className="text-[10px] text-slate-400 block">Prévia dos botões do seu cliente:</span>
-                  <div className={`py-2 px-3 rounded-xl text-center text-xs font-bold transition-all ${STYLE_PRESETS[stylePreset].primaryButton}`}>
+                  <div className={`py-2 px-3 rounded-xl text-center text-xs font-bold transition ${STYLE_PRESETS[stylePreset].primaryButton}`}>
                     Agendar Horário • {STYLE_PRESETS[stylePreset].name}
                   </div>
                 </div>
@@ -401,7 +401,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
             <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/80 flex items-center gap-3.5">
               <div className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-amber-500/60 bg-slate-900 shrink-0 shadow-md">
                 {logoUrl ? (
-                  <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                  <img src={logoUrl} alt="Logo" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-amber-400 bg-amber-500/10">
                     <Camera className="w-6 h-6" />
@@ -441,7 +441,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
                   />
                   <label
                     htmlFor="logo-upload-input"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md cursor-pointer active:scale-95 transition-all"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md cursor-pointer active:scale-95 transition"
                   >
                     <Camera className="w-3.5 h-3.5" />
                     <span>{hasCustomLogo ? 'Trocar Foto/Logo' : 'Enviar Logo / Foto'}</span>
@@ -453,11 +453,11 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
             <div className="space-y-3 text-xs">
               {/* Nome do responsável */}
               <div>
-                <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5" htmlFor="onb-456">
                   <User className="w-3.5 h-3.5 text-amber-400" />
                   <span>Seu Nome *</span>
                 </label>
-                <input
+                <input name="name" autoComplete="name" id="onb-456"
                   type="text"
                   required
                   placeholder="Ex: Carlos Eduardo Silva"
@@ -469,11 +469,11 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
 
               {/* Nome da Barbearia */}
               <div>
-                <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5" htmlFor="onb-472">
                   <Scissors className="w-3.5 h-3.5 text-amber-400" />
                   <span>{`Nome ${businessType === 'salao' ? 'do Salão' : businessType === 'barbearia' ? 'da Barbearia' : 'do Negócio'} *`}</span>
                 </label>
-                <input
+                <input name="shop-name" autoComplete="organization" id="onb-472"
                   type="text"
                   required
                   placeholder={businessType === 'salao' ? 'Ex: Studio Bela Vida' : 'Ex: Barbearia Black Diamond'}
@@ -486,11 +486,11 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* WhatsApp */}
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5" htmlFor="onb-489">
                     <Phone className="w-3.5 h-3.5 text-emerald-400" />
                     <span>WhatsApp com DDD *</span>
                   </label>
-                  <input
+                  <input name="phone" autoComplete="tel-national" id="onb-489"
                     type="tel"
                     required
                     placeholder="(11) 99999-9999"
@@ -503,11 +503,11 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
                 {/* Senha de Acesso */}
                 {!loggedEmail && (
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5" htmlFor="onb-506">
                     <Lock className="w-3.5 h-3.5 text-amber-400" />
                     <span>Criar Senha de Acesso *</span>
                   </label>
-                  <PasswordInput
+                  <PasswordInput name="password" id="onb-506"
                     required
                     autoComplete="new-password"
                     placeholder="Mínimo 6 caracteres"
@@ -538,7 +538,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
                   <button
                     type="button"
                     onClick={onBack}
-                    className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs cursor-pointer active:scale-95 transition-all"
+                    className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs cursor-pointer active:scale-95 transition"
                   >
                     Entrar na minha conta
                   </button>
@@ -554,8 +554,8 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="sm:col-span-2">
-                    <label className="block text-slate-300 font-semibold mb-1">Rua / Avenida / Logradouro *</label>
-                    <input
+                    <label className="block text-slate-300 font-semibold mb-1" htmlFor="onb-557">Rua / Avenida / Logradouro *</label>
+                    <input name="street" autoComplete="address-line1" id="onb-557"
                       type="text"
                       required
                       placeholder="Ex: Rua das Flores"
@@ -566,8 +566,8 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
                   </div>
 
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Número *</label>
-                    <input
+                    <label className="block text-slate-300 font-semibold mb-1" htmlFor="onb-569">Número *</label>
+                    <input name="number" autoComplete="off" id="onb-569"
                       type="text"
                       required
                       placeholder="Ex: 120 ou S/N"
@@ -580,8 +580,8 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Bairro *</label>
-                    <input
+                    <label className="block text-slate-300 font-semibold mb-1" htmlFor="onb-583">Bairro *</label>
+                    <input name="neighborhood" autoComplete="off" id="onb-583"
                       type="text"
                       required
                       placeholder="Ex: Centro"
@@ -592,8 +592,8 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
                   </div>
 
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Cidade *</label>
-                    <input
+                    <label className="block text-slate-300 font-semibold mb-1" htmlFor="onb-595">Cidade *</label>
+                    <input name="city" autoComplete="address-level2" id="onb-595"
                       type="text"
                       required
                       placeholder="Ex: São Paulo"
@@ -604,8 +604,8 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
                   </div>
 
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1">UF *</label>
-                    <select
+                    <label className="block text-slate-300 font-semibold mb-1" htmlFor="onb-607">UF *</label>
+                    <select name="state" autoComplete="address-level1" id="onb-607"
                       required
                       value={uf}
                       onChange={(e) => setUf(e.target.value)}
@@ -620,8 +620,8 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Ponto de Referência (Opcional)</label>
-                  <input
+                  <label className="block text-slate-300 font-semibold mb-1" htmlFor="onb-623">Ponto de Referência (Opcional)</label>
+                  <input name="reference-point" autoComplete="off" id="onb-623"
                     type="text"
                     placeholder="Ex: Em frente à praça central, ao lado da padaria"
                     value={referencePoint}
@@ -635,13 +635,13 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Instagram */}
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5" htmlFor="onb-638">
                     <InstagramIcon className="w-3.5 h-3.5 text-pink-400" />
                     <span>Instagram (Opcional)</span>
                   </label>
                   <div className="flex items-center px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 focus-within:border-amber-500">
                     <span className="text-pink-400 font-bold mr-1">@</span>
-                    <input
+                    <input name="instagram" autoComplete="off" id="onb-638"
                       type="text"
                       placeholder="seunegocio"
                       value={instagram.replace('@', '')}
@@ -654,11 +654,11 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
                 {/* E-mail */}
                 {!loggedEmail && (
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5" htmlFor="onb-657">
                     <Mail className="w-3.5 h-3.5 text-blue-400" />
                     <span>E-mail *</span>
                   </label>
-                  <input
+                  <input name="email" autoComplete="email" id="onb-657"
                     type="email"
                     required
                     placeholder="seuemail@gmail.com"
@@ -676,12 +676,12 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
 
               {/* Slug / Link personalizado */}
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">
+                <label className="block text-slate-300 font-semibold mb-1" htmlFor="onb-679">
                   Link que os clientes vão acessar para agendar:
                 </label>
                 <div className="flex items-center px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs">
                   <span className="text-slate-500 shrink-0 font-mono">app.com/</span>
-                  <input
+                  <input name="slug" autoComplete="off" id="onb-679"
                     type="text"
                     required
                     value={slug}
@@ -705,17 +705,17 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
               {/* EQUIPE / PROFISSIONAIS DA BARBEARIA */}
               <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/80 space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="block text-slate-200 font-semibold flex items-center gap-1.5 text-xs">
+                  <p className="block text-slate-200 font-semibold flex items-center gap-1.5 text-xs">
                     <Users className="w-3.5 h-3.5 text-amber-400" />
                     <span>Como será o atendimento? *</span>
-                  </label>
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setTeamType('solo')}
-                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    className={`p-3 rounded-xl border text-left transition cursor-pointer ${
                       teamType === 'solo'
                         ? 'bg-amber-500/15 border-amber-500/50 text-white shadow-md'
                         : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
@@ -728,7 +728,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
                   <button
                     type="button"
                     onClick={() => setTeamType('team')}
-                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    className={`p-3 rounded-xl border text-left transition cursor-pointer ${
                       teamType === 'team'
                         ? 'bg-amber-500/15 border-amber-500/50 text-white shadow-md'
                         : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
@@ -746,7 +746,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
                     </p>
 
                     <div className="flex gap-2">
-                      <input
+                      <input name="member-name" autoComplete="off" aria-label="Nome do outro profissional"
                         type="text"
                         placeholder="Nome do outro profissional"
                         value={newMemberName}
@@ -762,7 +762,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
                       <button
                         type="button"
                         onClick={handleAddTeamMember}
-                        className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shrink-0 cursor-pointer transition-all active:scale-95"
+                        className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shrink-0 cursor-pointer transition active:scale-95"
                       >
                         + Adicionar
                       </button>
@@ -794,10 +794,10 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
 
               {/* Slogan */}
               <div>
-                <label className="block text-slate-400 mb-1">
+                <label className="block text-slate-400 mb-1" htmlFor="onb-797">
                   Frase de destaque / slogan (Opcional):
                 </label>
-                <input
+                <input name="slogan" autoComplete="off" id="onb-797"
                   type="text"
                   value={slogan}
                   placeholder={terms.defaultSlogan}
@@ -817,10 +817,10 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 active:scale-95 transition-all cursor-pointer disabled:opacity-60"
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 active:scale-95 transition cursor-pointer disabled:opacity-60"
             >
               <Sparkles className="w-4 h-4" />
-              <span>{submitting ? 'Criando sua conta...' : 'Concluir Cadastro & Acessar Painel'}</span>
+              <span>{submitting ? 'Criando sua conta…' : 'Concluir Cadastro & Acessar Painel'}</span>
             </button>
 
             <div className="text-center pt-1">

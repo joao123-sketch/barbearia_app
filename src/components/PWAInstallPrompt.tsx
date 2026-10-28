@@ -98,7 +98,7 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
       {variant === 'button' && (
         <button
           onClick={handleInstallClick}
-          className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 shadow-lg active:scale-95 bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-slate-950 shadow-amber-500/20 hover:shadow-amber-500/35 hover:brightness-105 cursor-pointer ${className}`}
+          className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition duration-300 shadow-lg active:scale-95 bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-slate-950 shadow-amber-500/20 hover:shadow-amber-500/35 hover:brightness-105 cursor-pointer ${className}`}
         >
           <Download className="w-4 h-4 animate-bounce" />
           <span>{buttonText}</span>
@@ -109,7 +109,7 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
       {variant === 'compact' && (
         <button
           onClick={handleInstallClick}
-          className={`flex items-center gap-1.5 p-2 min-[420px]:px-3 min-[420px]:py-1.5 rounded-full text-xs font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-400 hover:bg-amber-500/25 transition-all cursor-pointer ${className}`}
+          className={`flex items-center gap-1.5 p-2 min-[420px]:px-3 min-[420px]:py-1.5 rounded-full text-xs font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-400 hover:bg-amber-500/25 transition cursor-pointer ${className}`}
         >
           <Smartphone className="w-3.5 h-3.5 text-amber-400" />
           <span className="hidden min-[420px]:inline">Baixar App</span>
@@ -118,7 +118,7 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
 
       {/* Banner de fixação flutuante no rodapé para clientes mobile */}
       {variant === 'banner' && !dismissed && (
-        <div className="fixed bottom-4 left-4 right-4 z-50 max-w-md mx-auto animate-fade-in">
+        <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-4 right-4 z-50 max-w-md mx-auto animate-fade-in">
           <div className="relative p-3.5 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 border border-amber-500/30 shadow-2xl shadow-black/80 flex items-center justify-between gap-3 backdrop-blur-xl">
             <button
               onClick={() => setDismissed(true)}
@@ -150,7 +150,7 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
 
       {/* Modal Guiado para iPhone (iOS) e navegadores sem suporte direto */}
       {showIOSModal && portalTarget && createPortal(
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 overscroll-contain">
           <div className="w-full max-w-sm max-h-[90vh] overflow-y-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 text-slate-100 shadow-2xl animate-in slide-in-from-bottom duration-300">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-2">
@@ -251,7 +251,7 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
 
             <button
               onClick={() => setShowIOSModal(false)}
-              className="mt-6 w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/20 hover:brightness-105 transition-all"
+              className="mt-6 w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/20 hover:brightness-105 transition"
             >
               Entendi, obrigado!
             </button>

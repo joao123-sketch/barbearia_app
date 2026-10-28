@@ -8,18 +8,15 @@ import {
   XCircle,
   Copy,
   ExternalLink,
-  Phone,
   Settings,
   Scissors,
   Share2,
   Check,
   CreditCard,
-  Lock,
   Trash2,
   Edit3,
   AlertTriangle,
   CalendarOff,
-  BellRing,
   MessageCircle,
   ChevronRight,
   LogOut,
@@ -42,10 +39,11 @@ import { DEFAULT_PLATFORM_SETTINGS, SUPPORT_WHATSAPP, type PlatformSettings } fr
 import { newId } from '../lib/db'
 import { AccountSettings } from './AccountSettings'
 import { OwnerNotifications } from './OwnerNotifications'
-import { PixPayment } from './PixPayment'
+import { BillingPanel } from './BillingPanel'
+import { BillingBanner, BillingEntryNotice, BillingLockedScreen, BillingPayModal } from './BillingNotices'
 import { normalizeInstagram } from '../lib/instagram'
 import { getTerms } from '../lib/terms'
-import { formatBR, formatMoney, getBillingState, toDateStr } from '../lib/billing'
+import { formatMoney, getBillingState, toDateStr } from '../lib/billing'
 import { normalizePhone, toWaNumber } from '../lib/phone'
 import { BR_STATES } from '../lib/states'
 import { STYLE_PRESETS, STYLE_PRESET_ORDER } from '../lib/stylePresets'
@@ -82,6 +80,7 @@ interface AdminDashboardProps {
   platform?: PlatformSettings
   onBackToClientView?: () => void
   onLogout?: () => void
+  onReload?: () => void | Promise<void> // recarrega os dados do dono (depois de um pagamento confirmado)
   onUpdateAppointments?: (appointments: Appointment[]) => void
   onUpdateServices?: (services: Service[]) => void
   onUpdateBarbers?: (barbers: Barber[]) => void
@@ -101,6 +100,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   platform: platformProp,
   onBackToClientView,
   onLogout,
+  onReload,
   onUpdateAppointments,
   onUpdateServices,
   onUpdateBarbers,
@@ -198,8 +198,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const todayStr = toDateStr(now)
 
   // ===================== PLANO PRÉ-PAGO (TESTE GRÁTIS / PERÍODO PAGO) =====================
-  const billing = getBillingState(barbershop)
-  const daysUntilDue = billing.daysLeft
+  const billing = getBillingState(barbershop, platformProp?.grace_days)
+  const [showPayModal, setShowPayModal] = useState(false)
 
   // ===================== AGENDA DE HOJE =====================
   const todayAppointments = useMemo(() => {
@@ -221,7 +221,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // ===================== CALENDÁRIO DA SEMANA =====================
   const weekDays = useMemo(() => {
     const now = new Date()
-    const dayOfWeek = now.getDay() // 0 = Dom, 1 = Seg...
+    const dayOfWeek = now.getDay() // 0 = Dom, 1 = Seg…
     const distanceToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
     const monday = new Date(now)
     monday.setDate(now.getDate() + distanceToMonday)
@@ -234,7 +234,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const d = new Date(monday)
       d.setDate(monday.getDate() + i)
       const dateStr = d.toISOString().split('T')[0]
-      const dayIndex = d.getDay() // 0 is Sunday, 1 is Monday...
+      const dayIndex = d.getDay() // 0 is Sunday, 1 is Monday…
 
       const wh = localWorkingHours.find((w) => w.day_of_week === dayIndex)
       const isBlocked = Boolean(barbershop.blocked_dates?.includes(dateStr))
@@ -778,8 +778,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const isLight = false
   const isLightMode = theme === 'light'
   const platform = platformProp ?? DEFAULT_PLATFORM_SETTINGS
-  // Próximo pagamento: usa o novo valor já agendado (reajuste), se houver
-  const amountDue = barbershop.next_monthly_fee || barbershop.monthly_fee || platform.monthly_fee
   const existingCategories = Array.from(new Set(services.map((sv) => sv.category).filter((c): c is string => Boolean(c))))
   useShopChrome(barbershop.style_preset, isLightMode ? 'light' : 'dark')
 
@@ -793,6 +791,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     { id: 'config' as AdminTab, label: 'Config', fullLabel: 'Configurações', icon: Settings }
   ]
 
+  // Bloqueado: só a tela de cobrança abre, até o pagamento ser confirmado
+  if (billing.status === 'blocked') {
+    return <BillingLockedScreen barbershop={barbershop} platform={platform} onPaid={() => onReload?.()} onLogout={onLogout} />
+  }
+
   return (
     <div
       {...shopThemeAttrs(barbershop.style_preset)}
@@ -801,7 +804,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     >
       {/* ===================== BARRA LATERAL ESQUERDA (SIDEBAR RETRÁTIL) ===================== */}
       <aside
-        className={`hidden sm:flex fixed top-0 bottom-0 left-0 z-50 flex-col justify-between transition-all duration-300 border-r shadow-2xl ${
+        className={`hidden sm:flex fixed top-0 bottom-0 left-0 z-50 flex-col justify-between transition-[width] duration-300 border-r shadow-2xl ${
           sidebarExpanded ? 'w-56 sm:w-64' : 'w-14 sm:w-16'
         } ${
           isLight
@@ -852,7 +855,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     if (window.innerWidth < 640) setSidebarExpanded(false)
                   }}
                   title={tab.fullLabel}
-                  className={`w-full flex items-center gap-3 p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  className={`w-full flex items-center gap-3 p-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                     isActive
                       ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                       : isLight
@@ -883,6 +886,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <button
               onClick={onToggleTheme}
               title={isLightMode ? 'Modo Escuro' : 'Modo Claro'}
+              aria-label={isLightMode ? 'Modo Escuro' : 'Modo Claro'}
               className={`w-full flex items-center gap-3 p-2 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
                 isLight ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
@@ -896,6 +900,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <button
               onClick={onBackToClientView}
               title="Ver como Cliente"
+                  aria-label="Ver como Cliente"
               className={`w-full flex items-center gap-3 p-2 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
                 isLight ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
@@ -955,7 +960,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <button
                   onClick={onToggleTheme}
                   title={isLightMode ? 'Modo Escuro' : 'Modo Claro'}
-                  className={`p-2 rounded-xl border text-xs cursor-pointer active:scale-95 transition-all ${
+              aria-label={isLightMode ? 'Modo Escuro' : 'Modo Claro'}
+                  className={`p-2 rounded-xl border text-xs cursor-pointer active:scale-95 transition ${
                     isLight ? 'bg-slate-100 border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-amber-400'
                   }`}
                 >
@@ -965,7 +971,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {onBackToClientView && (
                 <button
                   onClick={onBackToClientView}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold border active:scale-95 transition-all cursor-pointer ${
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold border active:scale-95 transition cursor-pointer ${
                     isLight ? 'bg-slate-100 border-slate-200 text-slate-800 hover:bg-slate-200' : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
                   }`}
                 >
@@ -979,87 +985,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </header>
 
         <main className="max-w-4xl mx-auto px-3 sm:px-4 py-5 space-y-5 flex-1 w-full">
-        {/* ===================== AVISO: TESTE OU PERÍODO PAGO ACABANDO (5 DIAS OU MENOS) ===================== */}
-        {(billing.status === 'trial' || billing.status === 'active') && billing.daysLeft <= 5 && (
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/20 via-slate-900 to-slate-900 border border-amber-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl">
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
-                <BellRing className="w-5 h-5 animate-pulse" />
-              </div>
-              <div>
-                <h4 className="font-bold text-sm text-amber-300">
-                  {billing.status === 'trial' ? 'Seu teste grátis' : 'Seu período pago'}{' '}
-                  {billing.daysLeft === 0
-                    ? 'termina hoje!'
-                    : billing.daysLeft === 1
-                    ? 'termina amanhã!'
-                    : `termina em ${billing.daysLeft} dias.`}
-                </h4>
-                <p className="text-xs text-slate-300 mt-0.5">
-                  Para continuar sem interrupção, pague antecipadamente <strong>R$ {formatMoney(barbershop.monthly_fee || platform.monthly_fee)}</strong> via PIX e ganhe mais 30 dias.
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setActiveTab('config')}
-              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer self-start sm:self-auto shrink-0 shadow-lg shadow-amber-500/20"
-            >
-              <span>Ver Chave PIX & QR Code</span>
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+        {/* ===================== COBRANÇA: AVISO DE VENCIMENTO / MENSALIDADE VENCIDA ===================== */}
+        <BillingBanner barbershop={barbershop} platform={platform} onPay={() => setShowPayModal(true)} />
+        <BillingEntryNotice barbershop={barbershop} platform={platform} onPay={() => setShowPayModal(true)} />
+        {showPayModal && (
+          <BillingPayModal
+            barbershop={barbershop}
+            platform={platform}
+            onClose={() => setShowPayModal(false)}
+            onPaid={async () => {
+              await onReload?.()
+            }}
+          />
         )}
-
-        {/* ===================== ACESSO SUSPENSO (BLOQUEADO, PERÍODO ENCERRADO OU FALTA O 1º PAGAMENTO) ===================== */}
-        {(billing.status === 'blocked' || billing.status === 'expired') && (() => {
-          const firstPayment = barbershop.subscription_status === 'pending' && !barbershop.last_payment_date
-          const title =
-            billing.status === 'blocked' ? 'Acesso suspenso' : firstPayment ? 'Falta o primeiro pagamento' : 'Período encerrado'
-          const message =
-            billing.status === 'blocked'
-              ? 'Seu acesso foi suspenso pela administração. Entre em contato para regularizar.'
-              : firstPayment
-              ? 'Este WhatsApp já usou o período de teste grátis em outra conta. Pague a primeira mensalidade para liberar o link e o painel.'
-              : 'Seu período acabou e o link de agendamento está pausado. Pague para liberar mais 30 dias.'
-          return (
-            <div className="rounded-3xl bg-slate-900 border border-rose-500/40 shadow-xl overflow-hidden">
-              <div className="p-4 flex items-start gap-3 bg-rose-500/10">
-                <div className="p-2.5 rounded-2xl bg-rose-500/20 text-rose-400 shrink-0">
-                  <Lock className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-black text-base text-white">{title}</h3>
-                  <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">{message}</p>
-                </div>
-              </div>
-
-              {billing.status === 'expired' && (
-                <div className="p-4 space-y-3 text-xs">
-                  <p className="text-slate-300">
-                    Valor a pagar: <strong className="text-white">R$ {formatMoney(amountDue)}</strong> · libera 30 dias
-                  </p>
-
-                  <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800">
-                    <PixPayment platform={platform} amount={amountDue} />
-                  </div>
-
-                  {platform.contact_whatsapp && (
-                    <a
-                      href={`https://wa.me/${toWaNumber(platform.contact_whatsapp)}?text=${encodeURIComponent(`Olá! Realizei o pagamento de ${barbershop.name}. Segue o comprovante:`)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-all"
-                    >
-                      <Phone className="w-4 h-4 fill-current" />
-                      <span>Enviar comprovante pelo WhatsApp</span>
-                    </a>
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })()}
 
         {activeTab === 'agenda' && <OwnerNotifications shopId={barbershop.id} variant="banner" />}
 
@@ -1101,7 +1039,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           <button
             onClick={handleCopyLink}
-            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shrink-0 transition-all active:scale-95 cursor-pointer ${
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shrink-0 transition active:scale-95 cursor-pointer ${
               copiedLink
                 ? 'bg-emerald-500 text-slate-950 font-black'
                 : 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-md shadow-amber-500/20'
@@ -1146,7 +1084,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <DollarSign className="w-4 h-4 text-emerald-400" />
                 </div>
                 <p className="text-2xl font-black text-emerald-400">
-                  R$ {todayRevenue.toFixed(2).replace('.', ',')}
+                  R$ {formatMoney(todayRevenue)}
                 </p>
                 <p className="text-[10px] text-slate-400 mt-0.5">faturamento estimado</p>
               </div>
@@ -1157,7 +1095,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <Clock className="w-4 h-4 text-blue-400" />
                 </div>
                 <p className="text-2xl font-black text-white">
-                  R$ {todayCompletedCount > 0 ? (todayRevenue / todayCompletedCount).toFixed(2).replace('.', ',') : '0,00'}
+                  R$ {todayCompletedCount > 0 ? formatMoney((todayRevenue / todayCompletedCount)) : '0,00'}
                 </p>
                 <p className="text-[10px] text-slate-400 mt-0.5">por cliente</p>
               </div>
@@ -1175,7 +1113,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <button
                 onClick={() => setShowAddBookingModal(true)}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer self-start sm:self-auto"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 active:scale-95 transition cursor-pointer self-start sm:self-auto"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Agendar Balcão</span>
@@ -1191,7 +1129,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <button
                   type="button"
                   onClick={() => setSelectedBarberFilter('todos')}
-                  className={`px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer ${
                     selectedBarberFilter === 'todos'
                       ? 'bg-amber-500 text-slate-950 shadow-sm'
                       : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
@@ -1207,7 +1145,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       key={b.id}
                       type="button"
                       onClick={() => setSelectedBarberFilter(b.id)}
-                      className={`px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer flex items-center gap-1.5 ${
                         isSelected
                           ? 'bg-amber-500 text-slate-950 shadow-sm'
                           : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
@@ -1245,7 +1183,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   return (
                     <div
                       key={apt.id}
-                      className={`p-3.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg transition-all ${
+                      className={`p-3.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg transition ${
                         isCancelled
                           ? 'bg-rose-950/20 border-rose-900/40 opacity-70'
                           : 'bg-slate-900 border-slate-800'
@@ -1283,7 +1221,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                           <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-400 flex-wrap">
                             <span className="text-amber-400 font-bold">
-                              R$ {apt.total_price.toFixed(2).replace('.', ',')}
+                              R$ {formatMoney(apt.total_price)}
                             </span>
                             {aptBarber && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/25">
@@ -1309,7 +1247,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             target="_blank"
                             rel="noopener noreferrer"
                             title="Enviar WhatsApp de confirmação para este cliente"
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-md shadow-emerald-500/20 active:scale-95 transition-all"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-md shadow-emerald-500/20 active:scale-95 transition"
                           >
                             <MessageCircle className="w-3.5 h-3.5 fill-current" />
                             <span>WhatsApp</span>
@@ -1388,7 +1326,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <DollarSign className="w-4 h-4 text-emerald-400" />
                 </div>
                 <p className="text-2xl font-black text-emerald-400">
-                  R$ {weekTotalRevenue.toFixed(2).replace('.', ',')}
+                  R$ {formatMoney(weekTotalRevenue)}
                 </p>
                 <p className="text-[10px] text-slate-400 mt-0.5">calculado para esta semana</p>
               </div>
@@ -1529,7 +1467,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             return (
                               <td key={d.dateStr} className="p-1.5 border-r border-slate-800/40 align-top">
                                 <div
-                                  className={`p-2 rounded-xl text-left transition-all ${
+                                  className={`p-2 rounded-xl text-left transition ${
                                     isCancelled
                                       ? 'bg-rose-950/30 border border-rose-900/50 text-slate-400 opacity-70'
                                       : 'bg-amber-500/15 border border-amber-500/35 text-white shadow-sm'
@@ -1619,7 +1557,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   setShowAddBookingModal(true)
                                 }}
                                 title={`Agendar corte manual para ${d.dayName} às ${slot}`}
-                                className="w-full py-2 px-1 rounded-xl border border-dashed border-emerald-500/20 hover:border-emerald-500/60 hover:bg-emerald-500/10 text-emerald-400 hover:text-emerald-300 text-[10px] font-semibold text-center transition-all cursor-pointer flex items-center justify-center gap-0.5"
+                                className="w-full py-2 px-1 rounded-xl border border-dashed border-emerald-500/20 hover:border-emerald-500/60 hover:bg-emerald-500/10 text-emerald-400 hover:text-emerald-300 text-[10px] font-semibold text-center transition cursor-pointer flex items-center justify-center gap-0.5"
                               >
                                 <span>+ Livre</span>
                               </button>
@@ -1651,7 +1589,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {/* Filtros: Mês + Status */}
               <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
                 {/* Seletor de Mês */}
-                <select
+                <select name="mes" autoComplete="off" aria-label="Filtrar por mês"
                   value={historyMonthFilter}
                   onChange={(e) => setHistoryMonthFilter(e.target.value)}
                   className="bg-slate-900 border border-slate-800 text-xs text-amber-300 font-bold rounded-2xl px-3 py-2 focus:border-amber-500 focus:outline-none cursor-pointer"
@@ -1679,7 +1617,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <button
                       key={f.id}
                       onClick={() => setHistoryStatusFilter(f.id as any)}
-                      className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+                      className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${
                         historyStatusFilter === f.id
                           ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                           : 'text-slate-400 hover:text-white'
@@ -1703,7 +1641,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800">
                 <span className="text-xs text-slate-400 font-medium">Faturamento Acumulado</span>
                 <p className="text-2xl font-black text-emerald-400 mt-1">
-                  R$ {historyTotalRevenue.toFixed(2).replace('.', ',')}
+                  R$ {formatMoney(historyTotalRevenue)}
                 </p>
                 <p className="text-[10px] text-slate-400 mt-0.5">total histórico de cortes</p>
               </div>
@@ -1718,9 +1656,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {/* Busca no Histórico */}
             <div className="relative">
               <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
+              <input name="campo-1656" autoComplete="off" aria-label="Buscar cliente por nome ou WhatsApp…"
                 type="text"
-                placeholder="Buscar cliente por nome ou WhatsApp..."
+                placeholder="Buscar cliente por nome ou WhatsApp…"
                 value={historySearch}
                 onChange={(e) => setHistorySearch(e.target.value)}
                 className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-amber-500 focus:outline-none text-xs text-white"
@@ -1779,7 +1717,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                           <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-400 flex-wrap">
                             <span className="text-amber-400 font-bold">
-                              R$ {apt.total_price.toFixed(2).replace('.', ',')}
+                              R$ {formatMoney(apt.total_price)}
                             </span>
                             {apt.client_phone && apt.client_phone !== 'Cliente Balcão' && (
                               <span>Tel: {apt.client_phone}</span>
@@ -1819,7 +1757,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <button
                 onClick={handleOpenAddService}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 active:scale-95 transition cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Novo Serviço</span>
@@ -1839,7 +1777,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <button
                   onClick={handleOpenAddService}
-                  className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs inline-flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs inline-flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95 transition cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Cadastrar Primeiro Serviço</span>
@@ -1886,7 +1824,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         )}
                         <div className="flex items-center gap-3 mt-1.5 text-xs">
                           <span className="text-amber-400 font-extrabold text-sm">
-                            R$ {s.price.toFixed(2).replace('.', ',')}
+                            R$ {formatMoney(s.price)}
                           </span>
                           <span className="text-slate-500">•</span>
                           <span className="text-slate-400">{s.duration_minutes} minutos</span>
@@ -1952,7 +1890,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <button
                 type="button"
                 onClick={handleOpenAddBarber}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer self-start sm:self-auto"
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 active:scale-95 transition cursor-pointer self-start sm:self-auto"
               >
                 <UserPlus className="w-4 h-4" />
                 <span>+ Adicionar Profissional</span>
@@ -1991,7 +1929,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 return (
                   <div
                     key={barber.id}
-                    className={`p-4 rounded-2xl border transition-all ${
+                    className={`p-4 rounded-2xl border transition ${
                       isActive
                         ? 'bg-slate-900/90 border-slate-800 shadow-md'
                         : 'bg-slate-950/60 border-slate-800/80 opacity-60'
@@ -2003,6 +1941,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <img
                             src={barber.avatar_url}
                             alt={barber.name}
+                            loading="lazy"
+                            decoding="async"
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -2059,7 +1999,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <button
                         type="button"
                         onClick={() => handleToggleBarberActive(barber.id)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
                           isActive
                             ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
                             : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border-emerald-500/40'
@@ -2179,7 +2119,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {localWorkingHours.map((wh) => (
                   <div
                     key={wh.day_of_week}
-                    className={`p-3.5 rounded-2xl border transition-all ${
+                    className={`p-3.5 rounded-2xl border transition ${
                       wh.is_open
                         ? 'bg-slate-800/80 border-slate-700'
                         : 'bg-slate-950/60 border-slate-800/80 opacity-70'
@@ -2195,7 +2135,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <button
                           type="button"
                           onClick={() => handleUpdateDaySchedule(wh.day_of_week, 'is_open', !wh.is_open)}
-                          className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                          className={`px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer ${
                             wh.is_open
                               ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
                               : 'bg-slate-800 text-slate-400 hover:text-white'
@@ -2211,14 +2151,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           {/* Horário Geral */}
                           <div className="flex items-center gap-1.5">
                             <span className="text-slate-400 text-[11px]">Expediente:</span>
-                            <input
+                            <input name="campo-2149" autoComplete="off"
                               type="time"
                               value={wh.open_time}
                               onChange={(e) => handleUpdateDaySchedule(wh.day_of_week, 'open_time', e.target.value)}
                               className="px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-amber-300 font-bold focus:outline-none"
                             />
                             <span className="text-slate-500">às</span>
-                            <input
+                            <input name="campo-2156" autoComplete="off"
                               type="time"
                               value={wh.close_time}
                               onChange={(e) => handleUpdateDaySchedule(wh.day_of_week, 'close_time', e.target.value)}
@@ -2229,14 +2169,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           {/* Pausa Almoço */}
                           <div className="flex items-center gap-1.5 border-l border-slate-700 pl-3">
                             <span className="text-slate-400 text-[11px]">Almoço:</span>
-                            <input
+                            <input name="campo-2167" autoComplete="off"
                               type="time"
                               value={wh.lunch_start || '12:00'}
                               onChange={(e) => handleUpdateDaySchedule(wh.day_of_week, 'lunch_start', e.target.value)}
                               className="px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 focus:outline-none"
                             />
                             <span className="text-slate-500">às</span>
-                            <input
+                            <input name="campo-2174" autoComplete="off"
                               type="time"
                               value={wh.lunch_end || '13:00'}
                               onChange={(e) => handleUpdateDaySchedule(wh.day_of_week, 'lunch_end', e.target.value)}
@@ -2280,7 +2220,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               {/* Formulário para Bloquear Data */}
               <form onSubmit={handleAddPauseDate} className="flex flex-col sm:flex-row gap-2 pt-1 text-xs">
-                <input
+                <input name="campo-2218" autoComplete="off"
                   type="date"
                   required
                   min={todayStr}
@@ -2288,7 +2228,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   onChange={(e) => setNewPauseDate(e.target.value)}
                   className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-amber-500"
                 />
-                <input
+                <input name="campo-2226" autoComplete="off" aria-label="Motivo (ex: Viagem, Feriado)"
                   type="text"
                   placeholder="Motivo (ex: Viagem, Feriado)"
                   value={newPauseReason}
@@ -2297,7 +2237,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 />
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1 shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1 shadow-md shadow-amber-500/20 active:scale-95 transition cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Bloquear Data</span>
@@ -2371,45 +2311,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               )}
 
-              {/* Informações de Status e Valor */}
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="p-3 rounded-2xl bg-slate-800/80 border border-slate-700/80 space-y-1">
-                  <span className="text-slate-400 text-[11px]">Valor da Mensalidade:</span>
-                  <p className="font-black text-amber-400 text-lg">
-                    R$ {formatMoney(barbershop.monthly_fee || platform.monthly_fee)}
-                  </p>
-                  <span className="text-[10px] text-slate-400">pago antecipado, a cada 30 dias</span>
-                </div>
-
-                <div className="p-3 rounded-2xl bg-slate-800/80 border border-slate-700/80 space-y-1">
-                  <span className="text-slate-400 text-[11px]">
-                    {billing.status === 'trial' ? 'Teste grátis até:' : billing.status === 'active' ? 'Pago até:' : 'Venceu em:'}
-                  </span>
-                  <p className="font-bold text-white text-base">
-                    {formatBR(billing.dueDate)}
-                  </p>
-                  <span className={`text-[10px] font-bold ${billing.status === 'expired' ? 'text-rose-400' : daysUntilDue <= 5 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                    {billing.status === 'expired' ? 'Acesso pausado' : daysUntilDue === 0 ? 'Termina hoje' : `${daysUntilDue} dias restantes`}
-                  </span>
-                </div>
-              </div>
-
-              {/* QR CODE DO BANCO INTER E CHAVE PIX */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-center space-y-3">
-                <PixPayment platform={platform} amount={amountDue} />
-
-                {platform.contact_whatsapp && (
-                  <a
-                    href={`https://wa.me/${toWaNumber(platform.contact_whatsapp)}?text=${encodeURIComponent(`Olá! Realizei o pagamento antecipado de R$ ${formatMoney(amountDue)} de ${barbershop.name}. Segue o comprovante:`)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full max-w-sm mx-auto py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
-                  >
-                    <Phone className="w-4 h-4 fill-current" />
-                    <span>Enviar Comprovante via WhatsApp</span>
-                  </a>
-                )}
-              </div>
+              <BillingPanel barbershop={barbershop} platform={platform} onPaid={async () => { await onReload?.() }} />
             </div>
 
             {/* SEÇÃO DE ESTILO VISUAL / PALETA DE CORES */}
@@ -2442,7 +2344,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         const updated = { ...barbershop, style_preset: key }
                         if (onUpdateBarbershop) onUpdateBarbershop(updated)
                       }}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-3 text-left ${
+                      className={`p-3.5 rounded-2xl border transition cursor-pointer flex flex-col justify-between gap-3 text-left ${
                         isSelected
                           ? 'bg-slate-800/90 border-amber-500 shadow-lg ring-1 ring-amber-500/50'
                           : 'bg-slate-950/70 border-slate-800 hover:border-slate-700'
@@ -2509,7 +2411,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/80 flex items-center gap-3.5">
                 <div className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-amber-500/60 bg-slate-900 shrink-0 shadow-md">
                   {profileLogo ? (
-                    <img src={profileLogo} alt={profileName} className="w-full h-full object-cover" />
+                    <img src={profileLogo} alt={profileName} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-amber-400 bg-amber-500/10 font-black text-xl">
                       {profileName.trim().charAt(0).toUpperCase() || <Camera className="w-6 h-6" />}
@@ -2535,7 +2437,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     />
                     <label
                       htmlFor="profile-logo-upload"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md cursor-pointer active:scale-95 transition-all"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md cursor-pointer active:scale-95 transition"
                     >
                       <Camera className="w-3.5 h-3.5" />
                       <span>Trocar Logo / Foto</span>
@@ -2545,8 +2447,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Nome do negócio *</label>
-                <input
+                <label className="block text-slate-300 font-semibold mb-1" htmlFor="adm-2445">Nome do negócio *</label>
+                <input name="adm-2445" autoComplete="off" id="adm-2445"
                   type="text"
                   required
                   value={profileName}
@@ -2557,14 +2459,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               {/* Instagram */}
               <div>
-                <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5" htmlFor="adm-2457">
                   <InstagramIcon className="w-3.5 h-3.5 text-pink-400" />
                   <span>Instagram</span>
                 </label>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 flex items-center px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 focus-within:border-amber-500">
                     <span className="text-pink-400 font-bold mr-1">@</span>
-                    <input
+                    <input name="adm-2457" autoComplete="off" id="adm-2457"
                       type="text"
                       placeholder="seunegocio"
                       value={profileInstagram.replace('@', '')}
@@ -2588,8 +2490,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Frase de Destaque / Slogan</label>
-                <input
+                <label className="block text-slate-300 font-semibold mb-1" htmlFor="adm-2488">Frase de Destaque / Slogan</label>
+                <input name="adm-2488" autoComplete="off" id="adm-2488"
                   type="text"
                   value={profileSlogan}
                   onChange={(e) => setProfileSlogan(e.target.value)}
@@ -2599,8 +2501,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">WhatsApp de Contato & Notificações *</label>
-                <input
+                <label className="block text-slate-300 font-semibold mb-1" htmlFor="adm-2499">WhatsApp de Contato & Notificações *</label>
+                <input name="adm-2499" autoComplete="off" id="adm-2499"
                   type="tel"
                   required
                   value={profilePhone}
@@ -2618,8 +2520,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div className="sm:col-span-2">
-                    <label className="block text-slate-400 mb-1">Rua / Logradouro *</label>
-                    <input
+                    <label className="block text-slate-400 mb-1" htmlFor="adm-2518">Rua / Logradouro *</label>
+                    <input name="adm-2518" autoComplete="off" id="adm-2518"
                       type="text"
                       required
                       placeholder="Ex: Av. Paulista"
@@ -2630,8 +2532,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-slate-400 mb-1">Número *</label>
-                    <input
+                    <label className="block text-slate-400 mb-1" htmlFor="adm-2530">Número *</label>
+                    <input name="adm-2530" autoComplete="off" id="adm-2530"
                       type="text"
                       required
                       placeholder="Ex: 1500"
@@ -2644,8 +2546,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-slate-400 mb-1">Bairro *</label>
-                    <input
+                    <label className="block text-slate-400 mb-1" htmlFor="adm-2544">Bairro *</label>
+                    <input name="adm-2544" autoComplete="off" id="adm-2544"
                       type="text"
                       required
                       placeholder="Ex: Bela Vista"
@@ -2656,8 +2558,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-slate-400 mb-1">Cidade *</label>
-                    <input
+                    <label className="block text-slate-400 mb-1" htmlFor="adm-2556">Cidade *</label>
+                    <input name="adm-2556" autoComplete="off" id="adm-2556"
                       type="text"
                       required
                       placeholder="Ex: São Paulo"
@@ -2668,8 +2570,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-slate-400 mb-1">UF *</label>
-                    <select
+                    <label className="block text-slate-400 mb-1" htmlFor="adm-2568">UF *</label>
+                    <select name="adm-2568" autoComplete="off" id="adm-2568"
                       required
                       value={profileState}
                       onChange={(e) => setProfileState(e.target.value)}
@@ -2684,8 +2586,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 mb-1">Ponto de Referência (Opcional)</label>
-                  <input
+                  <label className="block text-slate-400 mb-1" htmlFor="adm-2584">Ponto de Referência (Opcional)</label>
+                  <input name="adm-2584" autoComplete="off" id="adm-2584"
                     type="text"
                     placeholder="Ex: Próximo à estação do metrô, em frente ao supermercado"
                     value={profileReferencePoint}
@@ -2699,7 +2601,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">Slug do Link Público (Fixo)</label>
+                <p className="block text-slate-400 mb-1">Slug do Link Público (Fixo)</p>
                 <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800 min-w-0">
                   <span className="text-amber-300 font-mono text-xs min-w-0 flex-1 break-all">{publicUrl}</span>
                   <button
@@ -2707,6 +2609,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     onClick={handleCopyLink}
                     className="text-slate-400 hover:text-amber-400 p-1 cursor-pointer shrink-0"
                     title="Copiar link"
+                    aria-label="Copiar link"
                   >
                     <Copy className="w-3.5 h-3.5" />
                   </button>
@@ -2715,7 +2618,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/20 active:scale-95 transition cursor-pointer"
               >
                 <Check className="w-4 h-4" />
                 <span>Salvar alterações</span>
@@ -2735,7 +2638,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {onLogout && (
               <button
                 onClick={onLogout}
-                className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+                className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition"
               >
                 <LogOut className="w-4 h-4" />
                 <span>Sair da conta</span>
@@ -2757,7 +2660,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 href={`https://wa.me/${toWaNumber(SUPPORT_WHATSAPP)}?text=${encodeURIComponent(`Olá! Sou da ${barbershop.name} (${barbershop.slug}) e preciso de ajuda com o SuaAgenda.`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition-all"
+                className="w-full px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition"
               >
                 <MessageCircle className="w-4 h-4 fill-current" />
                 <span>Falar com o suporte no WhatsApp</span>
@@ -2778,7 +2681,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   setDeleteConfirmationText('')
                   setShowDeleteModal(true)
                 }}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Excluir minha conta</span>
@@ -2792,7 +2695,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* ===================== MODAL DE NOVO/EDITAR SERVIÇO ===================== */}
       {showAddServiceModal && (
         <div
-          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4"
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4 overscroll-contain"
           onClick={() => setShowAddServiceModal(false)}
         >
           <div
@@ -2817,8 +2720,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="px-5 pb-4 space-y-5 overflow-y-auto text-sm">
                 {/* Nome */}
                 <div>
-                  <label className="block text-slate-200 font-bold mb-1.5">Nome do serviço *</label>
-                  <input
+                  <label className="block text-slate-200 font-bold mb-1.5" htmlFor="adm-2717">Nome do serviço *</label>
+                  <input name="adm-2717" autoComplete="off" id="adm-2717"
                     type="text"
                     required
                     placeholder={getTerms(barbershop.business_type).serviceExample}
@@ -2831,10 +2734,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {/* Preço e duração */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-200 font-bold mb-1.5">Preço *</label>
+                    <label className="block text-slate-200 font-bold mb-1.5" htmlFor="adm-2731">Preço *</label>
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
-                      <input
+                      <input name="adm-2731" autoComplete="off" id="adm-2731"
                         type="number"
                         inputMode="decimal"
                         step="0.01"
@@ -2848,9 +2751,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-slate-200 font-bold mb-1.5">Duração *</label>
+                    <label className="block text-slate-200 font-bold mb-1.5" htmlFor="adm-2748">Duração *</label>
                     <div className="relative">
-                      <input
+                      <input name="adm-2748" autoComplete="off" id="adm-2748"
                         type="number"
                         inputMode="numeric"
                         step="5"
@@ -2885,10 +2788,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 {/* Descrição */}
                 <div>
-                  <label className="block text-slate-200 font-bold mb-1.5">
+                  <label className="block text-slate-200 font-bold mb-1.5" htmlFor="adm-2785">
                     Descrição <span className="text-slate-500 font-normal">(opcional)</span>
                   </label>
-                  <textarea
+                  <textarea name="adm-2785" autoComplete="off" id="adm-2785"
                     rows={2}
                     placeholder="Ex: Inclui lavagem e finalização"
                     value={serviceDesc}
@@ -2899,10 +2802,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 {/* Categoria (criada pelo próprio dono) */}
                 <div>
-                  <label className="block text-slate-200 font-bold mb-1.5">
+                  <label className="block text-slate-200 font-bold mb-1.5" htmlFor="adm-2799">
                     Categoria <span className="text-slate-500 font-normal">(opcional)</span>
                   </label>
-                  <input
+                  <input name="adm-2799" autoComplete="off" id="adm-2799"
                     type="text"
                     placeholder="Ex: Cabelo, Unhas, Barba"
                     value={serviceCategory}
@@ -2947,7 +2850,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       className={`relative w-11 h-6 rounded-full shrink-0 transition-colors ${isCombo ? 'bg-amber-500' : 'bg-slate-700'}`}
                     >
                       <span
-                        className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${isCombo ? 'left-[22px]' : 'left-0.5'}`}
+                        className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-[left] ${isCombo ? 'left-[22px]' : 'left-0.5'}`}
                       />
                     </span>
                   </button>
@@ -2955,7 +2858,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   {isCombo && (
                     <div className="px-4 pb-4 space-y-3 border-t border-slate-800 pt-3">
                       <div className="flex gap-2">
-                        <input
+                        <input name="campo-2855" autoComplete="off" aria-label="Ex: Hidratação, Sobrancelha"
                           type="text"
                           placeholder="Ex: Hidratação, Sobrancelha"
                           value={newComboSubService}
@@ -2971,7 +2874,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <button
                           type="button"
                           onClick={handleAddComboItem}
-                          className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shrink-0 cursor-pointer active:scale-95 transition-all"
+                          className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shrink-0 cursor-pointer active:scale-95 transition"
                         >
                           Incluir
                         </button>
@@ -3013,7 +2916,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black cursor-pointer active:scale-95 transition-all"
+                  className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black cursor-pointer active:scale-95 transition"
                 >
                   Salvar serviço
                 </button>
@@ -3025,7 +2928,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* ===================== MODAL DE AGENDAMENTO MANUAL BALCÃO ===================== */}
       {showAddBookingModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overscroll-contain">
           <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-5 text-slate-100 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-base text-white">Novo Agendamento Balcão</h3>
@@ -3039,8 +2942,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             <form onSubmit={handleAddManualBooking} className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Nome do Cliente *</label>
-                <input
+                <label className="block text-slate-300 font-semibold mb-1" htmlFor="adm-2939">Nome do Cliente *</label>
+                <input name="adm-2939" autoComplete="off" id="adm-2939"
                   type="text"
                   required
                   placeholder="Nome do cliente"
@@ -3051,8 +2954,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Telefone / WhatsApp</label>
-                <input
+                <label className="block text-slate-300 font-semibold mb-1" htmlFor="adm-2951">Telefone / WhatsApp</label>
+                <input name="adm-2951" autoComplete="off" id="adm-2951"
                   type="text"
                   placeholder="(11) 99999-9999"
                   value={newClientPhone}
@@ -3062,15 +2965,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Serviço</label>
-                <select
+                <label className="block text-slate-300 font-semibold mb-1" htmlFor="adm-2962">Serviço</label>
+                <select name="adm-2962" autoComplete="off" id="adm-2962"
                   value={newServiceId}
                   onChange={(e) => setNewServiceId(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white"
                 >
                   {services.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.name} - R$ {s.price.toFixed(2)} ({s.duration_minutes}m)
+                      {s.name} - R$ {formatMoney(s.price)} ({s.duration_minutes}m)
                     </option>
                   ))}
                 </select>
@@ -3078,8 +2981,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               {barbersList.length > 1 && (
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Profissional *</label>
-                  <select
+                  <label className="block text-slate-300 font-semibold mb-1" htmlFor="adm-2978">Profissional *</label>
+                  <select name="adm-2978" autoComplete="off" id="adm-2978"
                     value={newBookingBarberId || (barbersList[0]?.id || '')}
                     onChange={(e) => setNewBookingBarberId(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-amber-300 font-bold"
@@ -3094,8 +2997,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               )}
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Horário</label>
-                <input
+                <label className="block text-slate-300 font-semibold mb-1" htmlFor="adm-2994">Horário</label>
+                <input name="adm-2994" autoComplete="off" id="adm-2994"
                   type="time"
                   value={newTime}
                   onChange={(e) => setNewTime(e.target.value)}
@@ -3126,7 +3029,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* ===================== MODAL DE ADICIONAR / EDITAR PROFISSIONAL ===================== */}
       {showBarberModal && (
         <div
-          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4"
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4 overscroll-contain"
           onClick={() => setShowBarberModal(false)}
         >
           <div
@@ -3151,7 +3054,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="flex items-center gap-4">
                   <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-amber-500/50 bg-slate-800 shrink-0 flex items-center justify-center text-amber-400">
                     {barberModalAvatar ? (
-                      <img src={barberModalAvatar} alt="Foto" className="w-full h-full object-cover" />
+                      <img src={barberModalAvatar} alt="Foto" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                     ) : (
                       <Camera className="w-7 h-7" />
                     )}
@@ -3160,7 +3063,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <input type="file" accept="image/*" onChange={handleBarberPhotoUpload} className="hidden" id="barber-photo-upload" />
                     <label
                       htmlFor="barber-photo-upload"
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer active:scale-95 transition-all"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer active:scale-95 transition"
                     >
                       <Camera className="w-3.5 h-3.5" />
                       <span>{barberModalAvatar ? 'Trocar foto' : 'Enviar foto'}</span>
@@ -3175,8 +3078,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-slate-200 font-bold mb-1.5">Nome *</label>
-                  <input
+                  <label className="block text-slate-200 font-bold mb-1.5" htmlFor="adm-3075">Nome *</label>
+                  <input name="adm-3075" autoComplete="off" id="adm-3075"
                     type="text"
                     required
                     placeholder="Ex: Carlos Oliveira"
@@ -3187,10 +3090,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-slate-200 font-bold mb-1.5">
+                  <label className="block text-slate-200 font-bold mb-1.5" htmlFor="adm-3087">
                     Função <span className="text-slate-500 font-normal">(opcional)</span>
                   </label>
-                  <input
+                  <input name="adm-3087" autoComplete="off" id="adm-3087"
                     type="text"
                     placeholder="Ex: Cabeleireira, Barbeiro, Manicure"
                     value={barberModalRole}
@@ -3200,10 +3103,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-slate-200 font-bold mb-1.5">
+                  <label className="block text-slate-200 font-bold mb-1.5" htmlFor="adm-3100">
                     WhatsApp <span className="text-slate-500 font-normal">(opcional)</span>
                   </label>
-                  <input
+                  <input name="adm-3100" autoComplete="off" id="adm-3100"
                     type="tel"
                     placeholder="(11) 99999-9999"
                     value={barberModalPhone}
@@ -3213,10 +3116,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-slate-200 font-bold mb-1.5">
+                  <label className="block text-slate-200 font-bold mb-1.5" htmlFor="adm-3113">
                     Sobre <span className="text-slate-500 font-normal">(opcional)</span>
                   </label>
-                  <textarea
+                  <textarea name="adm-3113" autoComplete="off" id="adm-3113"
                     rows={2}
                     placeholder="Ex: Mais de 8 anos de experiência"
                     value={barberModalBio}
@@ -3236,7 +3139,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black cursor-pointer active:scale-95 transition-all"
+                  className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black cursor-pointer active:scale-95 transition"
                 >
                   {editingBarber ? 'Salvar' : 'Adicionar'}
                 </button>
@@ -3248,7 +3151,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* ===================== MODAL DE CONFIRMAÇÃO DE EXCLUSÃO DE CONTA ===================== */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overscroll-contain">
           <div className="w-full max-w-sm bg-slate-900 border border-rose-500/50 rounded-3xl p-6 text-slate-100 shadow-2xl space-y-4">
             <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
               <AlertTriangle className="w-6 h-6" />
@@ -3262,10 +3165,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             <div className="space-y-2 text-xs">
-              <label className="block text-slate-300 font-semibold">
+              <label className="block text-slate-300 font-semibold" htmlFor="adm-3162">
                 Digite exatamente <strong className="text-rose-400">Excluir conta</strong> para confirmar:
               </label>
-              <input
+              <input name="adm-3162" autoComplete="off" id="adm-3162"
                 type="text"
                 placeholder="Excluir conta"
                 value={deleteConfirmationText}
@@ -3286,7 +3189,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 type="button"
                 disabled={deleteConfirmationText.trim() !== 'Excluir conta'}
                 onClick={handleConfirmDelete}
-                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs cursor-pointer transition-all"
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs cursor-pointer transition"
               >
                 Excluir Agora
               </button>

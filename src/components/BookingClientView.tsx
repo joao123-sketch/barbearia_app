@@ -23,7 +23,7 @@ import { INVALID_MOBILE_MESSAGE, formatPhoneInput, isValidMobile, toWaNumber } f
 import { normalizeInstagram } from '../lib/instagram'
 import { currentPushKeys, notificationPermission, pushSupport, subscribePush } from '../lib/push'
 import { registerClientPush } from '../lib/db'
-import { isServiceActive, toDateStr } from '../lib/billing'
+import { formatMoney, isServiceActive, toDateStr } from '../lib/billing'
 import { buildSlots } from '../lib/slots'
 import { friendlyError } from '../lib/db'
 import type { BusySlot } from '../lib/db'
@@ -333,7 +333,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
       `✂️ *Serviço(s):* ${confirmedBooking.service_names}\n` +
       `📅 *Data:* ${formattedDate}\n` +
       `⏰ *Horário:* ${confirmedBooking.start_time}\n` +
-      `💰 *Total:* R$ ${confirmedBooking.total_price.toFixed(2).replace('.', ',')}\n` +
+      `💰 *Total:* R$ ${formatMoney(confirmedBooking.total_price)}\n` +
       (confirmedBooking.notes ? `📝 *Observação:* ${confirmedBooking.notes}\n` : '') +
       `\nAguardo a confirmação. Obrigado!`
 
@@ -349,6 +349,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
 
   return (
     <div
+      role="main"
       {...shopThemeAttrs(preset.id, theme)}
       style={buildShopTheme(preset.id, theme)}
       className="min-h-screen pb-28 select-none transition-colors bg-slate-950 text-slate-100"
@@ -365,7 +366,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
         {onBackToPanel && (
           <button
             onClick={onBackToPanel}
-            className="absolute top-[calc(max(env(safe-area-inset-top),var(--ios-min-top,0px))+0.75rem)] left-4 z-10 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/85 hover:bg-slate-800 text-amber-400 border border-slate-700/80 backdrop-blur-md text-xs font-bold active:scale-95 transition-all cursor-pointer shadow-lg"
+            className="absolute top-[calc(max(env(safe-area-inset-top),var(--ios-min-top,0px))+0.75rem)] left-4 z-10 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/85 hover:bg-slate-800 text-amber-400 border border-slate-700/80 backdrop-blur-md text-xs font-bold active:scale-95 transition cursor-pointer shadow-lg"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Voltar ao painel</span>
@@ -379,7 +380,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               onClick={onToggleTheme}
               aria-label="Alternar tema claro/escuro"
               title={isLightMode ? 'Mudar para tema escuro' : 'Mudar para tema claro'}
-              className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-amber-400 border border-slate-700/80 backdrop-blur-md transition-all active:scale-95 cursor-pointer shadow-lg"
+              className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-amber-400 border border-slate-700/80 backdrop-blur-md transition active:scale-95 cursor-pointer shadow-lg"
             >
               {isLightMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
             </button>
@@ -481,7 +482,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               disabled={pushAsking}
               className={`px-3.5 py-2 rounded-xl font-bold shrink-0 cursor-pointer active:scale-95 transition-transform disabled:opacity-60 ${preset.primaryButton}`}
             >
-              {pushAsking ? '...' : 'Ativar'}
+              {pushAsking ? '…' : 'Ativar'}
             </button>
           </div>
         )}
@@ -517,7 +518,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setStep('service')}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
                     step === 'service'
                       ? `${preset.primaryButton} shadow-md`
                       : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-white'
@@ -533,7 +534,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                   type="button"
                   onClick={() => selectedServices.length > 0 && setStep('datetime')}
                   disabled={selectedServices.length === 0}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition ${
                     step === 'datetime'
                       ? `${preset.primaryButton} shadow-md`
                       : selectedServices.length > 0
@@ -551,7 +552,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                   type="button"
                   onClick={() => selectedServices.length > 0 && selectedTime && setStep('customer')}
                   disabled={selectedServices.length === 0 || !selectedTime}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition ${
                     step === 'customer'
                       ? `${preset.primaryButton} shadow-md`
                       : selectedServices.length > 0 && selectedTime
@@ -575,7 +576,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
-                    className={`shop-chip ${selectedCategory === cat ? 'shop-chip-active' : ''} px-3 py-1.5 rounded-xl font-medium shrink-0 transition-all capitalize ${
+                    className={`shop-chip ${selectedCategory === cat ? 'shop-chip-active' : ''} px-3 py-1.5 rounded-xl font-medium shrink-0 transition capitalize ${
                       selectedCategory === cat
                         ? 'bg-slate-200 text-slate-950 font-bold'
                         : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
@@ -601,7 +602,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                     <div
                       key={service.id}
                       onClick={() => toggleService(service.id)}
-                      className={`shop-service ${isSelected ? 'shop-service-selected' : ''} p-4 rounded-2xl border transition-all cursor-pointer active:scale-[0.99] ${
+                      className={`shop-service ${isSelected ? 'shop-service-selected' : ''} p-4 rounded-2xl border transition cursor-pointer active:scale-[0.99] ${
                         isSelected
                           ? 'bg-gradient-to-r from-amber-500/15 to-transparent border-amber-500 shadow-lg shadow-amber-500/10'
                           : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
@@ -643,7 +644,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                             {service.duration_minutes} min
                           </span>
                           <span className="text-base font-extrabold text-amber-400">
-                            R$ {service.price.toFixed(2).replace('.', ',')}
+                            R$ {formatMoney(service.price)}
                           </span>
                         </div>
                       </div>
@@ -669,16 +670,16 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
         {step === 'datetime' && (
           <div className="space-y-5 animate-in fade-in duration-200">
             {bookingError && (
-              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400 text-xs">{bookingError}</div>
+              <div role="alert" className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400 text-xs">{bookingError}</div>
             )}
             {/* Escolha do Barbeiro / Profissional (quando equipe > 1) */}
             {activeBarbers.length > 1 && (
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                     <Users className="w-3.5 h-3.5 text-amber-400" />
                     <span>Escolha o Profissional</span>
-                  </label>
+                  </p>
                   <span className={`text-[11px] font-bold ${preset.accentText}`}>
                     {selectedBarberId === 'any'
                       ? terms.anyProfessional
@@ -690,7 +691,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setSelectedBarberId('any')}
-                    className={`p-2.5 rounded-2xl border flex items-center gap-2.5 transition-all cursor-pointer text-left ${
+                    className={`p-2.5 rounded-2xl border flex items-center gap-2.5 transition cursor-pointer text-left ${
                       selectedBarberId === 'any'
                         ? `${preset.accentBorder} border-2 bg-slate-800/90 shadow-md ring-1 ring-amber-500/30`
                         : isLight
@@ -716,7 +717,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                         key={barber.id}
                         type="button"
                         onClick={() => setSelectedBarberId(barber.id)}
-                        className={`p-2.5 rounded-2xl border flex items-center gap-2.5 transition-all cursor-pointer text-left ${
+                        className={`p-2.5 rounded-2xl border flex items-center gap-2.5 transition cursor-pointer text-left ${
                           isSelected
                             ? `${preset.accentBorder} border-2 bg-slate-800/90 shadow-md ring-1 ring-amber-500/30`
                             : isLight
@@ -726,7 +727,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                       >
                         <div className="w-9 h-9 rounded-xl overflow-hidden border border-slate-700 shrink-0 bg-slate-800">
                           {barber.avatar_url ? (
-                            <img src={barber.avatar_url} alt={barber.name} className="w-full h-full object-cover" />
+                            <img src={barber.avatar_url} alt={barber.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-amber-400 bg-amber-500/10">
                               <Scissors className="w-4 h-4" />
@@ -751,9 +752,9 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
             {/* Seletor de Data Horizontal */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                   Escolha o Dia
-                </label>
+                </p>
                 <span className={`text-xs font-semibold ${preset.accentText}`}>{formattedDate}</span>
               </div>
 
@@ -765,7 +766,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                       key={d.date}
                       disabled={d.isBlocked}
                       onClick={() => !d.isBlocked && setSelectedDate(d.date)}
-                      className={`shop-day ${isSelected ? 'shop-day-selected' : ''} p-2.5 rounded-2xl flex flex-col items-center justify-center border transition-all cursor-pointer ${
+                      className={`shop-day ${isSelected ? 'shop-day-selected' : ''} p-2.5 rounded-2xl flex flex-col items-center justify-center border transition cursor-pointer ${
                         d.isBlocked
                           ? 'bg-slate-950/80 border-slate-900 text-slate-600 opacity-50 cursor-not-allowed'
                           : isSelected
@@ -790,9 +791,9 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
 
             {/* Horários */}
             <div>
-              <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">
+              <p className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">
                 Horários Disponíveis
-              </label>
+              </p>
 
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
                 {availableTimes.map((item) => {
@@ -802,7 +803,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                       key={item.time}
                       disabled={!item.available}
                       onClick={() => setSelectedTime(item.time)}
-                      className={`shop-time ${isSelected ? 'shop-time-selected' : ''} py-3 px-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                      className={`shop-time ${isSelected ? 'shop-time-selected' : ''} py-3 px-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
                         isSelected
                           ? `${preset.primaryButton} shadow-md`
                           : item.available
@@ -829,7 +830,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               <h4 className="font-bold text-white text-sm mb-2 flex items-center justify-between">
                 <span>Resumo do Agendamento</span>
                 <span className={`font-extrabold text-base ${preset.accentText}`}>
-                  R$ {totalPrice.toFixed(2).replace('.', ',')}
+                  R$ {formatMoney(totalPrice)}
                 </span>
               </h4>
               <div className="flex justify-between text-slate-400">
@@ -863,10 +864,10 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
             {/* Formulário */}
             <div className="space-y-3.5">
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-300 mb-1" htmlFor="bkg-866">
                   Seu Nome Completo *
                 </label>
-                <input
+                <input name="name" autoComplete="name" id="bkg-866"
                   type="text"
                   placeholder="Ex: João Silva"
                   value={clientName}
@@ -876,10 +877,10 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-300 mb-1" htmlFor="bkg-879">
                   WhatsApp (com DDD) *
                 </label>
-                <input
+                <input name="phone" autoComplete="tel-national" id="bkg-879"
                   type="tel"
                   placeholder="(11) 99999-9999"
                   value={clientPhone}
@@ -893,10 +894,10 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
 
               {/* Escolha do Tempo de Lembrete */}
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                <p className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
                   <Bell className="w-3.5 h-3.5 text-amber-400" />
                   <span>Com quanto tempo antes você quer ser lembrado?</span>
-                </label>
+                </p>
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { id: '10min', label: '10 min antes' },
@@ -907,7 +908,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                       key={rem.id}
                       type="button"
                       onClick={() => setReminderPreference(rem.id as any)}
-                      className={`py-2 px-1.5 rounded-xl text-center text-xs font-bold border transition-all cursor-pointer ${
+                      className={`py-2 px-1.5 rounded-xl text-center text-xs font-bold border transition cursor-pointer ${
                         reminderPreference === rem.id
                           ? `${preset.primaryButton} shadow-md`
                           : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
@@ -923,10 +924,10 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-300 mb-1" htmlFor="bkg-926">
                   Observações para o {terms.professional} (opcional)
                 </label>
-                <textarea
+                <textarea name="notes" autoComplete="off" id="bkg-926"
                   rows={2}
                   placeholder="Ex: Primeira vez aqui, alguma preferência?"
                   value={clientNotes}
@@ -977,7 +978,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
               <div className="flex justify-between items-center">
                 <span className="text-slate-400">Valor Total:</span>
                 <span className={`font-extrabold text-base ${preset.accentText}`}>
-                  R$ {confirmedBooking.total_price.toFixed(2).replace('.', ',')}
+                  R$ {formatMoney(confirmedBooking.total_price)}
                 </span>
               </div>
             </div>
@@ -1034,7 +1035,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                       }}
                       className={`w-full py-3 rounded-xl font-bold cursor-pointer active:scale-95 transition-transform disabled:opacity-60 ${preset.primaryButton}`}
                     >
-                      {reminderState === 'busy' ? 'Ativando...' : 'Receber lembrete neste aparelho'}
+                      {reminderState === 'busy' ? 'Ativando…' : 'Receber lembrete neste aparelho'}
                     </button>
                   </>
                 )}
@@ -1073,14 +1074,14 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
 
       {/* ===================== BARRA INFERIOR FLUTUANTE ===================== */}
       {step !== 'success' && selectedServices.length > 0 && (
-        <div className="shop-bar fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 border-t border-slate-800/90 backdrop-blur-xl p-3.5">
+        <div className="shop-bar fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 border-t border-slate-800/90 backdrop-blur-xl p-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))]">
           <div className="max-w-md mx-auto flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] text-slate-400">
                 {selectedServices.length} {selectedServices.length === 1 ? 'serviço' : 'serviços'} • {totalDuration} min
               </p>
               <p className={`text-lg font-black leading-tight ${preset.accentText}`}>
-                R$ {totalPrice.toFixed(2).replace('.', ',')}
+                R$ {formatMoney(totalPrice)}
               </p>
             </div>
 
@@ -1111,7 +1112,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                 <button
                   onClick={() => setStep('customer')}
                   disabled={!selectedTime}
-                  className={`px-5 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all cursor-pointer ${
+                  className={`px-5 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition cursor-pointer ${
                     selectedTime
                       ? `${preset.primaryButton} shadow-lg active:scale-95`
                       : 'bg-slate-800 text-slate-500 cursor-not-allowed'
@@ -1128,7 +1129,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                   disabled={submitting}
                   className={`px-5 py-3 rounded-xl font-black text-sm flex items-center gap-2 shadow-lg active:scale-95 transition-transform cursor-pointer disabled:opacity-60 ${preset.primaryButton}`}
                 >
-                  <span>{submitting ? 'Confirmando...' : 'Confirmar'}</span>
+                  <span>{submitting ? 'Confirmando…' : 'Confirmar'}</span>
                   <Check className="w-4 h-4 stroke-[3]" />
                 </button>
               )}

@@ -2,6 +2,7 @@
 //  - owner_new: avisa o dono de um agendamento novo
 //  - client_reminder: lembra o cliente antes do horário
 //  - owner_test: aviso de teste pedido pelo dono em Configurações
+//  - billing_reminder: lembrete de mensalidade (antes e depois do vencimento), programado por billing_daily()
 // Quem chama é o próprio banco (gatilho do agendamento e agendador de 1 minuto), com o segredo no cabeçalho.
 // Segredos usados (definidos no painel do Supabase): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, NOTIFY_SECRET.
 import webpush from 'npm:web-push@3.6.7'
@@ -50,7 +51,7 @@ Deno.serve(async (req) => {
 
   const { data: due } = await supabase
     .from('notification_queue')
-    .select('id, kind, appointment_id, barbershop_id')
+    .select('id, kind, appointment_id, barbershop_id, title, body')
     .is('sent_at', null)
     .lte('send_at', new Date().toISOString())
     .order('send_at')
@@ -82,6 +83,22 @@ Deno.serve(async (req) => {
         body: 'Tudo certo! Você vai receber um aviso a cada agendamento novo.',
         url: '/admin',
         tag: 'teste'
+      })
+      continue
+    }
+
+    // Lembrete de mensalidade (programado pelo banco, um por marco de vencimento)
+    if (item.kind === 'billing_reminder') {
+      const { data: subs } = await supabase
+        .from('push_subscriptions')
+        .select('id, endpoint, p256dh, auth')
+        .eq('kind', 'owner')
+        .eq('barbershop_id', item.barbershop_id)
+      delivered += await sendTo(subs ?? [], {
+        title: item.title ?? 'Mensalidade do SuaAgenda',
+        body: item.body ?? 'Abra o app para ver a sua mensalidade.',
+        url: '/admin',
+        tag: 'cobranca'
       })
       continue
     }

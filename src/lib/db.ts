@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import type { Appointment, Barber, Barbershop, Service, WorkingHour } from '../types'
-import type { PlatformSettings } from './platform'
+import { DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from './platform'
 import type { PushKeys } from './push'
 
 // ---------- conversões banco <-> app ----------
@@ -129,7 +129,10 @@ export async function fetchPlatformSettings(): Promise<PlatformSettings | null> 
     pix_name: r.pix_name ?? '',
     pix_bank: r.pix_bank ?? '',
     pix_qrcode: r.pix_qrcode ?? '',
-    contact_whatsapp: r.contact_whatsapp ?? ''
+    contact_whatsapp: r.contact_whatsapp ?? '',
+    grace_days: Number(r.grace_days ?? 10),
+    invoice_lead_days: Number(r.invoice_lead_days ?? 7),
+    reminder_offsets: (r.reminder_offsets as number[] | null) ?? DEFAULT_PLATFORM_SETTINGS.reminder_offsets
   }
 }
 
@@ -394,4 +397,124 @@ export async function adminFetchShopMetrics(): Promise<Record<string, ShopMetric
     }
   }
   return map
+}
+
+// ---------- mensalidades (faturas e pagamento pelo app) ----------
+
+export type InvoiceFlag = 'duplicate_payment' | 'amount_mismatch' | 'orphan_payment' | 'refunded'
+
+export interface Invoice {
+  id: string
+  barbershop_id: string
+  amount: number
+  due_date: string
+  status: 'open' | 'paid' | 'cancelled'
+  paid_at?: string
+  paid_amount?: number
+  payment_source?: 'provider' | 'manual'
+  flag?: InvoiceFlag
+  flag_note?: string
+  created_at: string
+  shop_name?: string
+}
+
+const toInvoice = (r: any): Invoice => ({
+  id: r.id,
+  barbershop_id: r.barbershop_id,
+  amount: Number(r.amount),
+  due_date: r.due_date,
+  status: r.status,
+  paid_at: r.paid_at ?? undefined,
+  paid_amount: r.paid_amount != null ? Number(r.paid_amount) : undefined,
+  payment_source: r.payment_source ?? undefined,
+  flag: r.flag ?? undefined,
+  flag_note: r.flag_note ?? undefined,
+  created_at: r.created_at,
+  shop_name: r.barbershops?.name ?? undefined
+})
+
+export async function fetchMyInvoices(shopId: string): Promise<Invoice[]> {
+  const rows = check(
+    await supabase.from('invoices').select('*').eq('barbershop_id', shopId).order('created_at', { ascending: false }).limit(12)
+  )
+  return (rows ?? []).map(toInvoice)
+}
+
+export interface PixCheckout {
+  configured: boolean
+  error?: 'cpf_required' | 'provider_error' | 'checkout_error' | 'suspended' | string
+  invoice?: { id: string; amount: number; due_date: string }
+  pix?: { payload: string; image: string; expires_at: string | null }
+}
+
+// Pede ao servidor o Pix da fatura aberta (a chave do provedor nunca passa pelo navegador)
+export async function requestPixCheckout(cpfCnpj?: string): Promise<PixCheckout> {
+  const { data, error } = await supabase.functions.invoke('billing-checkout', { body: cpfCnpj ? { cpf_cnpj: cpfCnpj } : {} })
+  if (error) {
+    // Respostas de erro da função (422/502...) trazem o motivo no corpo
+    const body = await (error as { context?: Response }).context?.json?.().catch(() => null)
+    if (body && typeof body === 'object') return body as PixCheckout
+    throw new Error(error.message)
+  }
+  return data as PixCheckout
+}
+
+export async function adminFetchInvoices(): Promise<Invoice[]> {
+  const rows = check(
+    await supabase
+      .from('invoices')
+      .select('*, barbershops(name)')
+      .order('created_at', { ascending: false })
+      .limit(200)
+  )
+  return (rows ?? []).map(toInvoice)
+}
+
+export interface PaymentEvent {
+  id: number
+  event_type: string
+  provider_payment_id?: string
+  result?: string
+  received_at: string
+}
+
+export async function adminFetchPaymentEvents(): Promise<PaymentEvent[]> {
+  const rows = check(
+    await supabase
+      .from('payment_events')
+      .select('id, event_type, provider_payment_id, result, received_at')
+      .order('received_at', { ascending: false })
+      .limit(40)
+  )
+  return (rows ?? []).map((r: any) => ({ ...r, provider_payment_id: r.provider_payment_id ?? undefined, result: r.result ?? undefined }))
+}
+
+export async function adminResolveInvoice(invoiceId: string, action: 'mark_paid' | 'cancel' | 'clear_flag') {
+  check(await supabase.rpc('admin_resolve_invoice', { p_invoice: invoiceId, p_action: action }))
+}
+
+// ---------- alertas do administrador (falhas do pagamento automático) ----------
+
+export interface AdminAlert {
+  id: number
+  kind: string
+  message: string
+  detail?: string
+  occurrences: number
+  last_at: string
+}
+
+export async function adminFetchAlerts(): Promise<AdminAlert[]> {
+  const rows = check(
+    await supabase
+      .from('admin_alerts')
+      .select('id, kind, message, detail, occurrences, last_at')
+      .is('resolved_at', null)
+      .order('last_at', { ascending: false })
+  )
+  return (rows ?? []).map((r: any) => ({ ...r, detail: r.detail ?? undefined }))
+}
+
+export async function adminResolveAlert(id: number) {
+  check(await supabase.rpc('admin_resolve_alert', { p_id: id }))
 }

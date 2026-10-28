@@ -144,9 +144,9 @@ export const OwnerNotifications: React.FC<OwnerNotificationsProps> = ({ shopId, 
               type="button"
               onClick={enable}
               disabled={busy}
-              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold cursor-pointer active:scale-95 transition-all disabled:opacity-60"
+              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold cursor-pointer active:scale-95 transition disabled:opacity-60"
             >
-              {busy ? 'Ativando...' : 'Ativar avisos'}
+              {busy ? 'Ativando…' : 'Ativar avisos'}
             </button>
           )}
         </div>

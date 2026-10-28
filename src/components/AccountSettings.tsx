@@ -15,7 +15,7 @@ type Section = 'email' | 'phone' | 'password' | null
 const field =
   'w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 text-sm'
 const primary =
-  'px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer active:scale-95 transition-all disabled:opacity-60'
+  'px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer active:scale-95 transition disabled:opacity-60'
 
 const formatPhone = (raw: string) => {
   const d = normalizePhone(raw)
@@ -142,7 +142,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ phone, onChang
           {row('email', <Mail className="w-4 h-4" />, 'E-mail', email || '—')}
           {open === 'email' && (
             <form onSubmit={saveEmail} className="pb-4 space-y-2.5">
-              <input
+              <input name="email" autoComplete="email" aria-label="Novo e-mail"
                 type="email"
                 required
                 autoCapitalize="none"
@@ -153,7 +153,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ phone, onChang
                 onChange={(e) => setNewEmail(normalizeEmail(e.target.value))}
                 className={field}
               />
-              <PasswordInput
+              <PasswordInput name="current-password" aria-label="Sua senha atual"
                 required
                 autoComplete="current-password"
                 placeholder="Sua senha atual"
@@ -163,7 +163,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ phone, onChang
               />
               {error && <p className="text-rose-400">{error}</p>}
               <button type="submit" disabled={busy} className={primary}>
-                {busy ? 'Salvando...' : 'Salvar e-mail'}
+                {busy ? 'Salvando…' : 'Salvar e-mail'}
               </button>
             </form>
           )}
@@ -173,7 +173,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ phone, onChang
           {row('phone', <Phone className="w-4 h-4" />, 'WhatsApp', formatPhone(phone))}
           {open === 'phone' && (
             <form onSubmit={savePhone} className="pb-4 space-y-2.5">
-              <input
+              <input name="phone" autoComplete="tel-national" aria-label="(11) 99999-9999"
                 type="tel"
                 required
                 placeholder="(11) 99999-9999"
@@ -186,7 +186,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ phone, onChang
               />
               {error && <p className="text-rose-400">{error}</p>}
               <button type="submit" disabled={busy} className={primary}>
-                {busy ? 'Salvando...' : 'Salvar WhatsApp'}
+                {busy ? 'Salvando…' : 'Salvar WhatsApp'}
               </button>
             </form>
           )}
@@ -196,7 +196,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ phone, onChang
           {row('password', <KeyRound className="w-4 h-4" />, 'Senha', '••••••••')}
           {open === 'password' && (
             <form onSubmit={savePassword} className="pb-4 space-y-2.5">
-              <PasswordInput
+              <PasswordInput name="current-password" aria-label="Senha atual"
                 required
                 autoComplete="current-password"
                 placeholder="Senha atual"
@@ -204,7 +204,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ phone, onChang
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 inputClassName={field}
               />
-              <PasswordInput
+              <PasswordInput name="new-password" aria-label="Nova senha (mínimo 6 caracteres)"
                 required
                 autoComplete="new-password"
                 placeholder="Nova senha (mínimo 6 caracteres)"
@@ -214,7 +214,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ phone, onChang
               />
               {error && <p className="text-rose-400">{error}</p>}
               <button type="submit" disabled={busy} className={primary}>
-                {busy ? 'Salvando...' : 'Salvar senha'}
+                {busy ? 'Salvando…' : 'Salvar senha'}
               </button>
             </form>
           )}

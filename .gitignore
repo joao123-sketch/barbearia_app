@@ -29,3 +29,7 @@ dist-ssr
 
 # Arquivos temporários do wrangler dev
 .wrangler
+
+# arquivos de trabalho da skill de design
+.taste-skill/
+supabase/.temp/

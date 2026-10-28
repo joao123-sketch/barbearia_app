@@ -101,7 +101,9 @@
 
 ### Para a plataforma (painel master `/master`, só administrador)
 - Lista de contas com status (teste, pago, vencido, bloqueado), vencimento e mensalidade individual.
-- Confirmação de pagamento por PIX (libera +30 dias), bloqueio e exclusão de contas.
+- Pagamentos e faturas: confirmações automáticas do Asaas, avisos recebidos, ocorrências para conferir (pagamento em duplicidade, valor menor, estorno) e correção manual. A confirmação manual "Recebi (+30d)" continua disponível como plano B.
+- Bloqueio e exclusão de contas.
+- Regras de cobrança configuráveis: dias de carência até bloquear, antecedência da fatura e em quais dias o dono recebe aviso.
 - Reajuste de mensalidade individual ou em porcentagem para todas.
 - **Métricas de uso por conta**, só totais e sem dados dos clientes finais: data de cadastro, serviços, atendimentos, média de horas atendidas por dia, faturamento do mês, do mês passado e total.
 - Link de cadastro para novos clientes e configuração da chave PIX (o QR Code de cada conta é gerado automaticamente com o valor dela).
@@ -112,7 +114,8 @@
 - Cada negócio só enxerga os próprios dados (Row Level Security no banco).
 - O cliente final agenda por função segura no servidor, que valida horário, preço e conflito.
 - Nome e telefone dos clientes finais **nunca** aparecem para outros negócios nem para o painel master. O master vê apenas totais.
-- Cobrança (status, vencimento, valor) só é alterada pelo administrador, nunca direto pelo navegador.
+- Cobrança (status, vencimento, valor) só é alterada pelo administrador ou pela confirmação verificada do provedor de pagamento, nunca direto pelo navegador.
+- As chaves do provedor de pagamento ficam só nos *secrets* do servidor (Supabase), nunca no código do site.
 
 ---
 
@@ -136,7 +139,7 @@ VITE_SUPABASE_ANON_KEY=sua-chave-anon-aqui
 ```
 
 ### Banco (Supabase)
-1. Abra o **SQL Editor** e rode, em ordem, os arquivos de `supabase/migrations/` (`0001` até `0010`).
+1. Abra o **SQL Editor** e rode, em ordem, os arquivos de `supabase/migrations/` (`0001` até `0013`).
 2. Crie a sua conta no app e torne-se administrador:
    ```sql
    insert into public.platform_admins (user_id)
@@ -144,6 +147,36 @@ VITE_SUPABASE_ANON_KEY=sua-chave-anon-aqui
    ```
 3. `0009_admin_metrics.sql` habilita as métricas por conta no painel master.
 4. `0010_mobile_and_email_format.sql` trava o WhatsApp no formato celular (DDD + 9 + 8 dígitos) e o e-mail num formato válido; contas antigas com 10 dígitos ganham o 9.
+5. `0012_billing_automation.sql` cria as faturas, o registro de eventos de pagamento, o bloqueio por atraso (com carência) e o agendador diário de faturas e lembretes. **Antes de rodar**, confira as contas atrasadas há mais de 10 dias: quando a migração entra, elas passam a ficar bloqueadas.
+
+### Cobrança automática (Pix pelo Asaas)
+
+Fluxo: o banco cria a fatura perto do vencimento → o dono toca em **Pagar com Pix** → a função `billing-checkout` cria a cobrança no Asaas e devolve o QR Code → o Asaas avisa o pagamento na função `asaas-webhook`, que **confere o pagamento na API do Asaas** antes de quitar → a fatura vira *paga*, o acesso é estendido por 30 dias e o painel libera sozinho. Nenhuma mensalidade é marcada como paga sem essa confirmação (ou sem ação do administrador).
+
+Regras: carência de 10 dias depois do vencimento (configurável no `/master`); depois disso o painel e os dados ficam bloqueados (inclusive no banco, por RLS) e só a tela de cobrança abre; o link público de agendamento fica no ar durante a carência. O bloqueio é calculado pelas datas, então vale mesmo que o dono não abra o app. Pagamento depois do bloqueio libera 30 dias a partir do dia do pagamento.
+
+**O que você precisa fazer (uma vez):**
+1. Crie a conta no [Asaas](https://www.asaas.com) (aceita CPF) e use o **Sandbox** para testar primeiro (`https://sandbox.asaas.com`).
+2. Em *Integrações > Chaves de API*, gere a chave. Ela **não** vai no `.env` do site.
+3. No Supabase, em *Edge Functions > Secrets*, cadastre:
+   - `ASAAS_API_KEY`: a chave da API
+   - `ASAAS_ENV`: `sandbox` (testes) ou `production`
+   - `ASAAS_WEBHOOK_TOKEN`: um texto aleatório com 32+ caracteres (você inventa)
+4. Publique as funções (CLI do Supabase, ou colando o código no painel):
+   ```bash
+   supabase functions deploy billing-checkout
+   supabase functions deploy asaas-webhook --no-verify-jwt
+   supabase functions deploy send-notifications
+   ```
+   `asaas-webhook` precisa ficar com *Verify JWT* **desligado** (quem chama é o Asaas); `billing-checkout` precisa de JWT ligado.
+5. No Asaas, em *Integrações > Webhooks*, crie um webhook para `https://SEU-PROJETO.supabase.co/functions/v1/asaas-webhook`, com o **mesmo token** de `ASAAS_WEBHOOK_TOKEN`, fila **sequencial**, e marque os eventos de cobrança (`PAYMENT_RECEIVED`, `PAYMENT_CONFIRMED`, `PAYMENT_REFUNDED`, `PAYMENT_DELETED`, `PAYMENT_OVERDUE`).
+6. Teste no sandbox: abra o painel de uma conta, toque em *Pagar com Pix*, pague pelo simulador do Asaas e veja a tela virar "Pagamento confirmado". Depois repita com `ASAAS_ENV=production` e a chave de produção.
+
+`0013_admin_alerts.sql` cria os alertas do administrador: se o Asaas recusar a chave, faltar a chave Pix na conta, um aviso de pagamento falhar ou um pagamento precisar de conferência, aparece um alerta vermelho no topo do `/master` (um por tipo de problema; repetições só somam a contagem). O dono vê só "pagamento automático indisponível" e o Pix manual.
+
+**Passar do sandbox para produção:** no Asaas de produção gere a chave de API, cadastre uma chave Pix na conta e crie o webhook (mesma URL e mesmo token). No Supabase troque `ASAAS_API_KEY` pela chave de produção e `ASAAS_ENV` por `production`. As funções não precisam ser publicadas de novo.
+
+Sem `ASAAS_API_KEY`, o app continua com o Pix manual e a conferência pelo WhatsApp, como antes. Se o Asaas exigir CPF/CNPJ de quem paga, o app pede o número na hora de gerar o Pix (ele vai só ao Asaas, não fica salvo).
 
 ### Conta de demonstração (para panfleto e vendas)
 1. Crie uma conta normalmente no app.

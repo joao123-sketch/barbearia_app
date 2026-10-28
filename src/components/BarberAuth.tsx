@@ -40,7 +40,7 @@ function initialView(pathname: string, hasNext: boolean): View {
 const inputClass =
   'w-full px-3.5 py-3 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-sm'
 const primaryClass =
-  'w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer disabled:opacity-60'
+  'w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition cursor-pointer disabled:opacity-60'
 
 export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, shopLoading, onRegistered }) => {
   const navigate = useNavigate()
@@ -144,16 +144,16 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
         {view === 'login' && (
           <form onSubmit={handleLogin} className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
             {error && (
-              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400 text-xs">{error}</div>
+              <div role="alert" className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400 text-xs">{error}</div>
             )}
 
             <div className="space-y-3.5 text-xs">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5" htmlFor="aut-152">
                   <User className="w-3.5 h-3.5 text-amber-400" />
                   <span>Usuário</span>
                 </label>
-                <input
+                <input name="username" id="aut-152"
                   type="text"
                   required
                   autoComplete="username"
@@ -168,11 +168,11 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5" htmlFor="aut-171">
                   <Lock className="w-3.5 h-3.5 text-amber-400" />
                   <span>Senha</span>
                 </label>
-                <PasswordInput
+                <PasswordInput name="password" id="aut-171"
                   required
                   autoComplete="current-password"
                   placeholder="Sua senha"
@@ -195,7 +195,7 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
             </div>
 
             <button type="submit" disabled={busy} className={primaryClass}>
-              <span>{busy ? 'Entrando...' : 'Entrar'}</span>
+              <span>{busy ? 'Entrando…' : 'Entrar'}</span>
               {!busy && <ArrowRight className="w-4 h-4" />}
             </button>
 
@@ -203,7 +203,7 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
               <button
                 type="button"
                 onClick={() => goTo('register')}
-                className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold text-sm cursor-pointer active:scale-95 transition-all"
+                className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold text-sm cursor-pointer active:scale-95 transition"
               >
                 Cadastrar conta
               </button>
@@ -222,7 +222,7 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
         {view === 'forgot' && (
           <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
             {error && (
-              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400 text-xs">{error}</div>
+              <div role="alert" className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400 text-xs">{error}</div>
             )}
 
             {recoverySent ? (
@@ -239,11 +239,11 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
             ) : (
               <form onSubmit={handleForgot} className="space-y-4 text-xs">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                  <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5" htmlFor="aut-242">
                     <Mail className="w-3.5 h-3.5 text-amber-400" />
                     <span>E-mail da conta</span>
                   </label>
-                  <input
+                  <input name="email" autoComplete="email" id="aut-242"
                     type="email"
                     required
                     placeholder="seuemail@gmail.com"
@@ -257,7 +257,7 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
                   />
                 </div>
                 <button type="submit" disabled={busy} className={primaryClass}>
-                  {busy ? 'Enviando...' : 'Enviar link'}
+                  {busy ? 'Enviando…' : 'Enviar link'}
                 </button>
               </form>
             )}

@@ -60,13 +60,13 @@ export const ResetPassword: React.FC = () => {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl text-xs">
-            {error && <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400">{error}</div>}
+            {error && <div role="alert" className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400">{error}</div>}
             <div>
-              <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+              <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5" htmlFor="rst-65">
                 <Lock className="w-3.5 h-3.5 text-amber-400" />
                 <span>Nova senha</span>
               </label>
-              <PasswordInput
+              <PasswordInput name="password" id="rst-65"
                 required
                 autoComplete="new-password"
                 placeholder="Mínimo 6 caracteres"
@@ -80,7 +80,7 @@ export const ResetPassword: React.FC = () => {
               disabled={saving}
               className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-sm cursor-pointer disabled:opacity-60"
             >
-              {saving ? 'Salvando...' : 'Salvar nova senha'}
+              {saving ? 'Salvando…' : 'Salvar nova senha'}
             </button>
           </form>
         )}

@@ -52,9 +52,9 @@ export const PixPayment: React.FC<PixPaymentProps> = ({ platform, amount }) => {
       <div className="flex justify-center">
         <div className="p-2.5 rounded-2xl bg-white shadow-xl border-2 border-amber-500/40 inline-block">
           {qr ? (
-            <img src={qr} alt={`QR Code PIX de R$ ${formatMoney(amount)}`} className="w-48 h-48 object-contain rounded-xl" />
+            <img src={qr} alt={`QR Code PIX de R$ ${formatMoney(amount)}`} width={192} height={192} className="w-48 h-48 object-contain rounded-xl" />
           ) : (
-            <div className="w-48 h-48 flex items-center justify-center text-slate-500 text-xs">Gerando QR Code...</div>
+            <div className="w-48 h-48 flex items-center justify-center text-slate-500 text-xs">Gerando QR Code…</div>
           )}
         </div>
       </div>
@@ -62,7 +62,7 @@ export const PixPayment: React.FC<PixPaymentProps> = ({ platform, amount }) => {
       <button
         type="button"
         onClick={() => copy('code')}
-        className="w-full max-w-sm mx-auto px-3 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+        className="w-full max-w-sm mx-auto px-3 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition cursor-pointer"
       >
         {copied === 'code' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
         <span>{copied === 'code' ? 'Código copiado!' : 'Copiar PIX copia e cola'}</span>
