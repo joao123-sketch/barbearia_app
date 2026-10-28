@@ -2,7 +2,10 @@
 // O manifesto e o ícone (logo do estabelecimento) são gerados pelo worker em /manifest e /icon.
 
 function setLink(rel: string, href: string) {
-  let link = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`)
+  const links = document.querySelectorAll<HTMLLinkElement>(`link[rel="${rel}"]`)
+  // O index.html traz vários ícones (.ico e png em tamanhos); ao trocar, sobra um só, senão o navegador pode escolher o antigo
+  links.forEach((extra, i) => i > 0 && extra.remove())
+  let link = links[0]
   if (!link) {
     link = document.createElement('link')
     link.rel = rel
@@ -10,6 +13,7 @@ function setLink(rel: string, href: string) {
   }
   link.href = href
   link.removeAttribute('type') // o tipo (png/jpeg) varia conforme a logo
+  link.removeAttribute('sizes')
 }
 
 function setMeta(name: string, content: string) {
@@ -66,9 +70,9 @@ export function applyDefaultPwa(pathname: string) {
   const isAdminArea = pathname.startsWith('/admin') || pathname.startsWith('/login') || pathname.startsWith('/cadastr')
   setLink('manifest', isAdminArea ? '/manifest-admin.json' : '/manifest.json')
   setLink('apple-touch-icon', '/apple-touch-icon.png')
-  // A logo da SuaAgenda aparece só como ícone da aba nas telas de entrada do dono
+  // Telas da própria SuaAgenda (site, entrar, cadastrar, painel) usam o ícone da marca na aba
   const isSignIn = pathname.startsWith('/login') || pathname.startsWith('/cadastr') || pathname.startsWith('/redefinir')
-  setLink('icon', isSignIn ? '/favicon-js.png' : '/icon-192.png')
+  setLink('icon', '/favicon-sa-192.png')
   setMeta('apple-mobile-web-app-title', 'SuaAgenda')
   document.title = isSignIn
     ? 'SuaAgenda | Agenda online para barbearias e salões'
