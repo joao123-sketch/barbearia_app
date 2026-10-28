@@ -677,6 +677,55 @@
 .foot-grid button:hover {
   color: var(--ink);
 }
+/* contatos: WhatsApp, e-mail e Instagram, cada um um alvo de toque de 44px */
+.foot-contact {
+  grid-column: 1 / -1;
+}
+.lp-contacts a {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 0;
+}
+.lp-contacts strong {
+  font-weight: 700;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.lp-contacts .lp-ico {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: var(--acc);
+}
+.price-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.cta-contacts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 16px;
+  font-size: var(--t-small);
+  color: rgba(255, 255, 255, 0.9);
+}
+.cta-contacts a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
 .foot-end {
   margin-top: 36px;
   display: flex;

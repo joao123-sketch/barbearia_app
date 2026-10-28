@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { fetchMonthlyFee } from '../lib/db'
-import { SUPPORT_WHATSAPP } from '../lib/platform'
-import { toWaNumber } from '../lib/phone'
+import { instagramUrl, mailtoUrl, whatsappUrl } from '../lib/contacts'
+import { ContactLinks } from './ContactLinks'
 import '../landing.css'
 
 // Página inicial de quem ainda não entrou. Um painel de blocos com as telas reais do app (contas de demonstração,
@@ -70,7 +70,7 @@ function useReveal(root: React.RefObject<HTMLElement | null>) {
     )
     items.forEach((i) => io.observe(i))
     return () => io.disconnect()
-  }, [])
+  }, [root])
 }
 
 const Mark: React.FC<{ className?: string }> = ({ className = '' }) => (
@@ -341,7 +341,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignup, onLogin }) =
                   <li>20 dias grátis para testar</li>
                   <li>Sem cartão e sem fidelidade</li>
                   <li>Sem taxa por agendamento</li>
-                  <li>Suporte direto no WhatsApp</li>
+                  <li>
+                    <a className="price-link" href={whatsappUrl('Olá! Quero saber mais sobre o SuaAgenda.')} target="_blank" rel="noopener noreferrer">
+                      Suporte direto no WhatsApp
+                    </a>
+                  </li>
                 </ul>
                 <button type="button" className="lp-btn lp-btn--acc lp-btn--lg" style={{ marginTop: 24 }} onClick={onSignup}>
                   Criar conta grátis
@@ -371,6 +375,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignup, onLogin }) =
                       Já tenho conta · Entrar
                     </button>
                   </div>
+                  <p className="cta-contacts">
+                    Prefere conversar?{' '}
+                    <a href={whatsappUrl('Olá! Quero saber mais sobre o SuaAgenda.')} target="_blank" rel="noopener noreferrer">
+                      WhatsApp
+                    </a>
+                    <a href={mailtoUrl('Dúvida sobre o SuaAgenda')}>E-mail</a>
+                    <a href={instagramUrl()} target="_blank" rel="noopener noreferrer">
+                      Instagram
+                    </a>
+                  </p>
                 </div>
                 <div className="cta-shot" aria-hidden="true">
                   <img src={`/landing/${a.prefix}-semana.webp`} alt="" width={560} height={1158} loading="lazy" decoding="async" />
@@ -411,14 +425,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignup, onLogin }) =
             </button>
           </div>
           <div className="foot-contact">
-            <h3>Dúvidas?</h3>
-            <a
-              href={`https://wa.me/${toWaNumber(SUPPORT_WHATSAPP)}?text=${encodeURIComponent('Olá! Quero saber mais sobre o SuaAgenda.')}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Fale com a gente no WhatsApp
-            </a>
+            <h3>Fale com a gente</h3>
+            <ContactLinks variant="landing" />
           </div>
         </div>
         <div className="foot-end">

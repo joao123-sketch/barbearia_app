@@ -41,6 +41,7 @@ import {
   savePlatformSettingsDb
 } from '../lib/db'
 import { MasterAlerts } from './MasterAlerts'
+import { GraceSetting } from './GraceSetting'
 import { MasterPayments } from './MasterPayments'
 import { TRIAL_DAYS, formatBR, formatMoney, getBillingState } from '../lib/billing'
 import { normalizePhone, toWaNumber } from '../lib/phone'
@@ -143,7 +144,7 @@ interface MasterPanelProps {
   barbershops: Barbershop[]
   metrics: Record<string, ShopMetrics>
   settings: PlatformSettings
-  onSettings: (s: PlatformSettings) => void
+  onSettings: React.Dispatch<React.SetStateAction<PlatformSettings>>
   reload: () => Promise<void>
   isLight: boolean
   onToggleTheme: () => void
@@ -202,7 +203,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
       pix_bank: draft.pix_bank.trim(),
       pix_qrcode: draft.pix_qrcode,
       contact_whatsapp: normalizePhone(draft.contact_whatsapp),
-      grace_days: Math.min(60, Math.max(0, Math.round(Number(draft.grace_days)))),
+      grace_days: settings.grace_days, // a carência tem cartão próprio (GraceSetting)
       invoice_lead_days: Math.min(30, Math.max(0, Math.round(Number(draft.invoice_lead_days)))),
       reminder_offsets: Array.from(
         new Set(
@@ -224,7 +225,8 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
       if (applyFeeToAll && clean.monthly_fee !== settings.monthly_fee) await adminScheduleFee(clean.monthly_fee)
     })
     if (!ok) return
-    onSettings(clean)
+    // a carência do estado atual vence: ela pode ter mudado no cartão enquanto este formulário salvava
+    onSettings((prev) => ({ ...clean, grace_days: prev.grace_days }))
     setApplyFeeToAll(false)
     setIsEditingSettings(false)
     setSettingsSaved(true)
@@ -275,7 +277,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
       if (filterStatus === 'all') return matchesSearch
       return matchesSearch && getBillingState(shop, settings.grace_days).status === filterStatus
     })
-  }, [barbershops, searchTerm, filterStatus])
+  }, [barbershops, searchTerm, filterStatus, settings.grace_days])
 
   // KPIs
   const totalShops = barbershops.length
@@ -618,10 +620,6 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                   <dd className="text-white">{settings.pix_bank}</dd>
                 </div>
                 <div>
-                  <dt className="text-slate-400 text-[11px]">Carência até bloquear</dt>
-                  <dd className="text-white">{settings.grace_days} dias de atraso</dd>
-                </div>
-                <div>
                   <dt className="text-slate-400 text-[11px]">Fatura criada com antecedência de</dt>
                   <dd className="text-white">{settings.invoice_lead_days} dias</dd>
                 </div>
@@ -676,17 +674,6 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                     value={draft.contact_whatsapp}
                     onChange={(e) => setDraft({ ...draft, contact_whatsapp: e.target.value })}
                     className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-amber-500 focus:outline-none text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1" htmlFor="mst-677">Carência até bloquear (dias de atraso)</label>
-                  <input name="mst-677" autoComplete="off" id="mst-677"
-                    type="number"
-                    min="0"
-                    max="60"
-                    value={draft.grace_days}
-                    onChange={(e) => setDraft({ ...draft, grace_days: Number(e.target.value) })}
-                    className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-amber-500 focus:outline-none text-white font-bold"
                   />
                 </div>
                 <div>
@@ -822,6 +809,8 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
             ))}
           </div>
         </div>
+
+        <GraceSetting graceDays={settings.grace_days} barbershops={barbershops} onSaved={(days) => onSettings((prev) => ({ ...prev, grace_days: days }))} />
 
         <MasterPayments onChanged={reload} />
 

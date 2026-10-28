@@ -10,6 +10,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
+// VAPID_SUBJECT (segredo) vence; o padrão abaixo deve ficar igual ao e-mail de src/lib/contacts.ts
+// (código Deno não consegue importar de src/).
 webpush.setVapidDetails(
   Deno.env.get('VAPID_SUBJECT') ?? 'mailto:sistemaappbarbearia@gmail.com',
   Deno.env.get('VAPID_PUBLIC_KEY')!,

@@ -35,7 +35,8 @@ import {
 } from 'lucide-react'
 import type { Barbershop, Barber, Service, Appointment, WorkingHour } from '../types'
 import { PWAInstallPrompt } from './PWAInstallPrompt'
-import { DEFAULT_PLATFORM_SETTINGS, SUPPORT_WHATSAPP, type PlatformSettings } from '../lib/platform'
+import { DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from '../lib/platform'
+import { ContactLinks } from './ContactLinks'
 import { newId } from '../lib/db'
 import { AccountSettings } from './AccountSettings'
 import { OwnerNotifications } from './OwnerNotifications'
@@ -2656,15 +2657,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <p className="text-slate-400 text-xs">Dúvida, problema ou sugestão? Fale direto com a gente.</p>
                 </div>
               </div>
-              <a
-                href={`https://wa.me/${toWaNumber(SUPPORT_WHATSAPP)}?text=${encodeURIComponent(`Olá! Sou da ${barbershop.name} (${barbershop.slug}) e preciso de ajuda com o SuaAgenda.`)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition"
-              >
-                <MessageCircle className="w-4 h-4 fill-current" />
-                <span>Falar com o suporte no WhatsApp</span>
-              </a>
+              <ContactLinks
+                variant="panel"
+                whatsappMessage={`Olá! Sou da ${barbershop.name} (${barbershop.slug}) e preciso de ajuda com o SuaAgenda.`}
+                emailSubject={`Suporte SuaAgenda: ${barbershop.name}`}
+                emailBody={`Olá! Sou da ${barbershop.name} (${barbershop.slug}) e preciso de ajuda com o SuaAgenda.`}
+              />
             </div>
 
             {/* ZONA DE PERIGO: EXCLUSÃO DE CONTA */}

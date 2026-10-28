@@ -14,6 +14,7 @@ import {
   updateMyShop
 } from './db'
 import { supabase } from './supabase'
+import { mergeBillingFields } from './billing'
 import { logoToAppIcon } from './image'
 import { readOwnerCache, writeOwnerCache } from './ownerCache'
 import { DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from './platform'
@@ -131,6 +132,37 @@ export function useOwnerData(userId: string | undefined) {
       supabase.removeChannel(channel)
     }
   }, [shopId])
+
+  // Cobrança e carência mudam no servidor sem o dono fazer nada (pagamento confirmado, carência alterada pelo
+  // administrador, bloqueio): relê a cada minuto e ao voltar para o app, e só os campos de cobrança entram na tela.
+  useEffect(() => {
+    if (!userId || !shopId) return
+    let busy = false
+    const refreshBilling = async () => {
+      if (busy || document.hidden) return
+      busy = true
+      try {
+        const [mine, settings] = await Promise.all([fetchMyShop(userId), fetchPlatformSettings()])
+        if (mine) setShop((prev) => (prev ? mergeBillingFields(prev, mine) : prev))
+        if (settings) setPlatform((prev) => (JSON.stringify(prev) === JSON.stringify(settings) ? prev : settings))
+      } catch {
+        // sem rede: tenta de novo no próximo ciclo
+      } finally {
+        busy = false
+      }
+    }
+    const onVisible = () => {
+      if (!document.hidden) refreshBilling()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    const timer = window.setInterval(refreshBilling, 60000)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [userId, shopId])
 
   // Negócios antigos ainda sem ícone PNG: gera da logo uma vez para o app instalar com ela
   const iconTried = useRef(false)

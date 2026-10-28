@@ -7,6 +7,7 @@ import { friendlyError } from '../lib/db'
 import { normalizeEmail } from '../lib/phone'
 import { BarberOnboarding } from './BarberOnboarding'
 import { PasswordInput } from './PasswordInput'
+import { ContactLinks } from './ContactLinks'
 import { LandingPage } from './LandingPage'
 
 interface BarberAuthProps {
@@ -274,6 +275,8 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
             )}
           </div>
         )}
+
+        <ContactLinks variant="inline" whatsappMessage="Olá! Estou com problema para entrar no SuaAgenda." emailSubject="Problema para entrar no SuaAgenda" />
       </div>
     </div>
   )

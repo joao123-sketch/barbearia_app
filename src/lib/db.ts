@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import type { Appointment, Barber, Barbershop, Service, WorkingHour } from '../types'
+import { graceUpdatePayload, requireSavedGrace, withoutGrace } from './billing'
 import { DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from './platform'
 import type { PushKeys } from './push'
 
@@ -140,9 +141,22 @@ export async function savePlatformSettingsDb(s: PlatformSettings) {
   check(
     await supabase
       .from('platform_settings')
-      .update({ ...s, updated_at: new Date().toISOString() })
+      // a carência não passa por aqui: só o cartão próprio grava, para este formulário nunca desfazer uma mudança dela
+      .update({ ...withoutGrace(s), updated_at: new Date().toISOString() })
       .eq('id', 1)
   )
+}
+
+// Carência antes do bloqueio (só o administrador consegue; o banco aceita de 0 a 60)
+export async function saveGraceDays(days: number): Promise<number> {
+  const rows = check(
+    await supabase
+      .from('platform_settings')
+      .update(graceUpdatePayload(days, new Date().toISOString()))
+      .eq('id', 1)
+      .select('grace_days')
+  )
+  return requireSavedGrace(rows as { grace_days: number }[] | null)
 }
 
 export async function isPlatformAdmin(): Promise<boolean> {
@@ -332,6 +346,8 @@ export function friendlyError(message: string): string {
     'User already registered': 'Já existe uma conta com este e-mail.',
     'Invalid login credentials': 'Usuário ou senha incorretos.',
     'is invalid': 'Este e-mail não é aceito. Confira o endereço ou use outro.',
+    forbidden: 'Só o administrador pode alterar isso.',
+    grace_days_check: 'A carência precisa ficar entre 0 e 60 dias.',
     barbershops_slug_key: 'Este link já está em uso. Escolha outro nome de link.',
     barbershops_phone_whatsapp_key: 'Já existe uma conta com este WhatsApp.'
   }
