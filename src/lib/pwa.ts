@@ -68,13 +68,17 @@ export function applyShopPwa(slug: string, name: string, app: 'client' | 'admin'
 // Telas sem negócio definido (entrar, cadastrar...): app genérico
 export function applyDefaultPwa(pathname: string) {
   const isAdminArea = pathname.startsWith('/admin') || pathname.startsWith('/login') || pathname.startsWith('/cadastr')
-  setLink('manifest', isAdminArea ? '/manifest-admin.json' : '/manifest.json')
+  // O painel da plataforma tem o próprio app instalável (abre direto em /master)
+  const isPlatformArea = pathname.startsWith('/master') || pathname.startsWith('/superadmin')
+  setLink('manifest', isPlatformArea ? '/manifest-master.json' : isAdminArea ? '/manifest-admin.json' : '/manifest.json')
   setLink('apple-touch-icon', '/apple-touch-icon.png')
   // Telas da própria SuaAgenda (site, entrar, cadastrar, painel) usam o ícone da marca na aba
   const isSignIn = pathname.startsWith('/login') || pathname.startsWith('/cadastr') || pathname.startsWith('/redefinir')
   setLink('icon', '/favicon-sa-192.png')
-  setMeta('apple-mobile-web-app-title', 'SuaAgenda')
-  document.title = isSignIn
+  setMeta('apple-mobile-web-app-title', isPlatformArea ? 'Admin SuaAgenda' : 'SuaAgenda')
+  document.title = isPlatformArea
+    ? 'Admin | SuaAgenda'
+    : isSignIn
     ? 'SuaAgenda | Agenda online para barbearias e salões'
     : isAdminArea
       ? 'Painel | SuaAgenda'

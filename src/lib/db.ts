@@ -276,6 +276,38 @@ export async function sendOwnerTestPush(shopId: string) {
   check(await supabase.rpc('send_owner_test_push', { p_shop: shopId }))
 }
 
+// ---------- avisos do administrador (novo cadastro de negócio) ----------
+
+export async function saveAdminPush(keys: PushKeys) {
+  const { data } = await supabase.auth.getUser()
+  if (!data.user) throw new Error('forbidden')
+  const { error } = await supabase.from('push_subscriptions').insert({
+    kind: 'admin',
+    user_id: data.user.id,
+    endpoint: keys.endpoint,
+    p256dh: keys.p256dh,
+    auth: keys.auth
+  })
+  if (error && error.code !== '23505') throw new Error(error.message)
+}
+
+export async function hasAdminPush(endpoint: string): Promise<boolean> {
+  const { count } = await supabase
+    .from('push_subscriptions')
+    .select('id', { count: 'exact', head: true })
+    .eq('kind', 'admin')
+    .eq('endpoint', endpoint)
+  return (count ?? 0) > 0
+}
+
+export async function removeAdminPush(endpoint: string) {
+  check(await supabase.from('push_subscriptions').delete().eq('kind', 'admin').eq('endpoint', endpoint))
+}
+
+export async function sendAdminTestPush() {
+  check(await supabase.rpc('send_admin_test_push'))
+}
+
 export async function registerClientPush(appointmentId: string, keys: PushKeys) {
   check(
     await supabase.rpc('register_client_push', {

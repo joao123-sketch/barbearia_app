@@ -3,6 +3,7 @@
 //  - client_reminder: lembra o cliente antes do horário
 //  - owner_test: aviso de teste pedido pelo dono em Configurações
 //  - billing_reminder: lembrete de mensalidade (antes e depois do vencimento), programado por billing_daily()
+//  - admin_signup / admin_test: aviso ao administrador de um novo cadastro de negócio (e o teste dele)
 // Quem chama é o próprio banco (gatilho do agendamento e agendador de 1 minuto), com o segredo no cabeçalho.
 // Segredos usados (definidos no painel do Supabase): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, NOTIFY_SECRET.
 import webpush from 'npm:web-push@3.6.7'
@@ -101,6 +102,22 @@ Deno.serve(async (req) => {
         body: item.body ?? 'Abra o app para ver a sua mensalidade.',
         url: '/admin',
         tag: 'cobranca'
+      })
+      continue
+    }
+
+    // Aviso ao administrador: novo cadastro de negócio (e o teste dele). Só aparelhos do administrador recebem.
+    if (item.kind === 'admin_signup' || item.kind === 'admin_test') {
+      const { data: subs } = await supabase
+        .from('push_subscriptions')
+        .select('id, endpoint, p256dh, auth')
+        .eq('kind', 'admin')
+      const isTest = item.kind === 'admin_test'
+      delivered += await sendTo(subs ?? [], {
+        title: isTest ? 'Aviso de teste' : (item.title ?? 'Novo cadastro'),
+        body: isTest ? 'Tudo certo! Você vai receber um aviso a cada novo cadastro no SuaAgenda.' : (item.body ?? 'Um novo negócio se cadastrou.'),
+        url: '/master',
+        tag: isTest ? 'admin-teste' : 'cadastro-' + item.id
       })
       continue
     }

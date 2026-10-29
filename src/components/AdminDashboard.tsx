@@ -31,7 +31,8 @@ import {
   Sparkles,
   Users,
   Palette,
-  UserPlus
+  UserPlus,
+  ShieldCheck
 } from 'lucide-react'
 import type { Barbershop, Barber, Service, Appointment, WorkingHour } from '../types'
 import { PWAInstallPrompt } from './PWAInstallPrompt'
@@ -979,6 +980,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
                   <span className="hidden sm:inline">Ver como Cliente</span>
                 </button>
+              )}
+              {barbershop.billing_exempt && (
+                <a
+                  href="/master"
+                  className={`flex items-center gap-1 px-3 min-h-[36px] rounded-xl text-xs font-semibold border active:scale-95 transition cursor-pointer ${
+                    isLight ? 'bg-slate-100 border-slate-200 text-slate-800 hover:bg-slate-200' : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
+                  <span>Plataforma</span>
+                </a>
               )}
               <PWAInstallPrompt variant="compact" buttonText="App" />
             </div>

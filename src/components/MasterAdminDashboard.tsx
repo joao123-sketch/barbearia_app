@@ -42,6 +42,7 @@ import {
 } from '../lib/db'
 import { MasterAlerts } from './MasterAlerts'
 import { GraceSetting } from './GraceSetting'
+import { AdminNotifications } from './AdminNotifications'
 import { MasterPayments } from './MasterPayments'
 import { TRIAL_DAYS, formatBR, formatMoney, getBillingState } from '../lib/billing'
 import { normalizePhone, toWaNumber } from '../lib/phone'
@@ -385,7 +386,14 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <a
+              href="/admin"
+              className="flex items-center gap-1.5 px-3 min-h-[36px] rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/40 text-xs text-slate-300 hover:text-white"
+            >
+              <Store className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
+              <span>Meu painel</span>
+            </a>
             <button
               onClick={onToggleTheme}
               title={isLight ? 'Modo escuro' : 'Modo claro'}
@@ -415,6 +423,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
 
       <main className="max-w-5xl mx-auto px-4 py-5 space-y-5">
         <MasterAlerts />
+        <AdminNotifications />
         {/* ===================== LINK PARA ENVIAR AOS BARBEIROS (CADASTRO) ===================== */}
         <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-500/20 via-slate-900 to-slate-900 border border-amber-500/40 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
           <div className="flex items-start gap-3.5">
