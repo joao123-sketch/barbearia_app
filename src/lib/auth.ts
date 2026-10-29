@@ -77,9 +77,9 @@ export async function accountExists(phone?: string, email?: string): Promise<boo
   return Boolean(data)
 }
 
-// Já usou o teste grátis? (o cadastro avisa antes de criar a conta)
-export async function trialAlreadyUsed(phone: string): Promise<boolean> {
-  const { data } = await supabase.rpc('trial_used', { p_phone: phone })
+// Este WhatsApp ou e-mail já usou o teste grátis? (o cadastro avisa antes de criar a conta)
+export async function trialAlreadyUsed(phone?: string, email?: string): Promise<boolean> {
+  const { data } = await supabase.rpc('trial_used', { p_phone: phone || null, p_email: email ? normalizeEmail(email) : null })
   return Boolean(data)
 }
 

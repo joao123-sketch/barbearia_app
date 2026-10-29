@@ -21,7 +21,8 @@ import { PasswordInput } from './PasswordInput'
 import { normalizeInstagram } from '../lib/instagram'
 import { defaultWorkingHours, fetchMonthlyFee, friendlyError, registerBarbershop, saveWorkingHours } from '../lib/db'
 import { getTerms } from '../lib/terms'
-import { INVALID_MOBILE_MESSAGE, formatPhoneInput, isValidEmail, isValidMobile, normalizeEmail, normalizePhone } from '../lib/phone'
+import { INVALID_MOBILE_MESSAGE, formatPhoneInput, isValidEmail, isValidMobile, normalizeEmail, normalizePhone, toWaNumber } from '../lib/phone'
+import { SUPPORT_EMAIL, SUPPORT_WHATSAPP } from '../lib/platform'
 import { TRIAL_DAYS, formatMoney } from '../lib/billing'
 import { BR_STATES } from '../lib/states'
 import { STYLE_PRESETS, STYLE_PRESET_ORDER } from '../lib/stylePresets'
@@ -101,27 +102,42 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
       setExisting(null)
       return
     }
+    // Resposta de uma consulta antiga (número que já foi trocado) não pode mais mexer no aviso
+    let stale = false
     const timer = window.setTimeout(async () => {
-      if (phoneOk && (await accountExists(phone, undefined))) setExisting('phone')
-      else if (emailOk && (await accountExists(undefined, email))) setExisting('email')
-      else setExisting(null)
+      let found: 'phone' | 'email' | null = null
+      if (phoneOk && (await accountExists(phone, undefined))) found = 'phone'
+      else if (emailOk && (await accountExists(undefined, email))) found = 'email'
+      if (!stale) setExisting(found)
     }, 400)
-    return () => window.clearTimeout(timer)
+    return () => {
+      stale = true
+      window.clearTimeout(timer)
+    }
   }, [phone, email, loggedEmail])
   const existingAccount = existing !== null
 
   // Este WhatsApp já usou o teste grátis (conta apagada antes, por exemplo)? Avisa antes de criar
   const [trialUsed, setTrialUsed] = useState(false)
   useEffect(() => {
-    if (!isValidMobile(phone)) {
+    const phoneOk = isValidMobile(phone)
+    const emailToCheck = loggedEmail ?? email
+    const emailOk = isValidEmail(emailToCheck)
+    if (!phoneOk && !emailOk) {
       setTrialUsed(false)
       return
     }
+    let stale = false
     const timer = window.setTimeout(() => {
-      trialAlreadyUsed(phone).then(setTrialUsed).catch(() => setTrialUsed(false))
+      trialAlreadyUsed(phoneOk ? phone : undefined, emailOk ? emailToCheck : undefined)
+        .then((used) => !stale && setTrialUsed(used))
+        .catch(() => !stale && setTrialUsed(false))
     }, 400)
-    return () => window.clearTimeout(timer)
-  }, [phone])
+    return () => {
+      stale = true
+      window.clearTimeout(timer)
+    }
+  }, [phone, email, loggedEmail])
   const existingByPhone = existing === 'phone'
 
   // Gerar slug automaticamente ao digitar o nome da barbearia
@@ -211,10 +227,17 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
       alert('Por favor, escolha o estado (UF).')
       return
     }
-    if (existingAccount) {
-      alert('Já existe uma conta com este WhatsApp ou e-mail. Toque em "Entrar" para acessar a sua conta.')
+    // Confere de novo com o banco, com o número e e-mail que estão no formulário agora (o aviso na tela pode estar atrasado)
+    const phoneTaken = await accountExists(phone, undefined)
+    const emailTaken = !phoneTaken && !loggedEmail && (await accountExists(undefined, email))
+    if (phoneTaken || emailTaken) {
+      setExisting(phoneTaken ? 'phone' : 'email')
+      alert(
+        `Já existe uma conta com ${phoneTaken ? 'este WhatsApp' : 'este e-mail'}. Toque em "Entrar" para acessar a sua conta.`
+      )
       return
     }
+    setExisting(null)
 
     const cleanPhone = normalizePhone(phone)
     const finalSlug =
@@ -524,9 +547,20 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
 
               {trialUsed && !existingAccount && (
                 <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/40 text-xs text-slate-200 leading-relaxed">
-                  <strong className="text-amber-300">Este WhatsApp já usou o teste grátis.</strong> Você pode criar a conta, mas o
-                  acesso só é liberado depois do pagamento da primeira mensalidade
-                  {baseFee !== null ? ` (R$ ${formatMoney(baseFee)})` : ''}. Se quiser testar sem pagar, use outro número.
+                  <strong className="text-amber-300">Este WhatsApp ou e-mail já usou o teste grátis.</strong> Você pode criar a
+                  conta normalmente, mas sem os {TRIAL_DAYS} dias grátis: o acesso é liberado depois do pagamento da primeira
+                  mensalidade{baseFee !== null ? ` (R$ ${formatMoney(baseFee)})` : ''}. Depois de criar, você paga por PIX ou
+                  fala com o nosso suporte por{' '}
+                  <a href={`mailto:${SUPPORT_EMAIL}`} className="text-amber-300 underline">e-mail</a> ou{' '}
+                  <a
+                    href={`https://wa.me/${toWaNumber(SUPPORT_WHATSAPP)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-amber-300 underline"
+                  >
+                    WhatsApp
+                  </a>
+                  .
                 </div>
               )}
 

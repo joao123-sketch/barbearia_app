@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import { AlertTriangle, BellRing, ChevronRight, Lock, LogOut, Phone, X } from 'lucide-react'
+import { AlertTriangle, BellRing, ChevronRight, Lock, LogOut, Mail, Phone, X } from 'lucide-react'
 import type { Barbershop } from '../types'
 import { formatBR, formatMoney, getBillingState } from '../lib/billing'
 import { toWaNumber } from '../lib/phone'
-import { DEFAULT_PLATFORM_SETTINGS, SUPPORT_WHATSAPP, type PlatformSettings } from '../lib/platform'
+import { DEFAULT_PLATFORM_SETTINGS, SUPPORT_EMAIL, SUPPORT_WHATSAPP, type PlatformSettings } from '../lib/platform'
 import { BillingPanel } from './BillingPanel'
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
@@ -192,7 +192,7 @@ export const BillingLockedScreen: React.FC<{
       : 'Acesso bloqueado por falta de pagamento'
   const message =
     billing.blockReason === 'first_payment'
-      ? 'Este WhatsApp já usou o teste grátis em outra conta. Pague a primeira mensalidade para liberar o painel e o link.'
+      ? 'Este WhatsApp ou e-mail já usou o teste grátis antes. Pague a primeira mensalidade para liberar o painel e o link, ou fale com o suporte.'
       : manual
       ? 'Sua conta foi suspensa pela administração. Fale com o suporte para regularizar.'
       : `Sua mensalidade está vencida há ${plural(billing.overdueDays, 'dia', 'dias')}. Pague agora e o acesso volta na hora, com todos os seus dados e agendamentos.`
@@ -229,6 +229,13 @@ export const BillingLockedScreen: React.FC<{
         >
           <Phone className="w-4 h-4 text-emerald-400" />
           <span>Falar com o suporte no WhatsApp</span>
+        </a>
+        <a
+          href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Mensalidade de ${barbershop.name}`)}`}
+          className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/50 text-slate-200 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <Mail className="w-4 h-4 text-amber-400" />
+          <span>Falar com o suporte por e-mail</span>
         </a>
 
         {onLogout && (
