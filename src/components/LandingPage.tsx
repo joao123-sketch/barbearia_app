@@ -3,6 +3,7 @@ import { ArrowRight } from 'lucide-react'
 import { fetchMonthlyFee } from '../lib/db'
 import { instagramUrl, mailtoUrl, whatsappUrl } from '../lib/contacts'
 import { ContactLinks } from './ContactLinks'
+import { STYLE_PRESET_ORDER } from '../lib/stylePresets'
 import '../landing.css'
 
 // Página inicial de quem ainda não entrou. Um painel de blocos com as telas reais do app (contas de demonstração,
@@ -130,6 +131,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignup, onLogin }) =
 
   return (
     <div ref={root} className="lp" data-aud={audience}>
+      <div className="lp-top" role="group" aria-label="Contatos do SuaAgenda">
+        <ContactLinks variant="topbar" />
+      </div>
       <header className="lp-bar">
         <div className="lp-bar-in">
           <Mark />
@@ -271,10 +275,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignup, onLogin }) =
                 <img src="/landing/s-booking.webp" alt="Página de agendamento de um salão, em tons de rosa" width={560} height={1212} loading="lazy" decoding="async" />
               </div>
               <div className="t t-img s-reg wide-img span-all lp-reveal" style={reveal(80)}>
-                <img src="/landing/cadastro.webp" alt="Escolha do estilo visual no cadastro, com cinco estilos" width={560} height={1049} loading="lazy" decoding="async" />
+                <img src="/landing/cadastro.webp" alt="Escolha do estilo visual no cadastro" width={560} height={1049} loading="lazy" decoding="async" />
               </div>
               <div className="t t-accd s-fig fig-tile span-all lp-reveal" style={reveal(140)}>
-                <span className="lp-fig">5 estilos</span>
+                <span className="lp-fig">{STYLE_PRESET_ORDER.length} estilos</span>
                 <p className="lp-small lp-soft">prontos para a sua página, da barbearia clássica ao salão delicado.</p>
               </div>
             </div>

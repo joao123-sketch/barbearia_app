@@ -89,14 +89,14 @@ test('os textos "Fale com o suporte" são links, não texto solto', () => {
   assert.match(read('src/components/BillingPanel.tsx'), /whatsappUrl\([^)]*\)[\s\S]{0,300}Falar com o suporte no WhatsApp/)
 })
 
-test('o ContactLinks entrega os três canais em todas as variantes', () => {
+test('o ContactLinks entrega os três canais em todas as variantes (topo, ajuda, painel e rodapé)', () => {
   const source = read('src/components/ContactLinks.tsx')
-  for (const variant of ["variant === 'inline'", "variant === 'panel'"]) assert.ok(source.includes(variant), variant)
+  for (const variant of ["variant === 'topbar'", "variant === 'inline'", "variant === 'panel'"]) assert.ok(source.includes(variant), variant)
   // cada variante monta os três destinos a partir das mesmas três constantes
-  assert.equal((source.match(/href=\{wa\}/g) || []).length, 3, 'WhatsApp em 3 variantes')
-  assert.equal((source.match(/href=\{mail\}/g) || []).length, 3, 'E-mail em 3 variantes')
-  assert.equal((source.match(/href=\{ig\}/g) || []).length, 3, 'Instagram em 3 variantes')
-  assert.equal((source.match(/rel="noopener noreferrer"/g) || []).length, 6, 'links externos com rel seguro (WhatsApp e Instagram)')
+  assert.equal((source.match(/href=\{wa\}/g) || []).length, 4, 'WhatsApp em 4 variantes')
+  assert.equal((source.match(/href=\{mail\}/g) || []).length, 4, 'E-mail em 4 variantes')
+  assert.equal((source.match(/href=\{ig\}/g) || []).length, 4, 'Instagram em 4 variantes')
+  assert.equal((source.match(/rel="noopener noreferrer"/g) || []).length, 8, 'links externos com rel seguro (WhatsApp e Instagram)')
 })
 
 test('o texto visível do contato não repete o número escrito à mão', () => {

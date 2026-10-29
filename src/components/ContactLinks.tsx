@@ -7,7 +7,8 @@ interface ContactLinksProps {
   // landing: os três canais com o dado visível (rodapé da página inicial)
   // panel: os três canais como botões, para o painel do dono e a tela de bloqueio
   // inline: uma linha de texto discreta ("Precisa de ajuda?"), para telas de entrada
-  variant: 'landing' | 'panel' | 'inline'
+  // topbar: faixa no topo da página inicial, com o dado completo no computador e só o nome do canal no celular
+  variant: 'landing' | 'panel' | 'inline' | 'topbar'
   // panel: "solid" destaca o WhatsApp em verde; "quiet" deixa os três com o mesmo peso
   emphasis?: 'solid' | 'quiet'
   whatsappMessage?: string
@@ -30,6 +31,42 @@ export const ContactLinks: React.FC<ContactLinksProps> = ({
   const wa = whatsappUrl(whatsappMessage)
   const mail = mailtoUrl(emailSubject, emailBody)
   const ig = instagramUrl()
+
+  if (variant === 'topbar') {
+    return (
+      <div className="lp-top-in">
+        <span className="lp-top-lead">Fale com a gente</span>
+        <ul className="lp-top-list">
+          <li>
+            <a href={wa} target="_blank" rel="noopener noreferrer">
+              <WhatsAppIcon className="lp-ico" />
+              <span>
+                WhatsApp<span className="lp-top-full"> {whatsappDisplay()}</span>
+                <NewTab />
+              </span>
+            </a>
+          </li>
+          <li>
+            <a href={mail}>
+              <Mail className="lp-ico" aria-hidden="true" />
+              <span>
+                E-mail<span className="lp-top-full"> {SUPPORT_CONTACTS.email}</span>
+              </span>
+            </a>
+          </li>
+          <li>
+            <a href={ig} target="_blank" rel="noopener noreferrer">
+              <InstagramIcon className="lp-ico" />
+              <span>
+                Instagram<span className="lp-top-full"> {instagramDisplay()}</span>
+                <NewTab />
+              </span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    )
+  }
 
   if (variant === 'inline') {
     const link = 'inline-flex items-center min-h-[44px] px-2 font-semibold text-amber-400 hover:underline'
