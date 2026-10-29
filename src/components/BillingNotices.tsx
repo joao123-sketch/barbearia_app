@@ -192,7 +192,7 @@ export const BillingLockedScreen: React.FC<{
       : 'Acesso bloqueado por falta de pagamento'
   const message =
     billing.blockReason === 'first_payment'
-      ? 'Este WhatsApp já usou o teste grátis em outra conta. Pague a primeira mensalidade para liberar o painel e o link.'
+      ? 'Este WhatsApp ou e-mail já usou o teste grátis antes. Pague a primeira mensalidade para liberar o painel e o link, ou fale com o suporte.'
       : manual
       ? 'Sua conta foi suspensa pela administração. Fale com o suporte para regularizar.'
       : `Sua mensalidade está vencida há ${plural(billing.overdueDays, 'dia', 'dias')}. Pague agora e o acesso volta na hora, com todos os seus dados e agendamentos.`

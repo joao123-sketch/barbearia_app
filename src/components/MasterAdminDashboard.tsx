@@ -46,6 +46,15 @@ import { AdminNotifications } from './AdminNotifications'
 import { MasterPayments } from './MasterPayments'
 import { TRIAL_DAYS, formatBR, formatMoney, getBillingState } from '../lib/billing'
 import { normalizePhone, toWaNumber } from '../lib/phone'
+import { adminFetchEventCounts, type EventCounts, type TrackEvent } from '../lib/track'
+
+const FUNNEL_ROWS: Array<[TrackEvent, string]> = [
+  ['login_visit', 'Visitas em /login'],
+  ['signup_click', 'Cliques em "Criar conta" / "Garantir minha vaga"'],
+  ['founder_click', 'Dos quais, no banner de fundador'],
+  ['signup_open', 'Aberturas do cadastro'],
+  ['signup_done', 'Cadastros concluídos']
+]
 import { fileToResizedDataUrl } from '../lib/image'
 import { buildShopTheme, getModeFor, shopThemeAttrs, useShopChrome, type ThemeMode } from '../lib/shopTheme'
 
@@ -169,6 +178,15 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
   const [copiedRegisterLink, setCopiedRegisterLink] = useState(false)
 
   const registerUrl = `${window.location.origin}/cadastrar`
+
+  // Funil de cadastro (medição); null enquanto carrega ou se a migração ainda não foi aplicada
+  const [eventCounts, setEventCounts] = useState<Partial<Record<TrackEvent, EventCounts>> | null>(null)
+  const [eventsFailed, setEventsFailed] = useState(false)
+  useEffect(() => {
+    adminFetchEventCounts()
+      .then(setEventCounts)
+      .catch(() => setEventsFailed(true))
+  }, [])
 
   const handleCopyRegisterLink = () => {
     navigator.clipboard.writeText(registerUrl)
@@ -570,6 +588,44 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
             </div>
           </div>
         )}
+
+        {/* Funil de cadastro: só contagens (visitas, cliques, aberturas e cadastros concluídos) */}
+        <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5">
+          <div>
+            <h3 className="font-bold text-sm text-white">Funil de cadastro</h3>
+            <p className="text-[11px] text-slate-400">Visita conta uma vez por sessão do navegador. Os demais contam a cada ação. Só números, sem dados pessoais.</p>
+          </div>
+          {eventCounts === null ? (
+            <p className="text-xs text-slate-500">
+              {eventsFailed ? 'Medição ainda não ativada (falta aplicar a migração 0015).' : 'Carregando…'}
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-slate-400 text-left">
+                    <th className="py-1 pr-2 font-medium">Etapa</th>
+                    <th className="py-1 px-2 font-medium text-right">Hoje</th>
+                    <th className="py-1 px-2 font-medium text-right">7 dias</th>
+                    <th className="py-1 px-2 font-medium text-right">30 dias</th>
+                    <th className="py-1 pl-2 font-medium text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="text-white">
+                  {FUNNEL_ROWS.map(([key, label]) => (
+                    <tr key={key} className="border-t border-slate-800">
+                      <td className="py-1.5 pr-2 text-slate-300">{label}</td>
+                      <td className="py-1.5 px-2 text-right font-bold">{eventCounts[key]?.today ?? 0}</td>
+                      <td className="py-1.5 px-2 text-right font-bold">{eventCounts[key]?.last_7 ?? 0}</td>
+                      <td className="py-1.5 px-2 text-right font-bold">{eventCounts[key]?.last_30 ?? 0}</td>
+                      <td className="py-1.5 pl-2 text-right font-bold">{eventCounts[key]?.total ?? 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
         {/* ===================== COBRANÇA: MENSALIDADE, PIX E QR CODE ===================== */}
         <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-900 to-slate-900 border border-amber-500/30 space-y-3 text-xs">
