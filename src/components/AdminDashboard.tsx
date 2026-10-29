@@ -42,6 +42,7 @@ import { OwnerNotifications } from './OwnerNotifications'
 import { BillingPanel } from './BillingPanel'
 import { BillingBanner, BillingEntryNotice, BillingLockedScreen, BillingPayModal } from './BillingNotices'
 import { normalizeInstagram } from '../lib/instagram'
+import { slugify } from '../lib/slug'
 import { getTerms } from '../lib/terms'
 import { formatMoney, getBillingState, toDateStr } from '../lib/billing'
 import { normalizePhone, toWaNumber } from '../lib/phone'
@@ -186,7 +187,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [profileState, setProfileState] = useState(barbershop.state || legacyCity.match(/-\s*([A-Za-z]{2})$/)?.[1]?.toUpperCase() || '')
   const [profileReferencePoint, setProfileReferencePoint] = useState(barbershop.reference_point || '')
   const [profileSlogan, setProfileSlogan] = useState(barbershop.slogan || '')
+  const [profileSlug, setProfileSlug] = useState(barbershop.slug)
   const [profileSaved, setProfileSaved] = useState(false)
+
+  // Primeiro acesso: lembra de completar o negócio (endereço, logo, Instagram, equipe) enquanto estiver tudo vazio
+  const [setupDismissed, setSetupDismissed] = useState(() => {
+    try {
+      return localStorage.getItem(`setup_dismissed_${barbershop.id}`) === '1'
+    } catch {
+      return false
+    }
+  })
+  const dismissSetup = () => {
+    setSetupDismissed(true)
+    try {
+      localStorage.setItem(`setup_dismissed_${barbershop.id}`, '1')
+    } catch {
+      // sem armazenamento: some só nesta visita
+    }
+  }
+  const needsSetup = !barbershop.logo_url && !barbershop.street && !barbershop.instagram
   const logoFileInputRef = useRef<HTMLInputElement>(null)
 
   // Relógio do painel: atualiza a cada 30s para os atendimentos virarem "concluídos" na hora certa
@@ -756,6 +776,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const updatedShop: Barbershop = {
       ...barbershop,
       name: profileName,
+      slug: slugify(profileSlug) || barbershop.slug,
       logo_url: profileLogo,
       app_icon: appIcon,
       instagram: normalizeInstagram(profileInstagram),
@@ -997,6 +1018,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               await onReload?.()
             }}
           />
+        )}
+
+        {activeTab === 'agenda' && needsSetup && !setupDismissed && (
+          <div className="p-4 rounded-2xl bg-slate-900 border border-amber-500/40 shadow-xl space-y-2.5 text-xs">
+            <p className="font-bold text-amber-300 text-sm">Complete o seu negócio</p>
+            <p className="text-slate-300 leading-relaxed">
+              Para seus clientes confiarem e chegarem até você, adicione o endereço, a logo, o Instagram e o estilo visual. Se
+              atende com equipe, cadastre os profissionais na aba Equipe. Tudo opcional, leva poucos minutos.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab('config')}
+                className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold cursor-pointer active:scale-95 transition"
+              >
+                Completar agora
+              </button>
+              <button
+                type="button"
+                onClick={dismissSetup}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 font-semibold cursor-pointer"
+              >
+                Depois
+              </button>
+            </div>
+          </div>
         )}
 
         {activeTab === 'agenda' && <OwnerNotifications shopId={barbershop.id} variant="banner" />}
@@ -2455,6 +2502,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   onChange={(e) => setProfileName(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-amber-500"
                 />
+              </div>
+
+              {/* Link de agendamento */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1" htmlFor="adm-slug">Link de agendamento</label>
+                <div className="flex items-center px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus-within:border-amber-500">
+                  <span className="text-slate-500 shrink-0 font-mono text-[11px]">/b/</span>
+                  <input name="slug" autoComplete="off" id="adm-slug"
+                    type="text"
+                    value={profileSlug}
+                    onChange={(e) => setProfileSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                    className="w-full bg-transparent text-amber-300 font-mono font-bold focus:outline-none"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">Se mudar, o link antigo deixa de funcionar. Avise seus clientes.</p>
               </div>
 
               {/* Instagram */}

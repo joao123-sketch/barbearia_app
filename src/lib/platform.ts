@@ -28,4 +28,6 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
 
 // Atendimento ao dono (suporte do SuaAgenda): WhatsApp do João
 export const SUPPORT_WHATSAPP = '88988941408'
+// Endereço oficial do app (aparece no link de agendamento mostrado no cadastro)
+export const SITE_URL = 'https://barbearia-app.sistemaappbarbearia.workers.dev'
 export const SUPPORT_EMAIL = 'sistemaappbarbearia@gmail.com'
