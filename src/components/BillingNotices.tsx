@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import { AlertTriangle, BellRing, ChevronRight, Lock, LogOut, Mail, Phone, X } from 'lucide-react'
+import { AlertTriangle, BellRing, ChevronRight, Lock, LogOut, X } from 'lucide-react'
 import type { Barbershop } from '../types'
 import { formatBR, formatMoney, getBillingState } from '../lib/billing'
-import { toWaNumber } from '../lib/phone'
-import { DEFAULT_PLATFORM_SETTINGS, SUPPORT_EMAIL, SUPPORT_WHATSAPP, type PlatformSettings } from '../lib/platform'
+import { DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from '../lib/platform'
+import { ContactLinks } from './ContactLinks'
 import { BillingPanel } from './BillingPanel'
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
@@ -221,22 +221,13 @@ export const BillingLockedScreen: React.FC<{
           )}
         </div>
 
-        <a
-          href={`https://wa.me/${toWaNumber(SUPPORT_WHATSAPP)}?text=${encodeURIComponent(`Olá! Preciso de ajuda com a mensalidade de ${barbershop.name}.`)}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-emerald-500/50 text-slate-200 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
-        >
-          <Phone className="w-4 h-4 text-emerald-400" />
-          <span>Falar com o suporte no WhatsApp</span>
-        </a>
-        <a
-          href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Mensalidade de ${barbershop.name}`)}`}
-          className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/50 text-slate-200 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
-        >
-          <Mail className="w-4 h-4 text-amber-400" />
-          <span>Falar com o suporte por e-mail</span>
-        </a>
+        <ContactLinks
+          variant="panel"
+          emphasis="quiet"
+          whatsappMessage={`Olá! Preciso de ajuda com a mensalidade de ${barbershop.name}.`}
+          emailSubject={`Mensalidade SuaAgenda: ${barbershop.name}`}
+          emailBody={`Olá! Preciso de ajuda com a mensalidade de ${barbershop.name}.`}
+        />
 
         {onLogout && (
           <button

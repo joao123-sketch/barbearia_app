@@ -5,8 +5,9 @@ import { accountExists, signUp, trialAlreadyUsed, useSession } from '../lib/auth
 import { PasswordInput } from './PasswordInput'
 import { defaultWorkingHours, fetchMonthlyFee, friendlyError, registerBarbershop, saveWorkingHours } from '../lib/db'
 import { getTerms } from '../lib/terms'
-import { INVALID_MOBILE_MESSAGE, formatPhoneInput, isValidEmail, isValidMobile, normalizeEmail, normalizePhone, toWaNumber } from '../lib/phone'
-import { SITE_URL, SUPPORT_EMAIL, SUPPORT_WHATSAPP } from '../lib/platform'
+import { INVALID_MOBILE_MESSAGE, formatPhoneInput, isValidEmail, isValidMobile, normalizeEmail, normalizePhone } from '../lib/phone'
+import { SITE_URL } from '../lib/platform'
+import { mailtoUrl, whatsappUrl } from '../lib/contacts'
 import { TRIAL_DAYS, formatMoney } from '../lib/billing'
 import { findFreeSlug, slugify } from '../lib/slug'
 import { track } from '../lib/track'
@@ -315,9 +316,9 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
                 conta normalmente, mas sem os {TRIAL_DAYS} dias grátis: o acesso é liberado depois do pagamento da primeira
                 mensalidade{baseFee !== null ? ` (R$ ${formatMoney(baseFee)})` : ''}. Depois de criar, você paga por PIX ou
                 fala com o nosso suporte por{' '}
-                <a href={`mailto:${SUPPORT_EMAIL}`} className="text-amber-300 underline">e-mail</a> ou{' '}
+                <a href={mailtoUrl()} className="text-amber-300 underline">e-mail</a> ou{' '}
                 <a
-                  href={`https://wa.me/${toWaNumber(SUPPORT_WHATSAPP)}`}
+                  href={whatsappUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-amber-300 underline"

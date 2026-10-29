@@ -1,3 +1,4 @@
+import { SUPPORT_CONTACTS } from './contacts'
 import { DEFAULT_MONTHLY_FEE } from './mockData'
 
 // Configurações de cobrança da plataforma: mensalidade, chave PIX, QR Code e contato.
@@ -27,7 +28,6 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
 }
 
 // Atendimento ao dono (suporte do SuaAgenda): WhatsApp do João
-export const SUPPORT_WHATSAPP = '88988941408'
+export const SUPPORT_WHATSAPP = SUPPORT_CONTACTS.whatsapp
 // Endereço oficial do app (aparece no link de agendamento mostrado no cadastro)
 export const SITE_URL = 'https://barbearia-app.sistemaappbarbearia.workers.dev'
-export const SUPPORT_EMAIL = 'sistemaappbarbearia@gmail.com'

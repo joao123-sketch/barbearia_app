@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { fetchMonthlyFee } from '../lib/db'
-import { SUPPORT_WHATSAPP } from '../lib/platform'
-import { toWaNumber } from '../lib/phone'
+import { instagramUrl, mailtoUrl, whatsappUrl } from '../lib/contacts'
+import { ContactLinks } from './ContactLinks'
+import { STYLE_PRESET_ORDER } from '../lib/stylePresets'
 import { track } from '../lib/track'
 import '../landing.css'
 
@@ -74,7 +75,7 @@ function useReveal(root: React.RefObject<HTMLElement | null>) {
     )
     items.forEach((i) => io.observe(i))
     return () => io.disconnect()
-  }, [])
+  }, [root])
 }
 
 const Mark: React.FC<{ className?: string }> = ({ className = '' }) => (
@@ -134,6 +135,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignup, onLogin }) =
 
   return (
     <div ref={root} className="lp" data-aud={audience}>
+      <div className="lp-top" role="group" aria-label="Contatos do SuaAgenda">
+        <ContactLinks variant="topbar" />
+      </div>
       <header className="lp-bar">
         <div className="lp-bar-in">
           <Mark />
@@ -303,10 +307,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignup, onLogin }) =
                 <img src="/landing/s-booking.webp" alt="Página de agendamento de um salão, em tons de rosa" width={560} height={1212} loading="lazy" decoding="async" />
               </div>
               <div className="t t-img s-reg wide-img span-all lp-reveal" style={reveal(80)}>
-                <img src="/landing/cadastro.webp" alt="Escolha do estilo visual no cadastro, com cinco estilos" width={560} height={1049} loading="lazy" decoding="async" />
+                <img src="/landing/cadastro.webp" alt="Escolha do estilo visual no cadastro" width={560} height={1049} loading="lazy" decoding="async" />
               </div>
               <div className="t t-accd s-fig fig-tile span-all lp-reveal" style={reveal(140)}>
-                <span className="lp-fig">5 estilos</span>
+                <span className="lp-fig">{STYLE_PRESET_ORDER.length} estilos</span>
                 <p className="lp-small lp-soft">prontos para a sua página, da barbearia clássica ao salão delicado.</p>
               </div>
             </div>
@@ -373,7 +377,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignup, onLogin }) =
                   <li>20 dias grátis para testar</li>
                   <li>Sem cartão e sem fidelidade</li>
                   <li>Sem taxa por agendamento</li>
-                  <li>Suporte direto no WhatsApp</li>
+                  <li>
+                    <a className="price-link" href={whatsappUrl('Olá! Quero saber mais sobre o SuaAgenda.')} target="_blank" rel="noopener noreferrer">
+                      Suporte direto no WhatsApp
+                    </a>
+                  </li>
                 </ul>
                 <button type="button" className="lp-btn lp-btn--acc lp-btn--lg" style={{ marginTop: 24 }} onClick={onSignup}>
                   Criar conta grátis
@@ -403,6 +411,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignup, onLogin }) =
                       Já tenho conta · Entrar
                     </button>
                   </div>
+                  <p className="cta-contacts">
+                    Prefere conversar?{' '}
+                    <a href={whatsappUrl('Olá! Quero saber mais sobre o SuaAgenda.')} target="_blank" rel="noopener noreferrer">
+                      WhatsApp
+                    </a>
+                    <a href={mailtoUrl('Dúvida sobre o SuaAgenda')}>E-mail</a>
+                    <a href={instagramUrl()} target="_blank" rel="noopener noreferrer">
+                      Instagram
+                    </a>
+                  </p>
                 </div>
                 <div className="cta-shot" aria-hidden="true">
                   <img src={`/landing/${a.prefix}-semana.webp`} alt="" width={560} height={1158} loading="lazy" decoding="async" />
@@ -443,14 +461,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignup, onLogin }) =
             </button>
           </div>
           <div className="foot-contact">
-            <h3>Dúvidas?</h3>
-            <a
-              href={`https://wa.me/${toWaNumber(SUPPORT_WHATSAPP)}?text=${encodeURIComponent('Olá! Quero saber mais sobre o SuaAgenda.')}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Fale com a gente no WhatsApp
-            </a>
+            <h3>Fale com a gente</h3>
+            <ContactLinks variant="landing" />
           </div>
         </div>
         <div className="foot-end">

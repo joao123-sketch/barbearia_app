@@ -70,6 +70,96 @@
   outline-offset: 3px;
 }
 
+/* ---------- faixa de contatos no topo ---------- */
+.lp-top {
+  background: var(--ink);
+  color: #fff;
+}
+.lp-top-in {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 24px;
+  padding: 0 var(--m);
+  max-width: 1600px;
+  margin: 0 auto;
+}
+.lp-top-lead {
+  display: none;
+  font-size: var(--t-small);
+  font-weight: 600;
+  color: #d9d6d1;
+}
+.lp-top-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 4px;
+}
+.lp-top-list a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 10px;
+  width: fit-content;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  text-decoration: none;
+  border-radius: var(--r);
+}
+.lp-top-list a:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.lp-top-list a:focus-visible {
+  outline-color: #fff;
+  outline-offset: -3px;
+}
+.lp-top-list .lp-ico {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: #e0b36a;
+}
+.lp-top-full {
+  display: none;
+  font-weight: 700;
+}
+@media (min-width: 760px) {
+  .lp-top-lead {
+    display: block;
+  }
+  .lp-top-in {
+    justify-content: flex-end;
+  }
+  .lp-top-full {
+    display: inline;
+  }
+  .lp-top-list a {
+    font-size: 15px;
+  }
+}
+@media (max-width: 380px) {
+  .lp-top-list a {
+    padding: 0 6px;
+    gap: 6px;
+    font-size: 13px;
+  }
+}
+@media (max-width: 340px) {
+  .lp-top-in {
+    padding: 0 4px;
+  }
+  .lp-top-list {
+    gap: 0;
+  }
+  .lp-top-list a {
+    padding: 0 4px;
+    gap: 4px;
+  }
+}
+
 /* ---------- barra ---------- */
 .lp-bar {
   position: sticky;
@@ -676,6 +766,55 @@
 .foot-grid a:hover,
 .foot-grid button:hover {
   color: var(--ink);
+}
+/* contatos: WhatsApp, e-mail e Instagram, cada um um alvo de toque de 44px */
+.foot-contact {
+  grid-column: 1 / -1;
+}
+.lp-contacts a {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 0;
+}
+.lp-contacts strong {
+  font-weight: 700;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.lp-contacts .lp-ico {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: var(--acc);
+}
+.price-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.cta-contacts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 16px;
+  font-size: var(--t-small);
+  color: rgba(255, 255, 255, 0.9);
+}
+.cta-contacts a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 .foot-end {
   margin-top: 36px;

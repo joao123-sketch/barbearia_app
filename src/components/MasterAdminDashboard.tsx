@@ -41,6 +41,8 @@ import {
   savePlatformSettingsDb
 } from '../lib/db'
 import { MasterAlerts } from './MasterAlerts'
+import { GraceSetting } from './GraceSetting'
+import { AdminNotifications } from './AdminNotifications'
 import { MasterPayments } from './MasterPayments'
 import { TRIAL_DAYS, formatBR, formatMoney, getBillingState } from '../lib/billing'
 import { normalizePhone, toWaNumber } from '../lib/phone'
@@ -152,7 +154,7 @@ interface MasterPanelProps {
   barbershops: Barbershop[]
   metrics: Record<string, ShopMetrics>
   settings: PlatformSettings
-  onSettings: (s: PlatformSettings) => void
+  onSettings: React.Dispatch<React.SetStateAction<PlatformSettings>>
   reload: () => Promise<void>
   isLight: boolean
   onToggleTheme: () => void
@@ -220,7 +222,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
       pix_bank: draft.pix_bank.trim(),
       pix_qrcode: draft.pix_qrcode,
       contact_whatsapp: normalizePhone(draft.contact_whatsapp),
-      grace_days: Math.min(60, Math.max(0, Math.round(Number(draft.grace_days)))),
+      grace_days: settings.grace_days, // a carência tem cartão próprio (GraceSetting)
       invoice_lead_days: Math.min(30, Math.max(0, Math.round(Number(draft.invoice_lead_days)))),
       reminder_offsets: Array.from(
         new Set(
@@ -242,7 +244,8 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
       if (applyFeeToAll && clean.monthly_fee !== settings.monthly_fee) await adminScheduleFee(clean.monthly_fee)
     })
     if (!ok) return
-    onSettings(clean)
+    // a carência do estado atual vence: ela pode ter mudado no cartão enquanto este formulário salvava
+    onSettings((prev) => ({ ...clean, grace_days: prev.grace_days }))
     setApplyFeeToAll(false)
     setIsEditingSettings(false)
     setSettingsSaved(true)
@@ -293,17 +296,17 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
       if (filterStatus === 'all') return matchesSearch
       return matchesSearch && getBillingState(shop, settings.grace_days).status === filterStatus
     })
-  }, [barbershops, searchTerm, filterStatus])
+  }, [barbershops, searchTerm, filterStatus, settings.grace_days])
 
   // KPIs
   const totalShops = barbershops.length
   const trialShops = barbershops.filter((s) => getBillingState(s, settings.grace_days).status === 'trial').length
-  const paidShops = barbershops.filter((s) => getBillingState(s, settings.grace_days).status === 'active').length
+  const paidShops = barbershops.filter((s) => !s.billing_exempt && getBillingState(s, settings.grace_days).status === 'active').length
   const expiredShops = barbershops.filter((s) => getBillingState(s, settings.grace_days).status === 'expired').length
   const blockedShops = barbershops.filter((s) => getBillingState(s, settings.grace_days).status === 'blocked').length
   // Receita recorrente: só quem está com o período pago em dia
   const totalMRR = barbershops
-    .filter((s) => getBillingState(s, settings.grace_days).status === 'active')
+    .filter((s) => !s.billing_exempt && getBillingState(s, settings.grace_days).status === 'active')
     .reduce((acc, curr) => acc + (curr.monthly_fee || settings.monthly_fee), 0)
 
   // Quanto os clientes faturaram usando o app (só atendimentos já concluídos)
@@ -401,7 +404,14 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <a
+              href="/admin"
+              className="flex items-center gap-1.5 px-3 min-h-[36px] rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/40 text-xs text-slate-300 hover:text-white"
+            >
+              <Store className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
+              <span>Meu painel</span>
+            </a>
             <button
               onClick={onToggleTheme}
               title={isLight ? 'Modo escuro' : 'Modo claro'}
@@ -431,6 +441,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
 
       <main className="max-w-5xl mx-auto px-4 py-5 space-y-5">
         <MasterAlerts />
+        <AdminNotifications />
         {/* ===================== LINK PARA ENVIAR AOS BARBEIROS (CADASTRO) ===================== */}
         <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-500/20 via-slate-900 to-slate-900 border border-amber-500/40 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
           <div className="flex items-start gap-3.5">
@@ -674,10 +685,6 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                   <dd className="text-white">{settings.pix_bank}</dd>
                 </div>
                 <div>
-                  <dt className="text-slate-400 text-[11px]">Carência até bloquear</dt>
-                  <dd className="text-white">{settings.grace_days} dias de atraso</dd>
-                </div>
-                <div>
                   <dt className="text-slate-400 text-[11px]">Fatura criada com antecedência de</dt>
                   <dd className="text-white">{settings.invoice_lead_days} dias</dd>
                 </div>
@@ -732,17 +739,6 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                     value={draft.contact_whatsapp}
                     onChange={(e) => setDraft({ ...draft, contact_whatsapp: e.target.value })}
                     className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-amber-500 focus:outline-none text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1" htmlFor="mst-677">Carência até bloquear (dias de atraso)</label>
-                  <input name="mst-677" autoComplete="off" id="mst-677"
-                    type="number"
-                    min="0"
-                    max="60"
-                    value={draft.grace_days}
-                    onChange={(e) => setDraft({ ...draft, grace_days: Number(e.target.value) })}
-                    className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-amber-500 focus:outline-none text-white font-bold"
                   />
                 </div>
                 <div>
@@ -879,6 +875,8 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
           </div>
         </div>
 
+        <GraceSetting graceDays={settings.grace_days} barbershops={barbershops} onSaved={(days) => onSettings((prev) => ({ ...prev, grace_days: days }))} />
+
         <MasterPayments onChanged={reload} />
 
         {/* ===================== LISTA DE CLIENTES / BARBEARIAS ===================== */}
@@ -941,7 +939,9 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                                 : 'bg-slate-800 text-slate-400 border border-slate-700'
                             }`}
                           >
-                            {isActive
+                            {shop.billing_exempt
+                              ? 'Isenta (administradora)'
+                              : isActive
                               ? 'Pago'
                               : isTrial
                               ? `Teste grátis (${billing.daysLeft}d)`
@@ -959,6 +959,10 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                         <div className="flex items-center gap-2.5 mt-1 text-xs text-slate-400 flex-wrap">
                           <span className="font-mono text-amber-300">/{shop.slug}</span>
                           <span>•</span>
+                          {shop.billing_exempt ? (
+                            <span>Sem mensalidade</span>
+                          ) : (
+                          <>
                           <span>
                             Mensalidade: <strong className="text-white">R$ {formatMoney(shop.monthly_fee || settings.monthly_fee)}</strong>
                             {shop.monthly_fee > 0 && shop.monthly_fee !== settings.monthly_fee && (
@@ -976,6 +980,8 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
                           <span>
                             {isTrial ? 'Teste até' : isActive ? 'Pago até' : 'Venceu em'}: <strong className="text-slate-200">{formatBR(billing.dueDate)}</strong>
                           </span>
+                          </>
+                          )}
                         </div>
 
                         {shop.address && (

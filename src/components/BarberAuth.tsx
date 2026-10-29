@@ -8,6 +8,8 @@ import { normalizeEmail } from '../lib/phone'
 import { track } from '../lib/track'
 import { BarberOnboarding } from './BarberOnboarding'
 import { PasswordInput } from './PasswordInput'
+import { ContactLinks } from './ContactLinks'
+import { SignupSteps } from './SignupSteps'
 import { LandingPage } from './LandingPage'
 
 interface BarberAuthProps {
@@ -136,7 +138,7 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
       className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center px-4 py-8 select-none"
     >
       <NeutralChrome />
-      <div className="w-full max-w-sm mx-auto space-y-6">
+      <div className={`w-full mx-auto space-y-6 ${view === 'login' ? 'max-w-sm lg:max-w-4xl' : 'max-w-sm'}`}>
         <div className="text-center space-y-3">
           <h1 className="text-2xl font-black text-white tracking-tight">
             {view === 'login' ? 'Entrar' : 'Recuperar senha'}
@@ -149,6 +151,7 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
         </div>
 
         {view === 'login' && (
+          <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
           <form onSubmit={handleLogin} className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
             {error && (
               <div role="alert" className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400 text-xs">{error}</div>
@@ -212,7 +215,7 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
                 onClick={() => goTo('register')}
                 className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold text-sm cursor-pointer active:scale-95 transition"
               >
-                Cadastrar conta
+                Criar conta grátis
               </button>
               <button
                 type="button"
@@ -224,6 +227,8 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
               </button>
             </div>
           </form>
+          <SignupSteps onSignup={() => goTo('register')} />
+          </div>
         )}
 
         {view === 'forgot' && (
@@ -281,6 +286,8 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
             )}
           </div>
         )}
+
+        <ContactLinks variant="inline" whatsappMessage="Olá! Estou com problema para entrar no SuaAgenda." emailSubject="Problema para entrar no SuaAgenda" />
       </div>
     </div>
   )

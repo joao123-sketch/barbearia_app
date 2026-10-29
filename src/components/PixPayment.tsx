@@ -4,6 +4,7 @@ import { Check, Copy } from 'lucide-react'
 import type { PlatformSettings } from '../lib/platform'
 import { buildPixPayload } from '../lib/pix'
 import { formatMoney } from '../lib/billing'
+import { whatsappUrl } from '../lib/contacts'
 
 interface PixPaymentProps {
   platform: PlatformSettings
@@ -41,7 +42,17 @@ export const PixPayment: React.FC<PixPaymentProps> = ({ platform, amount }) => {
     }
   }
 
-  if (!payload) return <p className="text-xs text-slate-400">O PIX ainda não foi configurado. Fale com o suporte.</p>
+  if (!payload) {
+    return (
+      <p className="text-xs text-slate-400">
+        O PIX ainda não foi configurado.{' '}
+        <a href={whatsappUrl('Olá! O Pix de pagamento da mensalidade ainda não foi configurado.')} target="_blank" rel="noopener noreferrer" className="text-amber-400 font-semibold underline">
+          Fale com o suporte
+        </a>
+        .
+      </p>
+    )
+  }
 
   return (
     <div className="space-y-3 text-center">

@@ -35,6 +35,7 @@ export interface Barbershop {
   due_day?: number
   next_billing_date: string // pré-pago: último dia de acesso (fim do teste ou do período pago)
   last_payment_date?: string
+  billing_exempt?: boolean // conta de administrador da plataforma: não paga mensalidade
   pix_key?: string
   // Pausas e Bloqueios de Agenda (Viagens / Férias)
   service_active?: boolean // só na visão pública: o link está liberado?

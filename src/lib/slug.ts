@@ -1,5 +1,3 @@
-import { fetchPublicShopBySlug } from './db'
-
 // Nomes que já são páginas do app: um negócio com esse link ficaria inalcançável
 const RESERVED = new Set(['login', 'cadastrar', 'cadastro', 'admin', 'master', 'superadmin', 'b', 'redefinir-senha', 'assets', 'api'])
 
@@ -17,6 +15,7 @@ export function slugify(name: string): string {
 
 // Link livre a partir do nome: se já existir (ou for reservado), acrescenta -2, -3… e por fim um sufixo aleatório
 export async function findFreeSlug(name: string): Promise<string> {
+  const { fetchPublicShopBySlug } = await import('./db')
   const base = slugify(name) || 'meu-negocio'
   const taken = async (slug: string) => RESERVED.has(slug) || Boolean(await fetchPublicShopBySlug(slug).catch(() => null))
   if (base.length >= 2 && !(await taken(base))) return base

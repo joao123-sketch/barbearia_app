@@ -7,6 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "test": "node --test \"tests/*.test.mjs\"",
+    "test:db": "node --test \"tests/db/*.test.mjs\"",
+    "evals": "node evals/landing.eval.mjs && node evals/grace.eval.mjs && node evals/entrada.eval.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -22,6 +25,7 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.13",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",

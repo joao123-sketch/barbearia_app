@@ -3,6 +3,7 @@ import { AlertTriangle, Check, CheckCircle2, Copy, Loader2, Phone, QrCode, Recei
 import type { Barbershop } from '../types'
 import { formatBR, formatMoney, getBillingState } from '../lib/billing'
 import { fetchMyInvoices, requestPixCheckout, type Invoice, type PixCheckout } from '../lib/db'
+import { whatsappUrl } from '../lib/contacts'
 import { toWaNumber } from '../lib/phone'
 import { DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from '../lib/platform'
 import { PixPayment } from './PixPayment'
@@ -204,6 +205,7 @@ export const BillingPanel: React.FC<BillingPanelProps> = ({
       ) : manualFallback ? (
         <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 text-center">
           <PixPayment platform={platform} amount={amount} />
+          {/* Número configurável no /master (recebe os comprovantes do Pix manual): não é o contato de suporte de contacts.ts */}
           {whatsapp && (
             <a
               href={`https://wa.me/${toWaNumber(whatsapp)}?text=${encodeURIComponent(`Olá! Realizei o pagamento de R$ ${formatMoney(amount)} de ${barbershop.name}. Segue o comprovante:`)}`}
@@ -258,11 +260,21 @@ export const BillingPanel: React.FC<BillingPanelProps> = ({
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{error}</span>
           </p>
-          {!manual && (
-            <button type="button" onClick={() => setManual(true)} className="underline font-semibold cursor-pointer">
-              Usar o Pix manual (confirmação pelo WhatsApp)
-            </button>
-          )}
+          <div className="flex flex-wrap gap-x-4">
+            {!manual && (
+              <button type="button" onClick={() => setManual(true)} className="underline font-semibold cursor-pointer min-h-[44px]">
+                Usar o Pix manual (confirmação pelo WhatsApp)
+              </button>
+            )}
+            <a
+              href={whatsappUrl(`Olá! Preciso de ajuda com a mensalidade de ${barbershop.name}.`)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline font-semibold inline-flex items-center min-h-[44px]"
+            >
+              Falar com o suporte no WhatsApp
+            </a>
+          </div>
         </div>
       )}
 

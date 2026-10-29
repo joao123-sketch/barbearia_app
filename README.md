@@ -153,7 +153,7 @@ VITE_SUPABASE_ANON_KEY=sua-chave-anon-aqui
 
 Fluxo: o banco cria a fatura perto do vencimento → o dono toca em **Pagar com Pix** → a função `billing-checkout` cria a cobrança no Asaas e devolve o QR Code → o Asaas avisa o pagamento na função `asaas-webhook`, que **confere o pagamento na API do Asaas** antes de quitar → a fatura vira *paga*, o acesso é estendido por 30 dias e o painel libera sozinho. Nenhuma mensalidade é marcada como paga sem essa confirmação (ou sem ação do administrador).
 
-Regras: carência de 10 dias depois do vencimento (configurável no `/master`); depois disso o painel e os dados ficam bloqueados (inclusive no banco, por RLS) e só a tela de cobrança abre; o link público de agendamento fica no ar durante a carência. O bloqueio é calculado pelas datas, então vale mesmo que o dono não abra o app. Pagamento depois do bloqueio libera 30 dias a partir do dia do pagamento.
+Regras: carência de 10 dias depois do vencimento (padrão); depois disso o painel e os dados ficam bloqueados (inclusive no banco, por RLS) e só a tela de cobrança abre; o link público de agendamento fica no ar durante a carência. O bloqueio é calculado pelas datas, então vale mesmo que o dono não abra o app. Pagamento depois do bloqueio libera 30 dias a partir do dia do pagamento.
 
 **O que você precisa fazer (uma vez):**
 1. Crie a conta no [Asaas](https://www.asaas.com) (aceita CPF) e use o **Sandbox** para testar primeiro (`https://sandbox.asaas.com`).
@@ -177,6 +177,20 @@ Regras: carência de 10 dias depois do vencimento (configurável no `/master`); 
 **Passar do sandbox para produção:** no Asaas de produção gere a chave de API, cadastre uma chave Pix na conta e crie o webhook (mesma URL e mesmo token). No Supabase troque `ASAAS_API_KEY` pela chave de produção e `ASAAS_ENV` por `production`. As funções não precisam ser publicadas de novo.
 
 Sem `ASAAS_API_KEY`, o app continua com o Pix manual e a conferência pelo WhatsApp, como antes. Se o Asaas exigir CPF/CNPJ de quem paga, o app pede o número na hora de gerar o Pix (ele vai só ao Asaas, não fica salvo).
+
+### Carência antes do bloqueio
+No `/master`, o cartão **Carência antes do bloqueio** define quantos dias de atraso o dono tolera (de 0 a 60; padrão 10). O valor vale para todas as contas, no banco (`platform_settings.grace_days`, usado por `shop_locked`) e na tela (`getBillingState`). O cartão mostra, antes de salvar, quantas contas ficariam bloqueadas com o novo valor e pede confirmação se a mudança bloquear alguma conta agora. Só o administrador consegue alterar (regra de acesso do banco). Com carência N, o acesso fecha no dia N+1 depois do vencimento.
+
+### Contatos do suporte
+WhatsApp, e-mail e Instagram ficam em um lugar só: `src/lib/contacts.ts` (para trocar um número ou perfil, é só ali). Aparecem na landing (rodapé, preço e fechamento), no cartão "Atendimento" do painel do dono e na tela de bloqueio. O componente é `src/components/ContactLinks.tsx`.
+
+### Testes e avaliações
+```bash
+npm test          # rápidos (menos de 1 segundo): regras da carência na tela e links de contato
+npm run test:db   # sobe um Postgres local (PGlite) com as migrações reais e testa as regras do banco (~3 segundos)
+npm run evals     # Chrome real: mede a landing (contatos, toque, destaque dos botões) e exercita o cartão de carência e os contatos da tela de bloqueio, com um servidor falso no lugar do Supabase
+```
+`test:db` e `evals` não tocam em produção. O `evals` precisa de Chrome ou Edge instalado (ou `CHROME_PATH`).
 
 ### Conta de demonstração (para panfleto e vendas)
 1. Crie uma conta normalmente no app.
