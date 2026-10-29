@@ -9,6 +9,7 @@ import { INVALID_MOBILE_MESSAGE, formatPhoneInput, isValidEmail, isValidMobile, 
 import { SITE_URL, SUPPORT_EMAIL, SUPPORT_WHATSAPP } from '../lib/platform'
 import { TRIAL_DAYS, formatMoney } from '../lib/billing'
 import { findFreeSlug, slugify } from '../lib/slug'
+import { track } from '../lib/track'
 import { buildShopTheme, getModeFor, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
 
 interface BarberOnboardingProps {
@@ -38,6 +39,10 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
   const [baseFee, setBaseFee] = useState<number | null>(null)
   useEffect(() => {
     fetchMonthlyFee().then(setBaseFee).catch(() => setBaseFee(null))
+  }, [])
+
+  useEffect(() => {
+    track('signup_open')
   }, [])
 
   // Visual neutro até o dono escolher outro no painel
@@ -157,6 +162,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
 
       // 3) horário de funcionamento inicial (o dono ajusta depois no painel)
       await saveWorkingHours(shopId, defaultWorkingHours())
+      track('signup_done')
       await onRegistered()
     } catch (err) {
       alert(friendlyError(err instanceof Error ? err.message : String(err)))

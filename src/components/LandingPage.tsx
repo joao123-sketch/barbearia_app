@@ -3,6 +3,7 @@ import { ArrowRight } from 'lucide-react'
 import { fetchMonthlyFee } from '../lib/db'
 import { SUPPORT_WHATSAPP } from '../lib/platform'
 import { toWaNumber } from '../lib/phone'
+import { track } from '../lib/track'
 import '../landing.css'
 
 // Página inicial de quem ainda não entrou. Um painel de blocos com as telas reais do app (contas de demonstração,
@@ -14,6 +15,9 @@ interface LandingPageProps {
 }
 
 type Audience = 'barbearia' | 'salao'
+
+// Anúncio das vagas de fundador. Texto fixo: quando as vagas acabarem ou mudarem, é só trocar aqui.
+const FOUNDER = { price: '10,90', after: '49,90', total: 10, left: 3 }
 
 const AUDIENCE: Record<Audience, { label: string; prefix: 'b' | 's'; lead: string; booking: string }> = {
   barbearia: {
@@ -173,6 +177,34 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignup, onLogin }) =
                 Seu cliente agenda <em>sozinho.</em>
               </h1>
               <p className="lp-lead">{a.lead}</p>
+            </section>
+
+            {/* ===== vagas de fundador (anúncio fixo: o número de vagas é trocado à mão em FOUNDER) ===== */}
+            <section className="t fund span-all" aria-labelledby="fundador">
+              <p className="fund-tag">Vagas de fundador</p>
+              <h2 id="fundador" className="fund-title">
+                R$ {FOUNDER.price}/mês. Restam {FOUNDER.left} de {FOUNDER.total}.
+              </h2>
+              <p className="fund-text">
+                Você pode ser um dos {FOUNDER.left} últimos. Preço fixo, enquanto sua assinatura estiver ativa.
+              </p>
+              <button
+                type="button"
+                className="fund-btn"
+                onClick={() => {
+                  track('founder_click')
+                  onSignup()
+                }}
+              >
+                <span>Garantir minha vaga</span>
+                <ArrowRight size={24} aria-hidden="true" />
+              </button>
+              <p className="fund-help">
+                Todo cliente conta com suporte direto no WhatsApp e ajuda para configurar o seu negócio.
+              </p>
+              <p className="fund-terms">
+                R$ {FOUNDER.price}/mês enquanto a assinatura estiver ativa. {FOUNDER.left} vagas. Depois, R$ {FOUNDER.after}/mês.
+              </p>
             </section>
 
             <div className="t t-img hero-img drift span-all lp-reveal" style={reveal(80)}>

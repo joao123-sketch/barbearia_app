@@ -962,3 +962,67 @@
     grid-column: 9 / 13;
   }
 }
+
+/* vagas de fundador */
+.fund {
+  background: var(--ink);
+  color: #fff;
+  border: 2px solid var(--gold);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.fund-tag {
+  margin: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #fff;
+  font-size: var(--t-small);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.fund-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: var(--t-mid);
+  line-height: 1.15;
+}
+.fund-text {
+  margin: 0;
+  font-size: var(--t-body);
+  color: rgba(255, 255, 255, 0.9);
+}
+.fund-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 360px;
+  min-height: 52px;
+  margin-top: 6px;
+  padding: 12px 22px;
+  border: 0;
+  border-radius: var(--r);
+  background: var(--acc);
+  color: #fff;
+  font: 700 18px var(--sans);
+  cursor: pointer;
+}
+.fund-btn:hover {
+  background: var(--acc-d);
+}
+.fund-help {
+  margin: 4px 0 0;
+  font-size: var(--t-small);
+  color: rgba(255, 255, 255, 0.9);
+}
+.fund-terms {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
