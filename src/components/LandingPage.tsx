@@ -11,16 +11,16 @@ import '../landing.css'
 // nomes fictícios). O alternador Barbearia / Salão troca as cores e as telas da página inteira.
 
 interface LandingPageProps {
-  onSignup: () => void
+  onSignup: (audience: Audience) => void
   onLogin: () => void
 }
 
-type Audience = 'barbearia' | 'salao'
+export type Audience = 'barbearia' | 'salao' | 'lavajato'
 
 // Anúncio das vagas de fundador. Texto fixo: quando as vagas acabarem ou mudarem, é só trocar aqui.
 const FOUNDER = { price: '10,90', after: '49,90', total: 10, left: 3 }
 
-const AUDIENCE: Record<Audience, { label: string; prefix: 'b' | 's'; lead: string; booking: string }> = {
+const AUDIENCE: Record<Audience, { label: string; prefix: 'b' | 's' | 'l'; lead: string; booking: string }> = {
   barbearia: {
     label: 'Barbearia',
     prefix: 'b',
@@ -32,6 +32,13 @@ const AUDIENCE: Record<Audience, { label: string; prefix: 'b' | 's'; lead: strin
     prefix: 's',
     lead: 'Suas clientes marcam horário sozinhas, a qualquer hora, e você acompanha agenda e faturamento no celular.',
     booking: 'Página de agendamento de um salão, com a lista de serviços e preços'
+  },
+  lavajato: {
+    label: 'Lava-jato',
+    // Enquanto não houver telas gravadas de um lava-jato (arquivos l-*.webp), usa as telas da barbearia
+    prefix: 'b',
+    lead: 'Chega de fila e de “tem vaga hoje?”. O cliente marca a lavagem sozinho e você controla a agenda e o faturamento no celular.',
+    booking: 'Página de agendamento, com a lista de serviços e preços'
   }
 }
 
@@ -156,7 +163,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignup, onLogin }) =
             <button type="button" className="lp-btn lp-btn--soft" onClick={onLogin}>
               Entrar
             </button>
-            <button type="button" className="lp-btn lp-btn--acc" onClick={onSignup}>
+            <button type="button" className="lp-btn lp-btn--acc" onClick={() => onSignup(audience)}>
               <span>
                 Criar conta<span className="lp-hide-s"> grátis</span>
               </span>
@@ -197,7 +204,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignup, onLogin }) =
                 className="fund-btn"
                 onClick={() => {
                   track('founder_click')
-                  onSignup()
+                  onSignup(audience)
                 }}
               >
                 <span>Garantir minha vaga</span>
@@ -216,7 +223,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignup, onLogin }) =
             </div>
 
             <div className="t t-acc hero-act span-all lp-reveal" style={reveal(120)}>
-              <button type="button" className="act-main" onClick={onSignup}>
+              <button type="button" className="act-main" onClick={() => onSignup(audience)}>
                 <span>Criar conta grátis</span>
                 <ArrowRight size={32} aria-hidden="true" />
               </button>
@@ -383,7 +390,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignup, onLogin }) =
                     </a>
                   </li>
                 </ul>
-                <button type="button" className="lp-btn lp-btn--acc lp-btn--lg" style={{ marginTop: 24 }} onClick={onSignup}>
+                <button type="button" className="lp-btn lp-btn--acc lp-btn--lg" style={{ marginTop: 24 }} onClick={() => onSignup(audience)}>
                   Criar conta grátis
                   <ArrowRight size={22} aria-hidden="true" />
                 </button>
@@ -403,7 +410,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignup, onLogin }) =
                     Leva cerca de 1 minuto, e você já entra no painel.
                   </p>
                   <div className="cta-btns">
-                    <button type="button" className="lp-btn lp-btn--paper lp-btn--lg" onClick={onSignup}>
+                    <button type="button" className="lp-btn lp-btn--paper lp-btn--lg" onClick={() => onSignup(audience)}>
                       Criar conta grátis
                       <ArrowRight size={22} aria-hidden="true" />
                     </button>
@@ -441,7 +448,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignup, onLogin }) =
         <div className="foot-grid">
           <div className="foot-col">
             <h3>Conta</h3>
-            <button type="button" onClick={onSignup}>
+            <button type="button" onClick={() => onSignup(audience)}>
               Criar conta grátis
             </button>
             <button type="button" onClick={onLogin}>

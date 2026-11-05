@@ -42,6 +42,11 @@
   --acc-d: #86204a;
   --tint: #f6e3eb;
 }
+.lp[data-aud='lavajato'] {
+  --acc: #0b6b9a;
+  --acc-d: #084d70;
+  --tint: #dcebf4;
+}
 .lp *,
 .lp *::before,
 .lp *::after {
@@ -400,14 +405,17 @@
   letter-spacing: -0.04em;
 }
 
-/* alternador Barbearia / Salão */
+/* alternador Barbearia / Salão / Lava-jato */
 .lp-aud {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  justify-content: start;
   gap: 6px;
+  max-width: 100%;
 }
 .lp-aud button {
   min-height: 44px;
-  padding: 0 18px;
+  padding: 0 12px;
   border: 0;
   border-radius: var(--r);
   background: #fff;
@@ -1164,4 +1172,17 @@
   margin: 0;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.7);
+}
+
+/* alternador com três opções em tela estreita */
+@media (max-width: 420px) {
+  .lp-aud {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+  .lp-aud button {
+    padding: 0 6px;
+    font-size: 14px;
+    line-height: 1.2;
+  }
 }
