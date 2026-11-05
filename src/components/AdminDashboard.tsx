@@ -1482,16 +1482,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           const apt = d.allAppointments.find((a) => a.start_time === slot)
 
                           // Agendamento anterior que ainda está ocorrendo
-                          const isCovered =
-                            !apt &&
-                            d.allAppointments.some((a) => {
-                              if (a.status === 'cancelled') return false
-                              const [sh, sm] = a.start_time.split(':').map(Number)
-                              const [th, tm] = slot.split(':').map(Number)
-                              const startM = sh * 60 + sm
-                              const targetM = th * 60 + tm
-                              return targetM > startM && targetM < startM + a.total_duration
-                            })
+                          const coveringApt = apt
+                            ? undefined
+                            : d.allAppointments.find((a) => {
+                                if (a.status === 'cancelled') return false
+                                const [sh, sm] = a.start_time.split(':').map(Number)
+                                const [th, tm] = slot.split(':').map(Number)
+                                const startM = sh * 60 + sm
+                                const targetM = th * 60 + tm
+                                return targetM > startM && targetM < startM + a.total_duration
+                              })
+                          const isCovered = Boolean(coveringApt)
+                          // até que horas o atendimento que começou antes continua ocupando este horário
+                          const coveredUntil = coveringApt
+                            ? (() => {
+                                const [sh, sm] = coveringApt.start_time.split(':').map(Number)
+                                const endM = sh * 60 + sm + coveringApt.total_duration
+                                return `${String(Math.floor(endM / 60)).padStart(2, '0')}:${String(endM % 60).padStart(2, '0')}`
+                              })()
+                            : ''
 
                           if (isDayClosed) {
                             return (
@@ -1564,7 +1573,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                                   {barbersList.find((b) => b.id === apt.barber_id) && (
                                     <span className="text-[9px] text-amber-300 font-semibold truncate block mt-0.5">
-                                      ✂️ {barbersList.find((b) => b.id === apt.barber_id)?.name}
+                                      {terms.staffEmoji} {barbersList.find((b) => b.id === apt.barber_id)?.name}
                                     </span>
                                   )}
 
@@ -1612,7 +1621,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               <td key={d.dateStr} className="p-1.5 border-r border-slate-800/40 align-middle">
                                 <div className="py-2 px-1 rounded-xl bg-amber-500/5 border border-amber-500/15 text-center">
                                   <span className="text-[10px] font-medium text-amber-400/80">
-                                    Em corte
+                                    {terms.busyLabel} até {coveredUntil}
                                   </span>
                                 </div>
                               </td>

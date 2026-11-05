@@ -35,8 +35,7 @@ const AUDIENCE: Record<Audience, { label: string; prefix: 'b' | 's' | 'l'; lead:
   },
   lavajato: {
     label: 'Lava-jato',
-    // Enquanto não houver telas gravadas de um lava-jato (arquivos l-*.webp), usa as telas da barbearia
-    prefix: 'b',
+    prefix: 'l',
     lead: 'Chega de fila e de “tem vaga hoje?”. O cliente marca a lavagem sozinho e você controla a agenda e o faturamento no celular.',
     booking: 'Página de agendamento, com a lista de serviços e preços'
   }
