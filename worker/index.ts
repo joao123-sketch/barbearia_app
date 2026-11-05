@@ -57,14 +57,32 @@ async function loadShop(slug: string): Promise<Shop | null> {
   }
 }
 
-// "data:image/jpeg;base64,...." -> tipo e bytes
-function parseDataUrl(value: string): { type: string; bytes: Uint8Array } | null {
-  const match = value.match(/^data:(image\/[a-z+.-]+);base64,(.+)$/i)
+// "data:image/jpeg;base64,...." -> tipo e bytes.
+// Só imagens de pixels (PNG, JPEG, WebP, GIF). SVG fica de fora de propósito: ele pode carregar script e, servido
+// neste endereço, rodaria dentro do site (roubo de sessão de quem abrisse o link do ícone).
+export function parseDataUrl(value: string): { type: string; bytes: Uint8Array } | null {
+  const match = value.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/i)
   if (!match) return null
-  const binary = atob(match[2])
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-  return { type: match[1], bytes }
+  try {
+    const binary = atob(match[2])
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    return { type: match[1].toLowerCase(), bytes }
+  } catch {
+    return null
+  }
+}
+
+// Cabeçalhos de proteção: não deixa o site ser embutido em outra página (clickjacking) nem o navegador adivinhar tipos
+function withSecurityHeaders(response: Response): Response {
+  const headers = new Headers(response.headers)
+  headers.set('x-content-type-options', 'nosniff')
+  headers.set('referrer-policy', 'strict-origin-when-cross-origin')
+  if ((headers.get('content-type') ?? '').includes('text/html')) {
+    headers.set('x-frame-options', 'SAMEORIGIN')
+    headers.set('content-security-policy', "frame-ancestors 'self'")
+  }
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
 }
 
 // Ícone do app: o PNG quadrado quando existe, senão a própria logo
@@ -134,10 +152,15 @@ async function iconResponse(slug: string, request: Request, env: Env) {
 
   if (icon) {
     return new Response(icon.bytes, {
-      headers: { 'content-type': icon.type, 'cache-control': 'public, max-age=300' }
+      headers: {
+        'content-type': icon.type,
+        'cache-control': 'public, max-age=300',
+        'x-content-type-options': 'nosniff',
+        'content-security-policy': "default-src 'none'; sandbox"
+      }
     })
   }
-  if (shop?.logo_url && /^https?:\/\//.test(shop.logo_url)) return Response.redirect(shop.logo_url, 302)
+  if (shop?.logo_url && /^https:\/\//.test(shop.logo_url)) return Response.redirect(shop.logo_url, 302)
 
   // Sem logo cadastrada: ícone padrão do app
   return env.ASSETS.fetch(new Request(new URL('/icon-512.png', request.url)))
@@ -209,9 +232,9 @@ export default {
       const target = pageTarget(url, request)
       if (target) {
         const shop = await loadShop(target.slug)
-        if (shop) return withShopHead(response, shop, target.app)
+        if (shop) return withSecurityHeaders(await withShopHead(response, shop, target.app))
       }
     }
-    return response
+    return withSecurityHeaders(response)
   }
 }
