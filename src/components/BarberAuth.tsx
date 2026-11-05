@@ -5,6 +5,8 @@ import { buildShopTheme, getModeFor, shopThemeAttrs, useShopChrome } from '../li
 import { requestPasswordReset, signIn } from '../lib/auth'
 import { friendlyError } from '../lib/db'
 import { normalizeEmail } from '../lib/phone'
+import { parseBusinessType } from '../lib/terms'
+import type { BusinessType } from '../types'
 import { track } from '../lib/track'
 import { BarberOnboarding } from './BarberOnboarding'
 import { PasswordInput } from './PasswordInput'
@@ -56,6 +58,8 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  // Tipo escolhido no alternador da página inicial (Barbearia / Salão / Lava-jato) já vem marcado no cadastro
+  const [pickedType, setPickedType] = useState<BusinessType | null>(null)
 
   // Recuperação de senha
   const [recoveryEmail, setRecoveryEmail] = useState('')
@@ -118,6 +122,7 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
   if (view === 'register') {
     return (
       <BarberOnboarding
+        initialType={parseBusinessType(params.get('tipo')) ?? pickedType}
         onBack={() => goTo('login')}
         onRegistered={async () => {
           await onRegistered()
@@ -128,7 +133,15 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
   }
 
   if (view === 'home') {
-    return <LandingPage onSignup={() => goTo('register')} onLogin={() => goTo('login')} />
+    return (
+      <LandingPage
+        onSignup={(audience) => {
+          setPickedType(parseBusinessType(audience))
+          goTo('register')
+        }}
+        onLogin={() => goTo('login')}
+      />
+    )
   }
 
   return (

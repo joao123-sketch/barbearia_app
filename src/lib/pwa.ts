@@ -79,7 +79,7 @@ export function applyDefaultPwa(pathname: string) {
   document.title = isPlatformArea
     ? 'Admin | SuaAgenda'
     : isSignIn
-    ? 'SuaAgenda | Agenda online para barbearias e salões'
+    ? 'SuaAgenda | Agenda online para o seu negócio'
     : isAdminArea
       ? 'Painel | SuaAgenda'
       : 'SuaAgenda | Agendamento Online'
