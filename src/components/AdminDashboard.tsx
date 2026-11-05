@@ -44,7 +44,7 @@ import { OwnerNotifications } from './OwnerNotifications'
 import { BillingPanel } from './BillingPanel'
 import { BillingBanner, BillingEntryNotice, BillingLockedScreen, BillingPayModal } from './BillingNotices'
 import { normalizeInstagram } from '../lib/instagram'
-import { slugify } from '../lib/slug'
+import { isReservedSlug, slugify } from '../lib/slugRules'
 import { getTerms } from '../lib/terms'
 import { formatMoney, getBillingState, toDateStr } from '../lib/billing'
 import { normalizePhone, toWaNumber } from '../lib/phone'
@@ -773,6 +773,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
+    const newSlug = slugify(profileSlug) || barbershop.slug
+    if (newSlug.length < 2 || isReservedSlug(newSlug)) {
+      alert('Este link é reservado pelo sistema ou é curto demais. Escolha outro nome para o link.')
+      return
+    }
     // Ícone do app: PNG quadrado gerado da logo (só refaz quando a logo muda)
     let appIcon = barbershop.app_icon
     if (profileLogo !== barbershop.logo_url || (profileLogo && !appIcon)) {
@@ -782,7 +787,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const updatedShop: Barbershop = {
       ...barbershop,
       name: profileName,
-      slug: slugify(profileSlug) || barbershop.slug,
+      slug: newSlug,
       logo_url: profileLogo,
       app_icon: appIcon,
       instagram: normalizeInstagram(profileInstagram),

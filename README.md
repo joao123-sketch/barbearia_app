@@ -1,4 +1,4 @@
-# SuaAgenda — Agendamento online para barbearias e salões
+# SuaAgenda — Agendamento online para barbearias, salões e lava-jatos
 
 > **Seus clientes agendam sozinhos pelo link. Você só atende.**
 > Sem aplicativo para o cliente baixar, sem taxa por agendamento, sem complicação.
@@ -7,9 +7,9 @@
 
 ## 📣 Resumo para o panfleto / anúncio
 
-**O que é:** um sistema de agenda online para barbearias e salões de beleza. O dono recebe um link próprio (ex.: `suaagenda.../b/nome-da-barbearia`), coloca na bio do Instagram ou manda no WhatsApp, e os clientes escolhem serviço, profissional, dia e horário sozinhos, 24 horas por dia.
+**O que é:** um sistema de agenda online para barbearias, salões de beleza e lava-jatos. O dono recebe um link próprio (ex.: `suaagenda.../b/nome-da-barbearia`), coloca na bio do Instagram ou manda no WhatsApp, e os clientes escolhem serviço, profissional, dia e horário sozinhos, 24 horas por dia.
 
-**Para quem:** barbeiros, donos de barbearia, salões, cabeleireiras, manicures e profissionais da beleza que hoje marcam horário pelo WhatsApp ou no caderno.
+**Para quem:** barbeiros, donos de barbearia, salões, cabeleireiras, manicures, profissionais da beleza e donos de lava-jato que hoje marcam horário pelo WhatsApp ou no caderno.
 
 **Dor que resolve:**
 - Parar de responder "tem horário hoje?" o dia inteiro.
@@ -45,12 +45,13 @@
 - Quer ver funcionando? Acesse uma **conta de demonstração** (os nomes dos clientes são fictícios):
   - Barbearia: `https://SEU-DOMINIO/b/barbearia-corte-bem` (Barbearia Corte Bem)
   - Salão de beleza: `https://SEU-DOMINIO/b/salao-fique-linda` (Salão Fique Linda)
-  *(troque `SEU-DOMINIO` pelo endereço real do site)*
-- Sugestão de QR Code no panfleto: aponta para o link da conta de demonstração do tipo de negócio (barbearia ou salão) ou para `https://SEU-DOMINIO/cadastrar` para já criar a conta.
+  - Lava-jato: `https://SEU-DOMINIO/b/turbocar` (TurboCar)
+  *(`SEU-DOMINIO` é `barbearia-app.sistemaappbarbearia.workers.dev`)*
+- Sugestão de QR Code no panfleto: aponta para o link da conta de demonstração do tipo de negócio (barbearia, salão ou lava-jato) ou para `https://SEU-DOMINIO/cadastrar` para já criar a conta. Para o lava-jato, `https://SEU-DOMINIO/cadastrar?tipo=lavajato` abre o cadastro com o tipo já marcado (também vale `?tipo=barbearia` e `?tipo=salao`).
 
 ### Fatos verificados (podem ir no panfleto)
-- Teste grátis: 20 dias. Mensalidade: R$ 70,00 por mês, paga antecipada por PIX, cada pagamento libera 30 dias.
-- Funciona para **barbearia** e **salão de beleza** (o painel usa os termos certos de cada um).
+- Teste grátis: 20 dias, sem cartão e sem fidelidade. A mensalidade é paga antecipada por PIX e cada pagamento libera 30 dias. O valor vem do painel do gestor (hoje: vagas de fundador a R$ 10,90 por mês, preço fixo enquanto a assinatura estiver ativa; depois, R$ 49,90).
+- Funciona para **barbearia**, **salão de beleza** e **lava-jato** (o painel e a página de agendamento usam os termos certos de cada um). No lava-jato o cliente escolhe o tipo do veículo (passeio, SUV/4x4, caminhonete, caminhão ou moto) e informa o modelo; o dono cadastra os tipos de lavagem com preço e duração e vê o veículo no cartão do atendimento.
 - O cliente agenda pelo link, sem baixar nada. O dono pode instalar como app: no celular ele aparece como **SuaAgenda**; o cliente que instalar a página do negócio vê o nome do estabelecimento na tela inicial.
 - O dono recebe aviso no celular a cada novo agendamento. O cliente recebe lembrete por notificação.
 - O atendimento só aparece como **concluído** depois que o horário termina. O histórico de cortes mostra só o que já aconteceu.
@@ -59,7 +60,7 @@
 
 ### Ideias de texto para o panfleto
 - **Título:** "Agenda cheia, cabeça tranquila." / "Seu cliente agenda sozinho. Você só atende."
-- **Subtítulo:** "Link de agendamento próprio para sua barbearia ou salão. 20 dias grátis."
+- **Subtítulo:** "Link de agendamento próprio para sua barbearia, salão ou lava-jato. 20 dias grátis."
 - **Chamada final:** "Teste grátis agora. Chame no WhatsApp (88) 98894-1408."
 
 ### Tom e visual sugeridos
@@ -139,7 +140,7 @@ VITE_SUPABASE_ANON_KEY=sua-chave-anon-aqui
 ```
 
 ### Banco (Supabase)
-1. Abra o **SQL Editor** e rode, em ordem, os arquivos de `supabase/migrations/` (`0001` até `0013`).
+1. Abra o **SQL Editor** e rode, em ordem, os arquivos de `supabase/migrations/` (`0001` até `0020`).
 2. Crie a sua conta no app e torne-se administrador:
    ```sql
    insert into public.platform_admins (user_id)
@@ -172,6 +173,8 @@ Regras: carência de 10 dias depois do vencimento (padrão); depois disso o pain
 5. No Asaas, em *Integrações > Webhooks*, crie um webhook para `https://SEU-PROJETO.supabase.co/functions/v1/asaas-webhook`, com o **mesmo token** de `ASAAS_WEBHOOK_TOKEN`, fila **sequencial**, e marque os eventos de cobrança (`PAYMENT_RECEIVED`, `PAYMENT_CONFIRMED`, `PAYMENT_REFUNDED`, `PAYMENT_DELETED`, `PAYMENT_OVERDUE`).
 6. Teste no sandbox: abra o painel de uma conta, toque em *Pagar com Pix*, pague pelo simulador do Asaas e veja a tela virar "Pagamento confirmado". Depois repita com `ASAAS_ENV=production` e a chave de produção.
 
+`0014` a `0020` (já aplicadas em produção): `0014_admin_exempt` isenta a conta do administrador de cobrança; `0015_admin_signup_push` avisa o administrador a cada cadastro novo; `0016_trial_by_email` controla o teste grátis também por e-mail (quem já usou WhatsApp ou e-mail recadastra sem teste grátis); `0017_page_events` guarda o funil de cadastro (visitas, cliques, aberturas e cadastros) mostrado no `/master`; `0018_business_type_lavajato` libera o tipo lava-jato; `0019_security_hardening` fecha a escrita anônima na view pública de negócios e valida o endereço das notificações push; `0020_slot_lock_reserved_slugs` impede dois agendamentos no mesmo horário e proíbe links reservados (`login`, `admin`, `api`…, lista em `src/lib/slugRules.ts`). Com o CLI do Supabase: `supabase db query --linked --yes -f supabase/migrations/00NN_nome.sql` (a CLI pede `--yes` para mexer em produção).
+
 `0013_admin_alerts.sql` cria os alertas do administrador: se o Asaas recusar a chave, faltar a chave Pix na conta, um aviso de pagamento falhar ou um pagamento precisar de conferência, aparece um alerta vermelho no topo do `/master` (um por tipo de problema; repetições só somam a contagem). O dono vê só "pagamento automático indisponível" e o Pix manual.
 
 **Passar do sandbox para produção:** no Asaas de produção gere a chave de API, cadastre uma chave Pix na conta e crie o webhook (mesma URL e mesmo token). No Supabase troque `ASAAS_API_KEY` pela chave de produção e `ASAAS_ENV` por `production`. As funções não precisam ser publicadas de novo.
@@ -186,7 +189,7 @@ WhatsApp, e-mail e Instagram ficam em um lugar só: `src/lib/contacts.ts` (para 
 
 ### Testes e avaliações
 ```bash
-npm test          # rápidos (menos de 1 segundo): regras da carência na tela e links de contato
+npm test          # rápidos (menos de 1 segundo): carência na tela, links de contato, tipos de negócio, links reservados e ícone do worker
 npm run test:db   # sobe um Postgres local (PGlite) com as migrações reais e testa as regras do banco (~3 segundos)
 npm run evals     # Chrome real: mede a landing (contatos, toque, destaque dos botões) e exercita o cartão de carência e os contatos da tela de bloqueio, com um servidor falso no lugar do Supabase
 ```
@@ -195,7 +198,7 @@ npm run evals     # Chrome real: mede a landing (contatos, toque, destaque dos b
 ### Conta de demonstração (para panfleto e vendas)
 1. Crie uma conta normalmente no app.
 2. Abra `supabase/seed_demo_account.sql`, troque a lista `v_refs` pelo e-mail ou slug de cada conta de teste (pode ser mais de uma) e rode no SQL Editor.
-3. Ele cria, se a conta ainda não tiver, horário de funcionamento e 5 serviços (de barbearia ou de salão, conforme o tipo da conta) e atendimentos fictícios do mês passado até o fim da semana atual. Pode rodar de novo: recria só o que ele mesmo criou (`notes = 'demo'`).
+3. Ele cria, se a conta ainda não tiver, horário de funcionamento e 5 serviços (de barbearia, de salão ou de lava-jato, conforme o tipo da conta) e atendimentos fictícios do mês passado até o fim da semana atual. Pode rodar de novo: recria só o que ele mesmo criou (`notes = 'demo'`; no lava-jato, atendimentos com nome fictício e modelo de veículo da lista do script). Use só em conta de demonstração.
 4. Não coloque senhas de contas de teste neste arquivo.
 
 ### Deploy
