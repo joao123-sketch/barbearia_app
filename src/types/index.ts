@@ -2,7 +2,7 @@ export type SubscriptionStatus = 'trial' | 'active' | 'pending' | 'overdue' | 'b
 
 export type ShopStylePreset = 'elegante' | 'sofisticado' | 'moderno' | 'minimalista' | 'simples' | 'rosa' | 'azul' | 'neutro'
 
-export type BusinessType = 'barbearia' | 'salao'
+export type BusinessType = 'barbearia' | 'salao' | 'lavajato'
 
 export interface Barbershop {
   business_type?: BusinessType

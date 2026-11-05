@@ -321,11 +321,11 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
       `📅 *Data:* ${formattedDate}\n` +
       `⏰ *Horário:* ${confirmedBooking.start_time}\n` +
       `💰 *Total:* R$ ${formatMoney(confirmedBooking.total_price)}\n` +
-      (confirmedBooking.notes ? `📝 *Observação:* ${confirmedBooking.notes}\n` : '') +
+      (confirmedBooking.notes ? `${terms.notesEmoji} *${terms.notesWhatsApp}:* ${confirmedBooking.notes}\n` : '') +
       `\nAguardo a confirmação. Obrigado!`
 
     return `https://wa.me/${toWaNumber(barbershop.phone_whatsapp)}?text=${encodeURIComponent(msg)}`
-  }, [confirmedBooking, formattedDate, barbershop.phone_whatsapp])
+  }, [confirmedBooking, formattedDate, barbershop.phone_whatsapp, terms])
 
   // Claro/escuro e cores do estilo vêm das variáveis do tema (shopTheme), não de classes condicionais
   const isLight = false
@@ -912,11 +912,11 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1" htmlFor="bkg-926">
-                  Observações para o {terms.professional} (opcional)
+                  {terms.notesLabel}
                 </label>
                 <textarea name="notes" autoComplete="off" id="bkg-926"
                   rows={2}
-                  placeholder="Ex: Primeira vez aqui, alguma preferência?"
+                  placeholder={terms.notesPlaceholder}
                   value={clientNotes}
                   onChange={(e) => setClientNotes(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-amber-500 focus:outline-none text-white text-xs"

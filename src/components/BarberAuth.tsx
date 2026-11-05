@@ -5,6 +5,7 @@ import { buildShopTheme, getModeFor, shopThemeAttrs, useShopChrome } from '../li
 import { requestPasswordReset, signIn } from '../lib/auth'
 import { friendlyError } from '../lib/db'
 import { normalizeEmail } from '../lib/phone'
+import { parseBusinessType } from '../lib/terms'
 import { track } from '../lib/track'
 import { BarberOnboarding } from './BarberOnboarding'
 import { PasswordInput } from './PasswordInput'
@@ -118,6 +119,7 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
   if (view === 'register') {
     return (
       <BarberOnboarding
+        initialType={parseBusinessType(params.get('tipo'))}
         onBack={() => goTo('login')}
         onRegistered={async () => {
           await onRegistered()

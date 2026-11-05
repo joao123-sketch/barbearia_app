@@ -70,6 +70,9 @@ const isAppointmentDone = (apt: Appointment, now: Date) => {
   return end.getTime() <= now.getTime()
 }
 
+// Observação gravada nos agendamentos feitos pelo dono no balcão (não é do cliente, não aparece no cartão)
+const MANUAL_NOTE = 'Agendamento manual via balcão'
+
 type AdminTab = 'agenda' | 'semana' | 'historico' | 'servicos' | 'equipe' | 'horarios' | 'config'
 
 interface AdminDashboardProps {
@@ -189,6 +192,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [profileState, setProfileState] = useState(barbershop.state || legacyCity.match(/-\s*([A-Za-z]{2})$/)?.[1]?.toUpperCase() || '')
   const [profileReferencePoint, setProfileReferencePoint] = useState(barbershop.reference_point || '')
   const [profileSlogan, setProfileSlogan] = useState(barbershop.slogan || '')
+  const terms = getTerms(barbershop.business_type)
   const [profileSlug, setProfileSlug] = useState(barbershop.slug)
   const [profileSaved, setProfileSaved] = useState(false)
 
@@ -590,7 +594,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       total_price: selectedService?.price || 40,
       total_duration: selectedService?.duration_minutes || 30,
       status: 'confirmed',
-      notes: 'Agendamento manual via balcão',
+      notes: MANUAL_NOTE,
       created_at: new Date().toISOString()
     }
 
@@ -1042,7 +1046,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <p className="font-bold text-amber-300 text-sm">Complete o seu negócio</p>
             <p className="text-slate-300 leading-relaxed">
               Para seus clientes confiarem e chegarem até você, adicione o endereço, a logo, o Instagram e o estilo visual. Se
-              atende com equipe, cadastre os profissionais na aba Equipe. Tudo opcional, leva poucos minutos.
+              {terms.teamHint} Tudo opcional, leva poucos minutos.
             </p>
             <div className="flex gap-2">
               <button
@@ -1282,6 +1286,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </div>
 
                           <p className="text-xs text-slate-300 mt-0.5">{serviceNames}</p>
+                          {apt.notes && apt.notes !== MANUAL_NOTE && (
+                            <p className="text-xs text-amber-300 mt-0.5">{terms.notesEmoji} {apt.notes}</p>
+                          )}
 
                           <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-400 flex-wrap">
                             <span className="text-amber-400 font-bold">
@@ -1778,6 +1785,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </div>
 
                           <p className="text-xs text-slate-300 mt-0.5">{serviceNames}</p>
+                          {apt.notes && apt.notes !== MANUAL_NOTE && (
+                            <p className="text-xs text-amber-300 mt-0.5">{terms.notesEmoji} {apt.notes}</p>
+                          )}
 
                           <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-400 flex-wrap">
                             <span className="text-amber-400 font-bold">

@@ -14,6 +14,7 @@ import { track } from '../lib/track'
 import { buildShopTheme, getModeFor, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
 
 interface BarberOnboardingProps {
+  initialType?: BusinessType | null // vem do link do panfleto (?tipo=lavajato)
   onBack: () => void
   onRegistered: () => Promise<void>
 }
@@ -22,14 +23,14 @@ interface BarberOnboardingProps {
 const fieldClass =
   'w-full px-3.5 py-3 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-500 focus:outline-none text-white text-base'
 
-export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRegistered }) => {
+export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ initialType = null, onBack, onRegistered }) => {
   // Já logado (criou a conta mas não terminou o negócio): não pede e-mail e senha de novo
   const { session } = useSession()
   const loggedEmail = session?.user.email
   const [submitting, setSubmitting] = useState(false)
 
   // Só o essencial: o resto (endereço, logo, tema, slogan, Instagram, equipe) fica para o painel
-  const [businessType, setBusinessType] = useState<BusinessType | null>(null)
+  const [businessType, setBusinessType] = useState<BusinessType | null>(initialType)
   const [ownerName, setOwnerName] = useState('')
   const [shopName, setShopName] = useState('')
   const [phone, setPhone] = useState('')
@@ -105,7 +106,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
     e.preventDefault()
 
     if (!businessType) {
-      alert('Escolha se o seu negócio é uma barbearia ou um salão de beleza.')
+      alert('Escolha o tipo do seu negócio: barbearia, salão de beleza ou lava-jato.')
       return
     }
     if (!ownerName.trim()) {
@@ -195,10 +196,11 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
               <Store className="w-4 h-4 text-amber-400" />
               <span>Qual é o seu negócio? *</span>
             </p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {([
                 { id: 'barbearia', label: 'Barbearia', icon: '💈' },
-                { id: 'salao', label: 'Salão de Beleza', icon: '💇‍♀️' }
+                { id: 'salao', label: 'Salão', icon: '💇‍♀️' },
+                { id: 'lavajato', label: 'Lava-jato', icon: '🚗' }
               ] as const).map((opt) => (
                 <button
                   key={opt.id}
@@ -236,12 +238,12 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ onBack, onRe
             <div>
               <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5" htmlFor="onb-negocio">
                 <Scissors className="w-3.5 h-3.5 text-amber-400" />
-                <span>{`Nome ${businessType === 'salao' ? 'do Salão' : businessType === 'barbearia' ? 'da Barbearia' : 'do Negócio'} *`}</span>
+                <span>{`${businessType ? terms.nameLabel : 'Nome do Negócio'} *`}</span>
               </label>
               <input name="shop-name" autoComplete="organization" id="onb-negocio"
                 type="text"
                 required
-                placeholder={businessType === 'salao' ? 'Ex: Studio Bela Vida' : 'Ex: Barbearia Black Diamond'}
+                placeholder={terms.namePlaceholder}
                 value={shopName}
                 onChange={(e) => setShopName(e.target.value)}
                 className={fieldClass}
