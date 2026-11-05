@@ -381,9 +381,12 @@ export function friendlyError(message: string): string {
     forbidden: 'Só o administrador pode alterar isso.',
     grace_days_check: 'A carência precisa ficar entre 0 e 60 dias.',
     barbershops_slug_key: 'Este link já está em uso. Escolha outro nome de link.',
+    barbershops_slug_not_reserved: 'Este link é reservado pelo sistema. Escolha outro nome de link.',
     barbershops_phone_whatsapp_key: 'Já existe uma conta com este WhatsApp.'
   }
   for (const key of Object.keys(map)) if (message.includes(key)) return map[key]
+  // O Safari diz "Load failed"; o Chrome, "Failed to fetch"; o Firefox, "NetworkError": é a conexão que falhou, não o app
+  if (/load failed|failed to fetch|networkerror|network request failed/i.test(message)) return 'Sem conexão. Verifique a internet e tente de novo.'
   return message
 }
 

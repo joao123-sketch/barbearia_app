@@ -2,6 +2,8 @@
 // (nome e logo do próprio estabelecimento) e já entrega a página com esses dados no HTML, para o
 // celular instalar com a logo certa mesmo antes do aplicativo carregar. Todo o resto é arquivo estático.
 
+import { RESERVED_SLUGS } from '../src/lib/slugRules.ts'
+
 const SUPABASE_URL = 'https://jkahsamhmaijhfgjijfg.supabase.co'
 // Chave pública (publishable): a proteção real está nas regras RLS do banco
 const SUPABASE_KEY = 'sb_publishable_Pp50y6WaFzFqr0yVUKSx3g_qi5nZQOi'
@@ -30,8 +32,8 @@ const PRESET_COLORS: Record<string, string> = {
   neutro: '#f6f1ea'
 }
 
-// Caminhos de uma só parte que NÃO são a página de um negócio
-const RESERVED = new Set(['login', 'cadastrar', 'cadastro', 'redefinir-senha', 'admin', 'master', 'superadmin'])
+// Caminhos de uma só parte que NÃO são a página de um negócio (mesma lista do app e do banco)
+const RESERVED = new Set<string>(RESERVED_SLUGS)
 
 // Muda quando a logo muda: o celular baixa o ícone novo em vez de reaproveitar o antigo
 // (mesma conta de src/lib/pwa.ts)

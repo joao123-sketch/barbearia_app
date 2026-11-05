@@ -9,7 +9,8 @@ import { INVALID_MOBILE_MESSAGE, formatPhoneInput, isValidEmail, isValidMobile, 
 import { SITE_URL } from '../lib/platform'
 import { mailtoUrl, whatsappUrl } from '../lib/contacts'
 import { TRIAL_DAYS, formatMoney } from '../lib/billing'
-import { findFreeSlug, slugify } from '../lib/slug'
+import { findFreeSlug } from '../lib/slug'
+import { slugify } from '../lib/slugRules'
 import { track } from '../lib/track'
 import { buildShopTheme, getModeFor, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
 

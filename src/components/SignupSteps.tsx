@@ -11,7 +11,7 @@ interface SignupStepsProps {
 const STEPS = [
   {
     title: 'Dados do negócio',
-    text: 'Seu nome, o nome do negócio, WhatsApp, e-mail, endereço e uma senha. Você diz se é barbearia ou salão.'
+    text: 'Seu nome, o nome do negócio, WhatsApp, e-mail e uma senha. Você escolhe se é barbearia, salão ou lava-jato.'
   },
   {
     title: 'Estilo da sua página',

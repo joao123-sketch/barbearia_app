@@ -472,7 +472,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignup, onLogin }) =
           </div>
         </div>
         <div className="foot-end">
-          <span>SuaAgenda · agenda online para barbearias e salões.</span>
+          <span>SuaAgenda · agenda online para barbearias, salões e lava-jatos.</span>
           <span>Telas de demonstração do app, com nomes fictícios.</span>
         </div>
       </footer>
