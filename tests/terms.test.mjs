@@ -15,7 +15,7 @@ test('?tipo= aceita só os tipos conhecidos, sem diferenciar maiúscula', () => 
 test('lava-jato: observação do agendamento pede só o modelo do veículo', () => {
   const t = getTerms('lavajato')
   assert.equal(t.notesLabel, 'Modelo do veículo (opcional)')
-  assert.equal(t.anyProfessional, 'Qualquer box')
+  assert.equal(t.anyProfessional, 'Qualquer funcionário')
   assert.match(t.serviceExample, /Lavagem/)
 })
 

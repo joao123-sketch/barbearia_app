@@ -16,16 +16,16 @@ export function getTerms(type?: BusinessType) {
       Business: 'Lava-jato',
       nameLabel: 'Nome do Lava-jato',
       namePlaceholder: 'Ex: Lava-jato Brilho Total',
-      professional: 'box',
-      Professional: 'Box',
-      anyProfessional: 'Qualquer box',
+      professional: 'funcionário',
+      Professional: 'Funcionário',
+      anyProfessional: 'Qualquer funcionário',
       defaultSlogan: 'Seu carro limpo e protegido, sem fila.',
       serviceExample: 'Ex: Lavagem simples, Lavagem completa, Polimento...',
       notesLabel: 'Modelo do veículo (opcional)',
       notesPlaceholder: 'Ex: Onix, Hilux, CG 160',
       notesEmoji: '🚗',
       notesWhatsApp: 'Veículo',
-      teamHint: 'Cadastre cada box ou lavador na aba Equipe: cada um tem a sua agenda, e dá para atender vários carros ao mesmo tempo.'
+      teamHint: 'Cadastre os seus funcionários na aba Equipe: cada um tem a sua agenda, e dá para atender vários carros ao mesmo tempo.'
     }
   }
   const salon = type === 'salao'
