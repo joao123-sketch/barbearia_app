@@ -99,6 +99,9 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
   const [clientName, setClientName] = useState('')
   const [clientPhone, setClientPhone] = useState('')
   const [clientNotes, setClientNotes] = useState('')
+  // Lava-jato: o cliente escolhe o tipo do veículo (passeio, 4x4, caminhão, moto…); vai no agendamento junto com o modelo
+  const [vehicleType, setVehicleType] = useState('')
+  const bookingNotes = terms.vehicleTypes.length ? [vehicleType, clientNotes.trim()].filter(Boolean).join(' · ') : clientNotes.trim()
   const [reminderPreference, setReminderPreference] = useState<'10min' | '30min' | '1hour'>('30min')
   const [confirmedBooking, setConfirmedBooking] = useState<any>(null)
 
@@ -232,6 +235,10 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
       alert(INVALID_MOBILE_MESSAGE)
       return
     }
+    if (terms.vehicleTypes.length && !vehicleType) {
+      alert('Escolha o tipo do veículo.')
+      return
+    }
     if (submitting) return
 
     const chosenBarber = activeBarbers.find((b) => b.id === selectedBarberId)
@@ -253,7 +260,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
           clientPhone,
           date: selectedDate,
           start: selectedTime,
-          notes: clientNotes.trim() || undefined,
+          notes: bookingNotes || undefined,
           reminder: reminderPreference
         })
       }
@@ -285,7 +292,7 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
       start_time: selectedTime,
       total_price: totalPrice,
       total_duration: totalDuration,
-      notes: clientNotes
+      notes: bookingNotes
     })
     refreshBusy()
     setStep('success')
@@ -909,6 +916,29 @@ export const BookingClientView: React.FC<BookingClientViewProps> = ({
                   Sua preferência fica salva no agendamento. Os lembretes automáticos ainda estão sendo preparados.
                 </span>
               </div>
+
+              {terms.vehicleTypes.length > 0 && (
+                <div>
+                  <p className="block text-xs font-bold text-slate-300 mb-1.5">Tipo do veículo *</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {terms.vehicleTypes.map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        aria-pressed={vehicleType === type}
+                        onClick={() => setVehicleType(type)}
+                        className={`px-3 py-2.5 rounded-xl border text-xs font-bold text-left transition cursor-pointer ${
+                          vehicleType === type
+                            ? 'bg-amber-500 border-amber-500 text-slate-950'
+                            : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-amber-500/60'
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1" htmlFor="bkg-926">

@@ -21,10 +21,16 @@ export function getTerms(type?: BusinessType) {
       anyProfessional: 'Qualquer funcionário',
       defaultSlogan: 'Seu carro limpo e protegido, sem fila.',
       serviceExample: 'Ex: Lavagem simples, Lavagem completa, Polimento...',
+      vehicleTypes: ['Carro de passeio', 'SUV / 4x4', 'Caminhonete', 'Caminhão', 'Moto'],
       notesLabel: 'Modelo do veículo (opcional)',
       notesPlaceholder: 'Ex: Onix, Hilux, CG 160',
       notesEmoji: '🚗',
       notesWhatsApp: 'Veículo',
+      busyLabel: 'Em lavagem',
+      staffEmoji: '🧽',
+      jobs: 'Lavagens',
+      jobsLower: 'lavagens',
+      defaultJob: 'Lavagem Padrão',
       teamHint: 'Cadastre os seus funcionários na aba Equipe: cada um tem a sua agenda, e dá para atender vários carros ao mesmo tempo.'
     }
   }
@@ -39,10 +45,16 @@ export function getTerms(type?: BusinessType) {
     anyProfessional: salon ? 'Qualquer profissional' : 'Qualquer barbeiro',
     defaultSlogan: salon ? 'Beleza e cuidado do seu jeito.' : 'Tradição, estilo e o melhor corte da região.',
     serviceExample: salon ? 'Ex: Corte feminino, Escova, Manicure...' : 'Ex: Corte degradê, Barba completa...',
+    vehicleTypes: [] as string[],
     notesLabel: `Observações para o ${salon ? 'profissional' : 'barbeiro'} (opcional)`,
     notesPlaceholder: 'Ex: Primeira vez aqui, alguma preferência?',
     notesEmoji: '📝',
     notesWhatsApp: 'Observação',
+    busyLabel: 'Em corte',
+    staffEmoji: '✂️',
+    jobs: 'Cortes',
+    jobsLower: 'cortes',
+    defaultJob: 'Corte Padrão',
     teamHint: 'Se atende com equipe, cadastre os profissionais na aba Equipe.'
   }
 }

@@ -811,7 +811,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const adminTabsList = [
     { id: 'agenda' as AdminTab, label: 'Hoje', fullLabel: 'Agenda de Hoje', icon: Calendar, badge: todayAppointments.length },
     { id: 'semana' as AdminTab, label: 'Semana', fullLabel: 'Calendário Semanal', icon: CalendarDays },
-    { id: 'historico' as AdminTab, label: 'Histórico', fullLabel: 'Histórico de Cortes', icon: History },
+    { id: 'historico' as AdminTab, label: 'Histórico', fullLabel: `Histórico de ${terms.jobs}`, icon: History },
     { id: 'servicos' as AdminTab, label: 'Serviços', fullLabel: 'Serviços & Preços', icon: Scissors, badge: services.length },
     { id: 'equipe' as AdminTab, label: 'Equipe', fullLabel: 'Equipe & Profissionais', icon: Users, badge: barbersList.length },
     { id: 'horarios' as AdminTab, label: 'Horários', fullLabel: 'Horários & Pausas', icon: Clock },
@@ -1045,7 +1045,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="p-4 rounded-2xl bg-slate-900 border border-amber-500/40 shadow-xl space-y-2.5 text-xs">
             <p className="font-bold text-amber-300 text-sm">Complete o seu negócio</p>
             <p className="text-slate-300 leading-relaxed">
-              Para seus clientes confiarem e chegarem até você, adicione o endereço, a logo, o Instagram e o estilo visual. Se
+              Para seus clientes confiarem e chegarem até você, adicione o endereço, a logo, o Instagram e o estilo visual.
+              {' '}
               {terms.teamHint} Tudo opcional, leva poucos minutos.
             </p>
             <div className="flex gap-2">
@@ -1137,7 +1138,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800">
                 <div className="flex items-center justify-between text-slate-400 mb-1">
-                  <span className="text-xs font-medium">Cortes Hoje</span>
+                  <span className="text-xs font-medium">{terms.jobs} Hoje</span>
                   <Scissors className="w-4 h-4 text-amber-400" />
                 </div>
                 <p className="text-2xl font-black text-white">{todayAppointments.length}</p>
@@ -1243,7 +1244,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   const serviceNames = services
                     .filter((s) => apt.service_ids.includes(s.id))
                     .map((s) => s.name)
-                    .join(' + ') || 'Corte Padrão'
+                    .join(' + ') || terms.defaultJob
 
                   const hasPhone = apt.client_phone && apt.client_phone !== 'Cliente Balcão'
                   const isCancelled = apt.status === 'cancelled'
@@ -1458,7 +1459,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {timetableSlots.map((slot) => (
+                    {timetableSlots.map((slot, slotIdx) => (
                       <tr key={slot} className="border-b border-slate-800/60 hover:bg-slate-800/20 transition-colors">
                         {/* Coluna Horário Fixa na Esquerda */}
                         <td className="sticky left-0 z-10 bg-slate-950 w-20 py-2.5 px-2 text-center font-mono font-bold text-xs text-amber-400/90 border-r border-slate-800">
@@ -1481,16 +1482,54 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           const apt = d.allAppointments.find((a) => a.start_time === slot)
 
                           // Agendamento anterior que ainda está ocorrendo
-                          const isCovered =
-                            !apt &&
-                            d.allAppointments.some((a) => {
-                              if (a.status === 'cancelled') return false
-                              const [sh, sm] = a.start_time.split(':').map(Number)
-                              const [th, tm] = slot.split(':').map(Number)
-                              const startM = sh * 60 + sm
-                              const targetM = th * 60 + tm
-                              return targetM > startM && targetM < startM + a.total_duration
-                            })
+                          const coveringApt = apt
+                            ? undefined
+                            : d.allAppointments.find((a) => {
+                                if (a.status === 'cancelled') return false
+                                const [sh, sm] = a.start_time.split(':').map(Number)
+                                const [th, tm] = slot.split(':').map(Number)
+                                const startM = sh * 60 + sm
+                                const targetM = th * 60 + tm
+                                return targetM > startM && targetM < startM + a.total_duration
+                              })
+                          const isCovered = Boolean(coveringApt)
+                          // até que horas o atendimento que começou antes continua ocupando este horário
+                          const coveredUntil = coveringApt
+                            ? (() => {
+                                const [sh, sm] = coveringApt.start_time.split(':').map(Number)
+                                const endM = sh * 60 + sm + coveringApt.total_duration
+                                return `${String(Math.floor(endM / 60)).padStart(2, '0')}:${String(endM % 60).padStart(2, '0')}`
+                              })()
+                            : ''
+
+                          // Quantas linhas do horário um atendimento ocupa: o cartão cobre todo o tempo dele (até o almoço,
+                          // o fim do expediente ou outro atendimento)
+                          const toMin = (t: string) => {
+                            const [h, m] = t.split(':').map(Number)
+                            return h * 60 + m
+                          }
+                          const slotBlocked = (sl: string) =>
+                            !d.isOpen ||
+                            d.isBlocked ||
+                            Boolean(
+                              d.wh &&
+                                (sl < d.wh.open_time ||
+                                  sl >= d.wh.close_time ||
+                                  (d.wh.lunch_start && d.wh.lunch_end && sl >= d.wh.lunch_start && sl < d.wh.lunch_end))
+                            )
+                          const spanOf = (a: (typeof d.allAppointments)[number], startIdx: number) => {
+                            if (a.status === 'cancelled') return 1
+                            const end = toMin(a.start_time) + a.total_duration
+                            let rows = 1
+                            for (let j = startIdx + 1; j < timetableSlots.length; j++) {
+                              const sl = timetableSlots[j]
+                              if (toMin(sl) >= end || slotBlocked(sl) || d.allAppointments.some((x) => x.start_time === sl)) break
+                              rows++
+                            }
+                            return rows
+                          }
+                          const aptSpan = apt ? spanOf(apt, slotIdx) : 1
+                          const coveringStart = coveringApt ? timetableSlots.indexOf(coveringApt.start_time) : -1
 
                           if (isDayClosed) {
                             return (
@@ -1536,9 +1575,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               apt.client_phone && apt.client_phone !== 'Cliente Balcão'
 
                             return (
-                              <td key={d.dateStr} className="p-1.5 border-r border-slate-800/40 align-top">
+                              <td key={d.dateStr} rowSpan={aptSpan} style={aptSpan > 1 ? { height: '1px' } : undefined} className="p-1.5 border-r border-slate-800/40 align-top">
                                 <div
-                                  className={`p-2 rounded-xl text-left transition ${
+                                  className={`p-2 h-full flex flex-col rounded-xl text-left transition ${
                                     isCancelled
                                       ? 'bg-rose-950/30 border border-rose-900/50 text-slate-400 opacity-70'
                                       : 'bg-amber-500/15 border border-amber-500/35 text-white shadow-sm'
@@ -1563,10 +1602,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                                   {barbersList.find((b) => b.id === apt.barber_id) && (
                                     <span className="text-[9px] text-amber-300 font-semibold truncate block mt-0.5">
-                                      ✂️ {barbersList.find((b) => b.id === apt.barber_id)?.name}
+                                      {terms.staffEmoji} {barbersList.find((b) => b.id === apt.barber_id)?.name}
                                     </span>
                                   )}
 
+                                  <div className="flex-1" />
                                   <div className="flex items-center justify-between gap-1 mt-1.5 pt-1 border-t border-slate-800/60">
                                     <span
                                       className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
@@ -1606,12 +1646,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             )
                           }
 
+                          // A parte de baixo de um atendimento longo já é desenhada pelo cartão dele (rowSpan)
+                          if (coveringApt && coveringStart >= 0 && slotIdx < coveringStart + spanOf(coveringApt, coveringStart)) {
+                            return null
+                          }
+
                           if (isCovered) {
                             return (
                               <td key={d.dateStr} className="p-1.5 border-r border-slate-800/40 align-middle">
                                 <div className="py-2 px-1 rounded-xl bg-amber-500/5 border border-amber-500/15 text-center">
                                   <span className="text-[10px] font-medium text-amber-400/80">
-                                    Em corte
+                                    {terms.busyLabel} até {coveredUntil}
                                   </span>
                                 </div>
                               </td>
@@ -1651,7 +1696,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="font-bold text-sm text-white">Histórico Geral de Cortes</h3>
+                <h3 className="font-bold text-sm text-white">Histórico Geral de {terms.jobs}</h3>
                 <p className="text-xs text-slate-400">
                   Todos os atendimentos realizados e cancelados no sistema.
                 </p>
@@ -1704,7 +1749,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {/* Cards de Métricas do Histórico */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800">
-                <span className="text-xs text-slate-400 font-medium">Total de Cortes Realizados</span>
+                <span className="text-xs text-slate-400 font-medium">Total de {terms.jobs} Realizados</span>
                 <p className="text-2xl font-black text-white mt-1">{historyCompletedCount}</p>
                 <p className="text-[10px] text-emerald-400 mt-0.5">atendimentos concluídos</p>
               </div>
@@ -1714,13 +1759,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <p className="text-2xl font-black text-emerald-400 mt-1">
                   R$ {formatMoney(historyTotalRevenue)}
                 </p>
-                <p className="text-[10px] text-slate-400 mt-0.5">total histórico de cortes</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">total histórico de {terms.jobsLower}</p>
               </div>
 
               <div className="col-span-2 sm:col-span-1 p-3.5 rounded-2xl bg-slate-900 border border-slate-800">
                 <span className="text-xs text-slate-400 font-medium">Cancelados</span>
                 <p className="text-2xl font-black text-rose-400 mt-1">{historyCancelledCount}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">cortes cancelados</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">{terms.jobsLower} cancelados</p>
               </div>
             </div>
 
@@ -1748,7 +1793,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   const serviceNames = services
                     .filter((s) => apt.service_ids.includes(s.id))
                     .map((s) => s.name)
-                    .join(' + ') || 'Corte Padrão'
+                    .join(' + ') || terms.defaultJob
 
                   return (
                     <div

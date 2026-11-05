@@ -9,7 +9,7 @@
 --
 -- O que cria (tudo com nomes FICTÍCIOS de clientes):
 --  * Horário de funcionamento (se a conta ainda não tiver): seg-sex 09-19 (almoço 12-13), sáb 09-16.
---  * Se a conta não tiver serviços, cria 5 serviços de exemplo.
+--  * Se a conta não tiver serviços, cria 5 serviços de exemplo (barbearia, salão ou lava-jato, conforme o tipo da conta).
 --  * Atendimentos de TODO o mês passado até o fim desta semana (domingo).
 --    O que já passou aparece como concluído; o que ainda vai acontecer aparece como agendado.
 -- ==============================================================
@@ -31,6 +31,8 @@ declare
     'João Pedro','Kaique Nunes','Leonardo Dias','Marcelo Teixeira','Nathan Oliveira','Otávio Cardoso','Paulo Vitor',
     'Rodrigo Mendes','Samuel Araújo','Tiago Moreira','Vinícius Castro','Wesley Pinto','Yuri Gomes','André Lopes',
     'Caio Ramos','Davi Monteiro','Eduardo Freitas'];
+  v_models text[] := array['Onix','HB20','Gol','Strada','Hilux','Corolla','Civic','Creta','Kwid','Argo','Fiesta','CG 160','Ranger','Compass','T-Cross'];
+  v_note text;
   v_svc uuid[];
   v_svc_id uuid;
   v_price numeric;
@@ -69,7 +71,14 @@ begin
 
   -- Serviços de exemplo (só se a conta ainda não tiver nenhum)
   if not exists (select 1 from public.services where barbershop_id = v_shop) then
-    if v_type = 'salao' then
+    if v_type = 'lavajato' then
+      insert into public.services (barbershop_id, name, description, duration_minutes, price, category) values
+        (v_shop, 'Lavagem Simples', 'Lavagem externa com secagem', 30, 35, 'Lavagem'),
+        (v_shop, 'Lavagem Completa', 'Externa, interna e aspiração', 60, 70, 'Lavagem'),
+        (v_shop, 'Higienização Interna', 'Bancos e carpetes', 90, 150, 'Estética'),
+        (v_shop, 'Polimento', 'Polimento e cera', 90, 180, 'Estética'),
+        (v_shop, 'Lavagem de Moto', 'Lavagem completa da moto', 30, 25, 'Lavagem');
+    elsif v_type = 'salao' then
       insert into public.services (barbershop_id, name, description, duration_minutes, price, category) values
         (v_shop, 'Corte Feminino', 'Corte com finalização', 60, 80, 'Cabelo'),
         (v_shop, 'Escova', 'Escova modelada', 45, 55, 'Cabelo'),
@@ -93,7 +102,8 @@ begin
   select id into v_barber from public.barbers where barbershop_id = v_shop and active order by created_at limit 1;
 
   -- Recria só o que o próprio script criou
-  delete from public.appointments where barbershop_id = v_shop and notes = 'demo';
+  -- (no lava-jato a observação do atendimento é o modelo do veículo; o nome do cliente fictício também identifica o que é demo)
+  delete from public.appointments where barbershop_id = v_shop and (notes = 'demo' or (notes = any(v_models) and client_name = any(v_names)));
   perform setseed(0.42);
 
   for v_day in select generate_series(v_from, v_to, interval '1 day')::date loop
@@ -114,6 +124,7 @@ begin
         v_svc_id := v_svc[1 + floor(random() * cardinality(v_svc))::int];
         select price, duration_minutes into v_price, v_dur from public.services where id = v_svc_id;
         v_start := v_day + v_t;
+        v_note := case when v_type = 'lavajato' then v_models[1 + floor(random() * cardinality(v_models))::int] else 'demo' end;
         -- ~6% de cancelados no passado; o que ainda vai acontecer fica confirmado
         v_status := case when v_start < v_now and random() < 0.06 then 'cancelled' else 'confirmed' end;
         insert into public.appointments (
@@ -123,7 +134,7 @@ begin
           v_shop, v_barber, array[v_svc_id],
           v_names[1 + floor(random() * cardinality(v_names))::int],
           '889' || lpad((90000000 + floor(random() * 9999999))::int::text, 8, '0'),
-          v_day, v_t, v_price, v_dur, v_status, 'demo',
+          v_day, v_t, v_price, v_dur, v_status, v_note,
           least(v_start - interval '1 day' - random() * interval '2 days', v_now)
         );
         v_count := v_count + 1;
