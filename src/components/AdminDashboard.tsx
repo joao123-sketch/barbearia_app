@@ -811,7 +811,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const adminTabsList = [
     { id: 'agenda' as AdminTab, label: 'Hoje', fullLabel: 'Agenda de Hoje', icon: Calendar, badge: todayAppointments.length },
     { id: 'semana' as AdminTab, label: 'Semana', fullLabel: 'Calendário Semanal', icon: CalendarDays },
-    { id: 'historico' as AdminTab, label: 'Histórico', fullLabel: 'Histórico de Cortes', icon: History },
+    { id: 'historico' as AdminTab, label: 'Histórico', fullLabel: `Histórico de ${terms.jobs}`, icon: History },
     { id: 'servicos' as AdminTab, label: 'Serviços', fullLabel: 'Serviços & Preços', icon: Scissors, badge: services.length },
     { id: 'equipe' as AdminTab, label: 'Equipe', fullLabel: 'Equipe & Profissionais', icon: Users, badge: barbersList.length },
     { id: 'horarios' as AdminTab, label: 'Horários', fullLabel: 'Horários & Pausas', icon: Clock },
@@ -1045,7 +1045,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="p-4 rounded-2xl bg-slate-900 border border-amber-500/40 shadow-xl space-y-2.5 text-xs">
             <p className="font-bold text-amber-300 text-sm">Complete o seu negócio</p>
             <p className="text-slate-300 leading-relaxed">
-              Para seus clientes confiarem e chegarem até você, adicione o endereço, a logo, o Instagram e o estilo visual. Se
+              Para seus clientes confiarem e chegarem até você, adicione o endereço, a logo, o Instagram e o estilo visual.
+              {' '}
               {terms.teamHint} Tudo opcional, leva poucos minutos.
             </p>
             <div className="flex gap-2">
@@ -1137,7 +1138,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800">
                 <div className="flex items-center justify-between text-slate-400 mb-1">
-                  <span className="text-xs font-medium">Cortes Hoje</span>
+                  <span className="text-xs font-medium">{terms.jobs} Hoje</span>
                   <Scissors className="w-4 h-4 text-amber-400" />
                 </div>
                 <p className="text-2xl font-black text-white">{todayAppointments.length}</p>
@@ -1243,7 +1244,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   const serviceNames = services
                     .filter((s) => apt.service_ids.includes(s.id))
                     .map((s) => s.name)
-                    .join(' + ') || 'Corte Padrão'
+                    .join(' + ') || terms.defaultJob
 
                   const hasPhone = apt.client_phone && apt.client_phone !== 'Cliente Balcão'
                   const isCancelled = apt.status === 'cancelled'
@@ -1651,7 +1652,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="font-bold text-sm text-white">Histórico Geral de Cortes</h3>
+                <h3 className="font-bold text-sm text-white">Histórico Geral de {terms.jobs}</h3>
                 <p className="text-xs text-slate-400">
                   Todos os atendimentos realizados e cancelados no sistema.
                 </p>
@@ -1704,7 +1705,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {/* Cards de Métricas do Histórico */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800">
-                <span className="text-xs text-slate-400 font-medium">Total de Cortes Realizados</span>
+                <span className="text-xs text-slate-400 font-medium">Total de {terms.jobs} Realizados</span>
                 <p className="text-2xl font-black text-white mt-1">{historyCompletedCount}</p>
                 <p className="text-[10px] text-emerald-400 mt-0.5">atendimentos concluídos</p>
               </div>
@@ -1714,13 +1715,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <p className="text-2xl font-black text-emerald-400 mt-1">
                   R$ {formatMoney(historyTotalRevenue)}
                 </p>
-                <p className="text-[10px] text-slate-400 mt-0.5">total histórico de cortes</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">total histórico de {terms.jobsLower}</p>
               </div>
 
               <div className="col-span-2 sm:col-span-1 p-3.5 rounded-2xl bg-slate-900 border border-slate-800">
                 <span className="text-xs text-slate-400 font-medium">Cancelados</span>
                 <p className="text-2xl font-black text-rose-400 mt-1">{historyCancelledCount}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">cortes cancelados</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">{terms.jobsLower} cancelados</p>
               </div>
             </div>
 
@@ -1748,7 +1749,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   const serviceNames = services
                     .filter((s) => apt.service_ids.includes(s.id))
                     .map((s) => s.name)
-                    .join(' + ') || 'Corte Padrão'
+                    .join(' + ') || terms.defaultJob
 
                   return (
                     <div

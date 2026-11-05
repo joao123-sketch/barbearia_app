@@ -25,6 +25,9 @@ export function getTerms(type?: BusinessType) {
       notesPlaceholder: 'Ex: Onix, Hilux, CG 160',
       notesEmoji: '🚗',
       notesWhatsApp: 'Veículo',
+      jobs: 'Lavagens',
+      jobsLower: 'lavagens',
+      defaultJob: 'Lavagem Padrão',
       teamHint: 'Cadastre os seus funcionários na aba Equipe: cada um tem a sua agenda, e dá para atender vários carros ao mesmo tempo.'
     }
   }
@@ -43,6 +46,9 @@ export function getTerms(type?: BusinessType) {
     notesPlaceholder: 'Ex: Primeira vez aqui, alguma preferência?',
     notesEmoji: '📝',
     notesWhatsApp: 'Observação',
+    jobs: 'Cortes',
+    jobsLower: 'cortes',
+    defaultJob: 'Corte Padrão',
     teamHint: 'Se atende com equipe, cadastre os profissionais na aba Equipe.'
   }
 }
