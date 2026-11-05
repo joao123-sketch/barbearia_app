@@ -27,6 +27,16 @@ test('barbearia e salão mantêm os textos de antes', () => {
 
 test('todo tipo tem todos os textos preenchidos', () => {
   for (const type of BUSINESS_TYPES) {
-    for (const [key, value] of Object.entries(getTerms(type))) assert.ok(String(value).length > 0, `${type}.${key}`)
+    for (const [key, value] of Object.entries(getTerms(type))) {
+      if (key === 'vehicleTypes') continue // só o lava-jato tem lista de tipos de veículo
+      assert.ok(String(value).length > 0, `${type}.${key}`)
+    }
   }
+})
+
+test('lava-jato pede o tipo do veículo; barbearia e salão não', () => {
+  const types = getTerms('lavajato').vehicleTypes
+  for (const expected of ['Carro de passeio', 'SUV / 4x4', 'Caminhonete', 'Caminhão', 'Moto']) assert.ok(types.includes(expected), expected)
+  assert.deepEqual(getTerms('barbearia').vehicleTypes, [])
+  assert.deepEqual(getTerms('salao').vehicleTypes, [])
 })

@@ -1459,7 +1459,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {timetableSlots.map((slot) => (
+                    {timetableSlots.map((slot, slotIdx) => (
                       <tr key={slot} className="border-b border-slate-800/60 hover:bg-slate-800/20 transition-colors">
                         {/* Coluna Horário Fixa na Esquerda */}
                         <td className="sticky left-0 z-10 bg-slate-950 w-20 py-2.5 px-2 text-center font-mono font-bold text-xs text-amber-400/90 border-r border-slate-800">
@@ -1501,6 +1501,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 return `${String(Math.floor(endM / 60)).padStart(2, '0')}:${String(endM % 60).padStart(2, '0')}`
                               })()
                             : ''
+
+                          // Quantas linhas do horário um atendimento ocupa: o cartão cobre todo o tempo dele (até o almoço,
+                          // o fim do expediente ou outro atendimento)
+                          const toMin = (t: string) => {
+                            const [h, m] = t.split(':').map(Number)
+                            return h * 60 + m
+                          }
+                          const slotBlocked = (sl: string) =>
+                            !d.isOpen ||
+                            d.isBlocked ||
+                            Boolean(
+                              d.wh &&
+                                (sl < d.wh.open_time ||
+                                  sl >= d.wh.close_time ||
+                                  (d.wh.lunch_start && d.wh.lunch_end && sl >= d.wh.lunch_start && sl < d.wh.lunch_end))
+                            )
+                          const spanOf = (a: (typeof d.allAppointments)[number], startIdx: number) => {
+                            if (a.status === 'cancelled') return 1
+                            const end = toMin(a.start_time) + a.total_duration
+                            let rows = 1
+                            for (let j = startIdx + 1; j < timetableSlots.length; j++) {
+                              const sl = timetableSlots[j]
+                              if (toMin(sl) >= end || slotBlocked(sl) || d.allAppointments.some((x) => x.start_time === sl)) break
+                              rows++
+                            }
+                            return rows
+                          }
+                          const aptSpan = apt ? spanOf(apt, slotIdx) : 1
+                          const coveringStart = coveringApt ? timetableSlots.indexOf(coveringApt.start_time) : -1
 
                           if (isDayClosed) {
                             return (
@@ -1546,9 +1575,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               apt.client_phone && apt.client_phone !== 'Cliente Balcão'
 
                             return (
-                              <td key={d.dateStr} className="p-1.5 border-r border-slate-800/40 align-top">
+                              <td key={d.dateStr} rowSpan={aptSpan} style={aptSpan > 1 ? { height: '1px' } : undefined} className="p-1.5 border-r border-slate-800/40 align-top">
                                 <div
-                                  className={`p-2 rounded-xl text-left transition ${
+                                  className={`p-2 h-full flex flex-col rounded-xl text-left transition ${
                                     isCancelled
                                       ? 'bg-rose-950/30 border border-rose-900/50 text-slate-400 opacity-70'
                                       : 'bg-amber-500/15 border border-amber-500/35 text-white shadow-sm'
@@ -1577,6 +1606,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     </span>
                                   )}
 
+                                  <div className="flex-1" />
                                   <div className="flex items-center justify-between gap-1 mt-1.5 pt-1 border-t border-slate-800/60">
                                     <span
                                       className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
@@ -1614,6 +1644,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 </div>
                               </td>
                             )
+                          }
+
+                          // A parte de baixo de um atendimento longo já é desenhada pelo cartão dele (rowSpan)
+                          if (coveringApt && coveringStart >= 0 && slotIdx < coveringStart + spanOf(coveringApt, coveringStart)) {
+                            return null
                           }
 
                           if (isCovered) {
