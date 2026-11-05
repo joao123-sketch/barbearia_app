@@ -15,6 +15,8 @@ const ENVIRONMENT = `
   create function net.http_post(url text, headers jsonb, body jsonb) returns void language sql as $$ select 1 $$;
   create publication supabase_realtime;
   grant usage on schema public to anon, authenticated, service_role;
+  -- o Supabase entrega ALL em toda tabela e view nova do esquema public para anon e authenticated; reproduz isso para as migrações serem testadas como em produção
+  alter default privileges for role postgres in schema public grant all on tables to anon, authenticated, service_role;
 `
 
 export const ADMIN = '33333333-3333-3333-3333-333333333333'
