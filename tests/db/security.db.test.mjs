@@ -51,3 +51,25 @@ test('endereço de push precisa ser https com domínio (sem IP nem http)', async
     await assert.rejects(insert(bad), /endpoint_https/, bad)
   }
 })
+
+test('endereço de push só aceita os serviços reais (Google, Mozilla, Apple, Microsoft)', async () => {
+  const insert = (endpoint) => db.exec(`insert into public.push_subscriptions (kind, barbershop_id, endpoint, p256dh, auth) values ('owner', '${SHOP}', '${endpoint}', 'k', 'a')`)
+  for (const ok of [
+    'https://web.push.apple.com/QOk1',
+    'https://updates.push.services.mozilla.com/wpush/v2/abc',
+    'https://wns2-pn1p.notify.windows.com/w/?token=abc',
+    'https://fcm.googleapis.com/fcm/send/xyz'
+  ]) await insert(ok)
+  for (const bad of [
+    'https://exemplo.com/hook',
+    'https://fcm.googleapis.com.evil.com/x',
+    'https://evil.com/fcm.googleapis.com/x',
+    'https://push.apple.com.atacante.net/x',
+    'https://internal.service.local/x'
+  ]) await assert.rejects(insert(bad), /endpoint_https/, bad)
+})
+
+test('contas de demonstração: o dono do negócio não consegue marcar a própria conta', async () => {
+  const col = await one(db, "select has_column_privilege('authenticated', 'public.barbershops', 'is_demo', 'update') as upd")
+  assert.equal(col.upd, false)
+})

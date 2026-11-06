@@ -47,8 +47,19 @@ async function sendTo(
   return delivered
 }
 
+// Comparação em tempo constante (evita descobrir o segredo pelo tempo de resposta)
+function safeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder()
+  const x = enc.encode(a)
+  const y = enc.encode(b)
+  let diff = x.length ^ y.length
+  for (let i = 0; i < Math.max(x.length, y.length); i++) diff |= (x[i] ?? 0) ^ (y[i] ?? 0)
+  return diff === 0
+}
+
 Deno.serve(async (req) => {
-  if (req.headers.get('x-notify-secret') !== Deno.env.get('NOTIFY_SECRET')) {
+  const expected = Deno.env.get('NOTIFY_SECRET') ?? ''
+  if (!expected || !safeEqual(req.headers.get('x-notify-secret') ?? '', expected)) {
     return new Response('forbidden', { status: 403 })
   }
 
