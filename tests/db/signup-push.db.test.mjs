@@ -43,14 +43,14 @@ test('editar o negócio não gera outro aviso, e a conta do próprio administrad
 })
 
 test('só o administrador cadastra o aparelho dele; dono comum não consegue', async () => {
-  const endpoint = 'https://push.example/admin-1'
+  const endpoint = 'https://fcm.googleapis.com/fcm/send/admin-1'
   await asUser(db, ADMIN, () =>
     db.query("insert into public.push_subscriptions (kind, user_id, endpoint, p256dh, auth) values ('admin', $1, $2, 'k', 'a')", [ADMIN, endpoint])
   )
   assert.equal((await rows(db, "select 1 from public.push_subscriptions where kind = 'admin'")).length, 1)
   await assert.rejects(
     asUser(db, OWNER, () =>
-      db.query("insert into public.push_subscriptions (kind, user_id, endpoint, p256dh, auth) values ('admin', $1, 'https://push.example/x', 'k', 'a')", [OWNER])
+      db.query("insert into public.push_subscriptions (kind, user_id, endpoint, p256dh, auth) values ('admin', $1, 'https://fcm.googleapis.com/fcm/send/x', 'k', 'a')", [OWNER])
     )
   )
   // o dono comum também não enxerga aparelhos do administrador
@@ -61,7 +61,7 @@ test('só o administrador cadastra o aparelho dele; dono comum não consegue', a
 test('o administrador não consegue cadastrar aparelho em nome de outro usuário', async () => {
   await assert.rejects(
     asUser(db, ADMIN, () =>
-      db.query("insert into public.push_subscriptions (kind, user_id, endpoint, p256dh, auth) values ('admin', $1, 'https://push.example/y', 'k', 'a')", [OWNER])
+      db.query("insert into public.push_subscriptions (kind, user_id, endpoint, p256dh, auth) values ('admin', $1, 'https://fcm.googleapis.com/fcm/send/y', 'k', 'a')", [OWNER])
     )
   )
 })
@@ -75,7 +75,7 @@ test('o aviso de teste só vale para o administrador', async () => {
 test('os avisos de agendamento do dono continuam como eram (aparelhos de dono e de cliente não mudam)', async () => {
   const kinds = await rows(db, "select conname from pg_constraint where conrelid = 'public.push_subscriptions'::regclass and contype = 'c' order by conname")
   assert.ok(kinds.some((k) => k.conname === 'push_subscriptions_target_check'))
-  await db.exec(`insert into public.push_subscriptions (kind, barbershop_id, endpoint, p256dh, auth) values ('owner', '${NEW_SHOP}', 'https://push.example/o', 'k', 'a')`)
-  await assert.rejects(db.query("insert into public.push_subscriptions (kind, endpoint, p256dh, auth) values ('owner', 'https://push.example/z', 'k', 'a')"))
+  await db.exec(`insert into public.push_subscriptions (kind, barbershop_id, endpoint, p256dh, auth) values ('owner', '${NEW_SHOP}', 'https://fcm.googleapis.com/fcm/send/o', 'k', 'a')`)
+  await assert.rejects(db.query("insert into public.push_subscriptions (kind, endpoint, p256dh, auth) values ('owner', 'https://fcm.googleapis.com/fcm/send/z', 'k', 'a')"))
   assert.equal((await one(db, "select count(*)::int as n from public.push_subscriptions where kind = 'owner'")).n, 1)
 })

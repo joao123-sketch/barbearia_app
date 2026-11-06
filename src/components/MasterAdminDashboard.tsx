@@ -307,19 +307,21 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
     })
   }, [barbershops, searchTerm, filterStatus, settings.grace_days])
 
-  // KPIs
-  const totalShops = barbershops.length
-  const trialShops = barbershops.filter((s) => getBillingState(s, settings.grace_days).status === 'trial').length
-  const paidShops = barbershops.filter((s) => !s.billing_exempt && getBillingState(s, settings.grace_days).status === 'active').length
-  const expiredShops = barbershops.filter((s) => getBillingState(s, settings.grace_days).status === 'expired').length
-  const blockedShops = barbershops.filter((s) => getBillingState(s, settings.grace_days).status === 'blocked').length
+  // KPIs: sem contas de demonstração nem a conta do administrador (aparecem na lista, mas não entram nos números)
+  const counted = barbershops.filter((s) => !s.is_demo && !s.billing_exempt)
+  const countedIds = new Set(counted.map((s) => s.id))
+  const totalShops = counted.length
+  const trialShops = counted.filter((s) => getBillingState(s, settings.grace_days).status === 'trial').length
+  const paidShops = counted.filter((s) => getBillingState(s, settings.grace_days).status === 'active').length
+  const expiredShops = counted.filter((s) => getBillingState(s, settings.grace_days).status === 'expired').length
+  const blockedShops = counted.filter((s) => getBillingState(s, settings.grace_days).status === 'blocked').length
   // Receita recorrente: só quem está com o período pago em dia
-  const totalMRR = barbershops
-    .filter((s) => !s.billing_exempt && getBillingState(s, settings.grace_days).status === 'active')
+  const totalMRR = counted
+    .filter((s) => getBillingState(s, settings.grace_days).status === 'active')
     .reduce((acc, curr) => acc + (curr.monthly_fee || settings.monthly_fee), 0)
 
   // Quanto os clientes faturaram usando o app (só atendimentos já concluídos)
-  const allMetrics = Object.values(metrics)
+  const allMetrics = Object.entries(metrics).filter(([id]) => countedIds.has(id)).map(([, m]) => m)
   const platformRevenueMonth = allMetrics.reduce((a, m) => a + m.revenue_this_month, 0)
   const platformDoneMonth = allMetrics.reduce((a, m) => a + m.done_this_month, 0)
   const platformRevenueTotal = allMetrics.reduce((a, m) => a + m.revenue_total, 0)
