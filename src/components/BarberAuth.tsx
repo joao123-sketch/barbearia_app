@@ -13,6 +13,7 @@ import { PasswordInput } from './PasswordInput'
 import { ContactLinks } from './ContactLinks'
 import { SignupSteps } from './SignupSteps'
 import { LandingPage } from './LandingPage'
+import { PWAInstallPrompt } from './PWAInstallPrompt'
 
 interface BarberAuthProps {
   hasSession: boolean
@@ -231,6 +232,7 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
               >
                 Criar conta grátis
               </button>
+              <PWAInstallPrompt variant="outline" buttonText="Baixar o app no celular" className="mt-3" />
               <button
                 type="button"
                 onClick={() => goTo('home')}
