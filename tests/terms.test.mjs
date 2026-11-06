@@ -40,3 +40,11 @@ test('lava-jato pede o tipo do veículo; barbearia e salão não', () => {
   assert.deepEqual(getTerms('barbearia').vehicleTypes, [])
   assert.deepEqual(getTerms('salao').vehicleTypes, [])
 })
+
+test('lava-jato não herda exemplos de cabelo, unha ou barba nos campos de serviço', async () => {
+  const { getTerms } = await import('../src/lib/terms.ts')
+  const t = getTerms('lavajato')
+  for (const k of ['descPlaceholder', 'categoryPlaceholder', 'comboPlaceholder', 'servicesEmptyHint']) {
+    assert.doesNotMatch(t[k], /cabelo|unha|barba|corte|sobrancelha|hidrata/i, k)
+  }
+})
