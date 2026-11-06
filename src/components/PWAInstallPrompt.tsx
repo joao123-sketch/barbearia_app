@@ -8,7 +8,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 interface PWAInstallPromptProps {
-  variant?: 'banner' | 'button' | 'compact'
+  variant?: 'banner' | 'button' | 'compact' | 'outline'
   buttonText?: string
   className?: string
 }
@@ -101,6 +101,18 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
           className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition duration-300 shadow-lg active:scale-95 bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-slate-950 shadow-amber-500/20 hover:shadow-amber-500/35 hover:brightness-105 cursor-pointer ${className}`}
         >
           <Download className="w-4 h-4 animate-bounce" />
+          <span>{buttonText}</span>
+        </button>
+      )}
+
+      {/* Discreto, para telas de entrar e cadastro (não disputa com o botão principal) */}
+      {variant === 'outline' && (
+        <button
+          type="button"
+          onClick={handleInstallClick}
+          className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold border border-slate-700 text-slate-200 hover:border-amber-500/60 hover:text-amber-400 transition cursor-pointer active:scale-95 ${className}`}
+        >
+          <Smartphone className="w-4 h-4" />
           <span>{buttonText}</span>
         </button>
       )}

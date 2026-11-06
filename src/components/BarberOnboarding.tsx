@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Scissors, Store, User, Mail, Lock, Phone, Sparkles, Calendar } from 'lucide-react'
 import type { BusinessType } from '../types'
+import { PWAInstallPrompt } from './PWAInstallPrompt'
 import { accountExists, signUp, trialAlreadyUsed, useSession } from '../lib/auth'
 import { PasswordInput } from './PasswordInput'
 import { defaultWorkingHours, fetchMonthlyFee, friendlyError, registerBarbershop, saveWorkingHours } from '../lib/db'
@@ -366,6 +367,8 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ initialType 
             <Sparkles className="w-4 h-4" />
             <span>{submitting ? 'Criando sua conta…' : 'Criar minha conta'}</span>
           </button>
+
+          <PWAInstallPrompt variant="outline" buttonText="Baixar o app no celular" />
 
           <div className="text-center pt-1">
             <button
