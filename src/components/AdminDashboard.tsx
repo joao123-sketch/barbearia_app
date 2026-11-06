@@ -1899,7 +1899,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div>
                   <h4 className="font-bold text-sm text-white">Nenhum serviço cadastrado ainda</h4>
                   <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-                    Adicione os serviços que você realiza (ex: Corte, Barba, Sobrancelha) com preços e tempos de duração para seus clientes agendarem.
+                    {terms.servicesEmptyHint}
                   </p>
                 </div>
                 <button
@@ -2933,7 +2933,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </label>
                   <textarea name="adm-2785" autoComplete="off" id="adm-2785"
                     rows={2}
-                    placeholder="Ex: Inclui lavagem e finalização"
+                    placeholder={terms.descPlaceholder}
                     value={serviceDesc}
                     onChange={(e) => setServiceDesc(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 resize-none"
@@ -2947,7 +2947,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </label>
                   <input name="adm-2799" autoComplete="off" id="adm-2799"
                     type="text"
-                    placeholder="Ex: Cabelo, Unhas, Barba"
+                    placeholder={terms.categoryPlaceholder}
                     value={serviceCategory}
                     onChange={(e) => setServiceCategory(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
@@ -2998,9 +2998,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   {isCombo && (
                     <div className="px-4 pb-4 space-y-3 border-t border-slate-800 pt-3">
                       <div className="flex gap-2">
-                        <input name="campo-2855" autoComplete="off" aria-label="Ex: Hidratação, Sobrancelha"
+                        <input name="campo-2855" autoComplete="off" aria-label={terms.comboPlaceholder}
                           type="text"
-                          placeholder="Ex: Hidratação, Sobrancelha"
+                          placeholder={terms.comboPlaceholder}
                           value={newComboSubService}
                           onChange={(e) => setNewComboSubService(e.target.value)}
                           onKeyDown={(e) => {
