@@ -44,6 +44,7 @@ import { OwnerNotifications } from './OwnerNotifications'
 import { BillingPanel } from './BillingPanel'
 import { BillingBanner, BillingEntryNotice, BillingLockedScreen, BillingPayModal } from './BillingNotices'
 import { normalizeInstagram } from '../lib/instagram'
+import { shortenLink } from '../lib/shorten'
 import { isReservedSlug, shareMessage, shortLink, slugify } from '../lib/slugRules'
 import { getTerms } from '../lib/terms'
 import { formatMoney, getBillingState, toDateStr } from '../lib/billing'
@@ -747,7 +748,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }
 
   // Link público e ações de cópia
-  const publicUrl = shortLink(typeof window !== 'undefined' ? window.location.origin : '', barbershop.slug)
+  const fullUrl = shortLink(typeof window !== 'undefined' ? window.location.origin : '', barbershop.slug)
+  // O link encurtado é buscado antes, para o botão copiar na hora (o navegador exige que a cópia seja imediata ao toque)
+  const [shortUrl, setShortUrl] = useState<string | null>(null)
+  useEffect(() => {
+    let alive = true
+    setShortUrl(null)
+    shortenLink(fullUrl).then((u) => { if (alive) setShortUrl(u) })
+    return () => { alive = false }
+  }, [fullUrl])
+  const publicUrl = shortUrl ?? fullUrl
   const shareUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage(barbershop.name, publicUrl))}`
 
   const handleCopyLink = () => {
