@@ -44,7 +44,7 @@ import { OwnerNotifications } from './OwnerNotifications'
 import { BillingPanel } from './BillingPanel'
 import { BillingBanner, BillingEntryNotice, BillingLockedScreen, BillingPayModal } from './BillingNotices'
 import { normalizeInstagram } from '../lib/instagram'
-import { isReservedSlug, slugify } from '../lib/slugRules'
+import { isReservedSlug, shareMessage, shortLink, slugify } from '../lib/slugRules'
 import { getTerms } from '../lib/terms'
 import { formatMoney, getBillingState, toDateStr } from '../lib/billing'
 import { normalizePhone, toWaNumber } from '../lib/phone'
@@ -747,7 +747,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }
 
   // Link público e ações de cópia
-  const publicUrl = typeof window !== 'undefined' ? `${window.location.origin}/b/${barbershop.slug}` : `/b/${barbershop.slug}`
+  const publicUrl = shortLink(typeof window !== 'undefined' ? window.location.origin : '', barbershop.slug)
+  const shareUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage(barbershop.name, publicUrl))}`
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(publicUrl)
@@ -1097,40 +1098,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 Seu Link de Agendamento
               </h2>
               <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                Coloque na bio do seu Instagram ou envie no WhatsApp dos clientes.
+                Copie para a bio do Instagram ou mande direto no WhatsApp dos clientes.
               </p>
-              <span
-                className={`text-xs font-mono mt-1.5 inline-block px-2.5 py-0.5 rounded-lg max-w-full sm:max-w-sm truncate border ${
-                  isLight
-                    ? 'bg-slate-100 text-slate-800 border-slate-200 font-bold'
-                    : 'bg-slate-950/60 text-amber-300 border-amber-500/20'
-                }`}
-              >
-                {publicUrl}
-              </span>
             </div>
           </div>
 
-          <button
-            onClick={handleCopyLink}
-            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shrink-0 transition active:scale-95 cursor-pointer ${
-              copiedLink
-                ? 'bg-emerald-500 text-slate-950 font-black'
-                : 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-md shadow-amber-500/20'
-            }`}
-          >
-            {copiedLink ? (
-              <>
-                <Check className="w-4 h-4" />
-                <span>Copiado!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-4 h-4" />
-                <span>Copiar Link</span>
-              </>
-            )}
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+            <button
+              onClick={handleCopyLink}
+              className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer ${
+                copiedLink
+                  ? 'bg-emerald-500 text-slate-950 font-black'
+                  : 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-md shadow-amber-500/20'
+              }`}
+            >
+              {copiedLink ? (
+                <>
+                  <Check className="w-4 h-4" />
+                  <span>Copiado!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4" />
+                  <span>Copiar link</span>
+                </>
+              )}
+            </button>
+            <a
+              href={shareUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/20 transition active:scale-95 cursor-pointer"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>Enviar no WhatsApp</span>
+            </a>
+          </div>
         </div>
         )}
 
@@ -2591,7 +2594,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div>
                 <label className="block text-slate-300 font-semibold mb-1" htmlFor="adm-slug">Link de agendamento</label>
                 <div className="flex items-center px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus-within:border-amber-500">
-                  <span className="text-slate-500 shrink-0 font-mono text-[11px]">/b/</span>
+                  <span className="text-slate-500 shrink-0 font-mono text-[11px]">/</span>
                   <input name="slug" autoComplete="off" id="adm-slug"
                     type="text"
                     value={profileSlug}
@@ -2745,20 +2748,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
 
-              <div>
-                <p className="block text-slate-400 mb-1">Slug do Link Público (Fixo)</p>
-                <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800 min-w-0">
-                  <span className="text-amber-300 font-mono text-xs min-w-0 flex-1 break-all">{publicUrl}</span>
-                  <button
-                    type="button"
-                    onClick={handleCopyLink}
-                    className="text-slate-400 hover:text-amber-400 p-1 cursor-pointer shrink-0"
-                    title="Copiar link"
-                    aria-label="Copiar link"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={handleCopyLink} className="flex-1 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer">
+                  {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  <span>{copiedLink ? 'Copiado!' : 'Copiar link'}</span>
+                </button>
+                <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer">
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Enviar no WhatsApp</span>
+                </a>
               </div>
 
               <button
