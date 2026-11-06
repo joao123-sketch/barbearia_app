@@ -31,9 +31,10 @@ const NeutralChrome: React.FC = () => {
 
 // Quem chega pelo link de cadastro vai direto ao formulário; quem foi mandado ao login (?next) ou abriu o app
 // instalado vai direto a entrar; os demais veem a página inicial com as informações do SuaAgenda.
-function initialView(pathname: string, hasNext: boolean): View {
+// /login?entrar abre direto a tela de entrar, sem passar pela página inicial (link para quem já tem conta)
+function initialView(pathname: string, hasNext: boolean, wantsLogin: boolean): View {
   if (/^\/cadastr/.test(pathname)) return 'register'
-  if (hasNext) return 'login'
+  if (hasNext || wantsLogin) return 'login'
   try {
     if (window.matchMedia('(display-mode: standalone)').matches) return 'login'
   } catch {
@@ -53,7 +54,7 @@ export const BarberAuth: React.FC<BarberAuthProps> = ({ hasSession, hasShop, sho
   const [params] = useSearchParams()
   const next = params.get('next') || '/admin'
 
-  const [view, setView] = useState<View>(() => initialView(pathname, params.has('next')))
+  const [view, setView] = useState<View>(() => initialView(pathname, params.has('next'), params.has('entrar')))
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
