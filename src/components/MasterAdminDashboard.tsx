@@ -25,6 +25,7 @@ import {
 import type { Barbershop } from '../types'
 import { DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from '../lib/platform'
 import { useSession } from '../lib/auth'
+import { shortenLink } from '../lib/shorten'
 import {
   adminConfirmPayment,
   adminFetchShopMetrics,
@@ -177,7 +178,16 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
   const [copiedPix, setCopiedPix] = useState(false)
   const [copiedRegisterLink, setCopiedRegisterLink] = useState(false)
 
-  const registerUrl = `${window.location.origin}/cadastrar`
+  // Link que o master envia: abre direto a tela de entrar, que já tem o "Criar conta grátis" ao lado
+  const fullRegisterUrl = `${window.location.origin}/login?entrar`
+  // Link encurtado buscado antes, para o botão copiar na hora (o navegador exige a cópia imediata ao toque)
+  const [shortRegisterUrl, setShortRegisterUrl] = useState<string | null>(null)
+  useEffect(() => {
+    let alive = true
+    shortenLink(fullRegisterUrl).then((u) => { if (alive) setShortRegisterUrl(u) })
+    return () => { alive = false }
+  }, [fullRegisterUrl])
+  const registerUrl = shortRegisterUrl ?? fullRegisterUrl
 
   // Funil de cadastro (medição); null enquanto carrega ou se a migração ainda não foi aplicada
   const [eventCounts, setEventCounts] = useState<Partial<Record<TrackEvent, EventCounts>> | null>(null)
@@ -482,7 +492,7 @@ const MasterPanel: React.FC<MasterPanelProps> = ({ barbershops, metrics, setting
             </button>
 
             <a
-              href="/cadastrar"
+              href="/login?entrar"
               target="_blank"
               rel="noopener noreferrer"
               className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
