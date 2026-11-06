@@ -50,7 +50,7 @@
 - Sugestão de QR Code no panfleto: aponta para o link da conta de demonstração do tipo de negócio (barbearia, salão ou lava-jato) ou para `https://SEU-DOMINIO/cadastrar` para já criar a conta. Para o lava-jato, `https://SEU-DOMINIO/cadastrar?tipo=lavajato` abre o cadastro com o tipo já marcado (também vale `?tipo=barbearia` e `?tipo=salao`).
 
 ### Fatos verificados (podem ir no panfleto)
-- Teste grátis: 20 dias, sem cartão e sem fidelidade. A mensalidade é paga antecipada por PIX e cada pagamento libera 30 dias. O valor vem do painel do gestor (hoje: vagas de fundador a R$ 10,90 por mês, preço fixo enquanto a assinatura estiver ativa; depois, R$ 49,90).
+- Teste grátis: 20 dias, sem cartão e sem fidelidade. A mensalidade é paga antecipada por PIX e cada pagamento libera 30 dias. O valor vem do painel do gestor (hoje: R$ 30,90 por mês; contas antigas mantêm o valor combinado na época).
 - Funciona para **barbearia**, **salão de beleza** e **lava-jato** (o painel e a página de agendamento usam os termos certos de cada um). No lava-jato o cliente escolhe o tipo do veículo (passeio, SUV/4x4, caminhonete, caminhão ou moto) e informa o modelo; o dono cadastra os tipos de lavagem com preço e duração e vê o veículo no cartão do atendimento.
 - O cliente agenda pelo link, sem baixar nada. O dono pode instalar como app: no celular ele aparece como **SuaAgenda**; o cliente que instalar a página do negócio vê o nome do estabelecimento na tela inicial.
 - O dono recebe aviso no celular a cada novo agendamento. O cliente recebe lembrete por notificação.
