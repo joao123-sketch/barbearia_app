@@ -4,7 +4,7 @@ import type { Barbershop, Barber, Service, WorkingHour, Appointment } from '../t
 export const DEFAULT_PIX_KEY = '092.136.103-35'
 export const DEFAULT_PIX_NAME = 'JOAO VICTOR DE SOUZA PEREIRA'
 export const DEFAULT_PIX_QRCODE = '/pix_qrcode.png'
-export const DEFAULT_MONTHLY_FEE = 50.00
+export const DEFAULT_MONTHLY_FEE = 30.90
 
 export const demoBarbershop: Barbershop = {
   id: 'barber-001',

@@ -51,8 +51,7 @@ import { adminFetchEventCounts, type EventCounts, type TrackEvent } from '../lib
 
 const FUNNEL_ROWS: Array<[TrackEvent, string]> = [
   ['login_visit', 'Visitas em /login'],
-  ['signup_click', 'Cliques em "Criar conta" / "Garantir minha vaga"'],
-  ['founder_click', 'Dos quais, no banner de fundador'],
+  ['signup_click', 'Cliques em "Criar conta"'],
   ['signup_open', 'Aberturas do cadastro'],
   ['signup_done', 'Cadastros concluídos']
 ]
