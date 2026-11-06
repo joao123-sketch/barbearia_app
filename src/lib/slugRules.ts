@@ -20,3 +20,19 @@ export function slugify(name: string): string {
     .slice(0, 50)
     .replace(/-$/, '')
 }
+
+// Link sugerido para novos cadastros: tira as palavras genéricas do ramo ("Lava Jato Brilho" -> "brilho"),
+// que só deixam o link comprido. Se sobrar pouco, volta ao nome completo.
+const GENERIC_WORDS = new Set(['lava', 'jato', 'lavajato', 'lavarapido', 'rapido'])
+export function slugifyBusiness(name: string): string {
+  const words = slugify(name).split('-').filter((w) => !GENERIC_WORDS.has(w))
+  const short = words.join('-').replace(/^-|-$/g, '')
+  return short.length >= 3 ? short : slugify(name)
+}
+
+// Link curto que o dono envia: sem o "/b/", que continua funcionando nos links antigos.
+export const shortLink = (origin: string, slug: string): string => `${origin}/${slug}`
+
+// Texto pronto para o dono mandar no WhatsApp, com o nome do negócio.
+export const shareMessage = (businessName: string, link: string): string =>
+  `Agende seu horário na ${businessName} pelo link: ${link}`

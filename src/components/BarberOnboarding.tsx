@@ -10,7 +10,7 @@ import { SITE_URL } from '../lib/platform'
 import { mailtoUrl, whatsappUrl } from '../lib/contacts'
 import { TRIAL_DAYS, formatMoney } from '../lib/billing'
 import { findFreeSlug } from '../lib/slug'
-import { slugify } from '../lib/slugRules'
+import { slugifyBusiness } from '../lib/slugRules'
 import { track } from '../lib/track'
 import { buildShopTheme, getModeFor, shopThemeAttrs, useShopChrome } from '../lib/shopTheme'
 
@@ -173,7 +173,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ initialType 
     }
   }
 
-  const previewSlug = slugify(shopName)
+  const previewSlug = slugifyBusiness(shopName)
 
   return (
     <div
@@ -251,7 +251,7 @@ export const BarberOnboarding: React.FC<BarberOnboardingProps> = ({ initialType 
               />
               {previewSlug && (
                 <p className="mt-1.5 text-[11px] text-slate-400 break-all">
-                  Seu link de agendamento: <span className="font-mono text-amber-300">{SITE_URL.replace('https://', '')}/b/{previewSlug}</span>
+                  Seu link de agendamento: <span className="font-mono text-amber-300">{SITE_URL.replace('https://', '')}/{previewSlug}</span>
                   <br />
                   <span className="text-slate-500">Você pode mudar o link depois, no painel.</span>
                 </p>

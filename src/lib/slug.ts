@@ -1,9 +1,9 @@
 import { fetchPublicShopBySlug } from './db'
-import { isReservedSlug, slugify } from './slugRules'
+import { isReservedSlug, slugifyBusiness } from './slugRules'
 
 // Link livre a partir do nome: se já existir (ou for reservado), acrescenta -2, -3… e por fim um sufixo aleatório
 export async function findFreeSlug(name: string): Promise<string> {
-  const base = slugify(name) || 'meu-negocio'
+  const base = slugifyBusiness(name) || 'meu-negocio'
   const taken = async (slug: string) => isReservedSlug(slug) || Boolean(await fetchPublicShopBySlug(slug).catch(() => null))
   if (base.length >= 2 && !(await taken(base))) return base
   for (let n = 2; n <= 9; n++) {

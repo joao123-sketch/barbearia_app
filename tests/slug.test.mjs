@@ -36,3 +36,13 @@ test('a lista de links reservados é a mesma no app, no worker e no banco', asyn
   const inDb = [...block.matchAll(/'([^']+)'/g)].map((m) => m[1]).sort()
   assert.deepEqual(inDb, [...RESERVED_SLUGS].sort())
 })
+
+test('link sugerido tira "lava jato" e o link curto não leva /b/', async () => {
+  const { slugifyBusiness, shortLink, shareMessage } = await import('../src/lib/slugRules.ts')
+  assert.equal(slugifyBusiness('Lava Jato Brilho Total'), 'brilho-total')
+  assert.equal(slugifyBusiness('Lava-jato do Zé'), 'do-ze')
+  assert.equal(slugifyBusiness('Lava Jato'), 'lava-jato') // sobra pouco: mantém o nome inteiro
+  assert.equal(slugifyBusiness('Barbearia Black Diamond'), 'barbearia-black-diamond')
+  assert.equal(shortLink('https://x.dev', 'brilho'), 'https://x.dev/brilho')
+  assert.equal(shareMessage('Brilho Total', 'https://x.dev/brilho'), 'Agende seu horário na Brilho Total pelo link: https://x.dev/brilho')
+})
